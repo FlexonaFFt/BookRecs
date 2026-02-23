@@ -24,3 +24,11 @@ venv/
 
 # Generated artifacts
 core/generated/*.json
+
+# Datasets and ML artifacts
+data/raw_data/
+data/processed/
+data/*.pq
+data/*.parquet
+*.pq
+*.parquet

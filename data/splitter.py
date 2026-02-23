@@ -64,6 +64,7 @@ def split_warm_cold_items(
     return val_warm, val_cold, warm_items, cold_items
 
 
+# Проверить корректность сплита
 def check_split(
     train: pd.DataFrame,
     val: pd.DataFrame,
