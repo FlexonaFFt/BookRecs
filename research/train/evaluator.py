@@ -11,6 +11,25 @@ def _check_columns(df: pd.DataFrame, required: list[str], name: str) -> None:
         raise ValueError(f"{name}: нет колонок {missing}. Есть: {list(df.columns)}")
 
 
+# Нормализовать значение в список айтемов
+def _to_items_list(value) -> list:
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    if isinstance(value, set):
+        return list(value)
+    # pyarrow/pandas после parquet часто возвращают ndarray/object
+    try:
+        import numpy as np  # локальный импорт, чтобы не требовать зависимость при разборе файла
+
+        if isinstance(value, np.ndarray):
+            return value.tolist()
+    except Exception:
+        pass
+    return []
+
+
 # Подготовить таблицу предсказаний к grouped формату user_id -> pred_items
 def ensure_grouped_predictions(
     predictions: pd.DataFrame,
@@ -41,8 +60,8 @@ def build_eval_table(
     _check_columns(eval_ground_truth, ["user_id", "item_id"], "eval_ground_truth")
     preds = ensure_grouped_predictions(predictions, pred_col=pred_col)
     merged = eval_ground_truth.merge(preds, on="user_id", how="left")
-    merged[pred_col] = merged[pred_col].apply(lambda x: x if isinstance(x, list) else [])
-    merged["item_id"] = merged["item_id"].apply(lambda x: x if isinstance(x, list) else [])
+    merged[pred_col] = merged[pred_col].apply(_to_items_list)
+    merged["item_id"] = merged["item_id"].apply(_to_items_list)
     return merged
 
 
@@ -119,7 +138,7 @@ def filter_ground_truth_by_items(
 ) -> pd.DataFrame:
     out = eval_ground_truth.copy()
     out["item_id"] = out["item_id"].apply(
-        lambda xs: [x for x in xs if x in item_ids] if isinstance(xs, list) else []
+        lambda xs: [x for x in _to_items_list(xs) if x in item_ids]
     )
     return out
 
