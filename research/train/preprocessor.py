@@ -1,4 +1,6 @@
 import logging
+import pickle
+import json
 from pathlib import Path
 from typing import Optional, Union
 
@@ -195,3 +197,83 @@ def prepare_research_bundle(
         "cold_item_ids": cold_item_ids,
         "catalog_size": int(books["item_id"].nunique()),
     }
+
+
+# Сохранить подготовленный bundle в кэш
+def save_research_bundle_cache(bundle: dict, cache_dir: Union[str, Path]) -> None:
+    cache_dir = Path(cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    df_keys = [
+        "books",
+        "item_text",
+        "local_train",
+        "local_val",
+        "local_val_warm",
+        "local_val_cold",
+        "eval_ground_truth",
+        "item_popularity",
+    ]
+    for key in df_keys:
+        df = bundle[key]
+        path = cache_dir / f"{key}.pq"
+        logger.info("Сохранение cache %s -> %s", key, path)
+        df.to_parquet(path, index=False)
+
+    meta = {
+        "eval_users": bundle["eval_users"],
+        "candidate_item_ids": bundle["candidate_item_ids"],
+        "warm_item_ids": sorted(list(bundle["warm_item_ids"])),
+        "cold_item_ids": sorted(list(bundle["cold_item_ids"])),
+        "catalog_size": int(bundle["catalog_size"]),
+    }
+    with open(cache_dir / "meta.json", "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+
+    with open(cache_dir / "seen_items_by_user.pkl", "wb") as f:
+        pickle.dump(bundle["seen_items_by_user"], f)
+
+    logger.info("Кэш research bundle сохранен в %s", cache_dir)
+
+
+# Загрузить bundle из кэша
+def load_research_bundle_cache(cache_dir: Union[str, Path]) -> dict:
+    cache_dir = Path(cache_dir)
+    if not cache_dir.exists():
+        raise FileNotFoundError(f"Кэш не найден: {cache_dir}")
+
+    def _read_df(name: str) -> pd.DataFrame:
+        path = cache_dir / f"{name}.pq"
+        if not path.exists():
+            raise FileNotFoundError(f"Не найден файл кэша: {path}")
+        logger.info("Чтение cache %s: %s", name, path)
+        return pd.read_parquet(path)
+
+    with open(cache_dir / "meta.json", "r", encoding="utf-8") as f:
+        meta = json.load(f)
+    with open(cache_dir / "seen_items_by_user.pkl", "rb") as f:
+        seen_items_by_user = pickle.load(f)
+
+    bundle = {
+        "books": _read_df("books"),
+        "item_text": _read_df("item_text"),
+        "local_train": _read_df("local_train"),
+        "local_val": _read_df("local_val"),
+        "local_val_warm": _read_df("local_val_warm"),
+        "local_val_cold": _read_df("local_val_cold"),
+        "eval_ground_truth": _read_df("eval_ground_truth"),
+        "item_popularity": _read_df("item_popularity"),
+        "seen_items_by_user": seen_items_by_user,
+        "eval_users": meta["eval_users"],
+        "candidate_item_ids": meta["candidate_item_ids"],
+        "warm_item_ids": set(meta["warm_item_ids"]),
+        "cold_item_ids": set(meta["cold_item_ids"]),
+        "catalog_size": int(meta["catalog_size"]),
+    }
+    logger.info(
+        "Кэш bundle загружен: users=%s, train=%s, val=%s",
+        len(bundle["eval_users"]),
+        bundle["local_train"].shape,
+        bundle["local_val"].shape,
+    )
+    return bundle
