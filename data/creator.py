@@ -334,6 +334,7 @@ def run_dataset_build(
     k_core: int = 2,
     keep_recent_fraction: float = 0.6,
     test_fraction: float = 0.25,
+    interactions_chunksize: int = 300000,
     val_fraction: float = 0.2,
     warm_users_only: bool = True,
     n_neg: int = 20,
@@ -356,6 +357,7 @@ def run_dataset_build(
             k_core=k_core,
             keep_recent_fraction=keep_recent_fraction,
             test_fraction=test_fraction,
+            interactions_chunksize=interactions_chunksize,
         )
     else:
         logger.info("Использую существующие parquet в %s", root)
@@ -409,6 +411,7 @@ def run_dataset_build(
     summary["k_core"] = int(k_core)
     summary["keep_recent_fraction"] = float(keep_recent_fraction)
     summary["test_fraction"] = float(test_fraction)
+    summary["interactions_chunksize"] = int(interactions_chunksize)
 
     logger.info("Сохраняю артефакты в %s", out_dir)
     save_parquet(local_train, out_dir / "local_train.pq")
@@ -440,6 +443,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--k-core", type=int, default=2)
     parser.add_argument("--keep-recent-fraction", type=float, default=0.6)
     parser.add_argument("--test-fraction", type=float, default=0.25)
+    parser.add_argument("--interactions-chunksize", type=int, default=300000)
     parser.add_argument("--val-fraction", type=float, default=0.2)
     parser.add_argument("--warm-users-only", action="store_true", default=True)
     parser.add_argument("--all-val-users", action="store_true")
@@ -458,6 +462,7 @@ if __name__ == "__main__":
         k_core=args.k_core,
         keep_recent_fraction=args.keep_recent_fraction,
         test_fraction=args.test_fraction,
+        interactions_chunksize=args.interactions_chunksize,
         val_fraction=args.val_fraction,
         warm_users_only=not args.all_val_users,
         n_neg=args.n_neg,

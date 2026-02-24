@@ -1,6 +1,7 @@
 import logging
 import re
 import time
+import gzip
 from pathlib import Path
 from typing import List, Tuple, Union
 
@@ -183,6 +184,23 @@ def load_raw_goodreads(raw_dir: Union[str, Path]) -> Tuple[pd.DataFrame, pd.Data
     return books, interactions
 
 
+# Загрузить только raw books (без interactions)
+def load_raw_books(raw_dir: Union[str, Path]) -> pd.DataFrame:
+    raw_dir = _as_path(raw_dir)
+    books_path = raw_dir / RAW_BOOKS_FILENAME
+    _check_file(books_path)
+
+    logger.info("Чтение raw books: %s", books_path)
+    books = pd.read_json(books_path, lines=True, compression="gzip")
+    logger.info("Raw books загружены: %s", books.shape)
+    _check_columns(
+        books,
+        ["book_id", "title", "description", "popular_shelves", "authors", "language_code"],
+        "raw books",
+    )
+    return books
+
+
 # Загрузить подготовленные parquet-таблицы
 def load_processed_goodreads(
     processed_dir: Union[str, Path],
@@ -231,6 +249,7 @@ def preprocess_goodreads_raw_to_parquet(
     k_core: int = 2,
     keep_recent_fraction: float = 0.6,
     test_fraction: float = 0.25,
+    interactions_chunksize: int = 300000,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     started_total = time.time()
     if not 0 < keep_recent_fraction <= 1:
@@ -249,7 +268,7 @@ def preprocess_goodreads_raw_to_parquet(
         keep_recent_fraction,
         test_fraction,
     )
-    books, interactions = load_raw_goodreads(raw_dir)
+    books = load_raw_books(raw_dir)
 
     stage_started = time.time()
     logger.info("Этап: подготовка книг")
@@ -302,28 +321,21 @@ def preprocess_goodreads_raw_to_parquet(
     )
 
     stage_started = time.time()
-    logger.info("Этап: подготовка взаимодействий")
-    interactions = interactions.merge(book_to_item, on="book_id", how="inner")
-    interactions = interactions.drop(columns=["book_id"])
+    logger.info("Этап: подготовка взаимодействий (по батчам)")
+    raw_dir = _as_path(raw_dir)
+    interactions_path = raw_dir / RAW_INTERACTIONS_FILENAME
+    _check_file(interactions_path)
 
-    interactions["date_added"] = pd.to_datetime(
-        interactions["date_added"],
-        format="%a %b %d %H:%M:%S %z %Y",
-        errors="coerce",
-        utc=True,
+    interactions = _read_and_aggregate_interactions_chunked(
+        interactions_path=interactions_path,
+        book_to_item=book_to_item,
+        chunksize=interactions_chunksize,
     )
-    interactions = interactions.dropna(subset=["date_added"]).copy()
-    interactions["date_added"] = interactions["date_added"].dt.tz_localize(None)
-
-    agg_dict = {"date_added": "min"}
-    if "is_read" in interactions.columns:
-        agg_dict["is_read"] = "max"
-    if "rating" in interactions.columns:
-        agg_dict["rating"] = "max"
-
-    logger.info("Агрегация interactions по (user_id, item_id)")
-    interactions = interactions.groupby(["user_id", "item_id"], as_index=False).agg(agg_dict).copy()
-    logger.info("После агрегации interactions=%s", interactions.shape)
+    logger.info(
+        "Этап завершен: подготовка взаимодействий за %s, interactions=%s",
+        _fmt_seconds(time.time() - stage_started),
+        interactions.shape,
+    )
 
     user_item_counts = interactions.groupby("user_id")["item_id"].nunique().rename("unique_item_count")
     warm_users = user_item_counts[user_item_counts > k_core].index
@@ -378,3 +390,109 @@ def preprocess_goodreads_raw_to_parquet(
     )
 
     return books_processed, train, test
+
+
+# Прочитать и агрегировать interactions по батчам, чтобы не упираться в память
+def _read_and_aggregate_interactions_chunked(
+    interactions_path: Path,
+    book_to_item: pd.DataFrame,
+    chunksize: int = 300000,
+) -> pd.DataFrame:
+    if chunksize <= 0:
+        raise ValueError("chunksize должен быть > 0")
+
+    total_compressed = interactions_path.stat().st_size
+    chunk_aggs: list[pd.DataFrame] = []
+    total_rows = 0
+    kept_rows = 0
+    chunk_idx = 0
+    started = time.time()
+
+    usecols = ["user_id", "book_id", "is_read", "rating", "date_added"]
+
+    logger.info(
+        "Чтение raw interactions по батчам: %s (chunksize=%s, size=%s)",
+        interactions_path,
+        chunksize,
+        total_compressed,
+    )
+
+    with gzip.open(interactions_path, mode="rt", encoding="utf-8") as gz:
+        # pandas читает по чанкам из текстового потока
+        reader = pd.read_json(gz, lines=True, chunksize=chunksize)
+
+        for chunk_idx, chunk in enumerate(reader, start=1):
+            chunk_started = time.time()
+            current_rows = len(chunk)
+            total_rows += current_rows
+
+            missing_cols = [c for c in usecols if c not in chunk.columns]
+            if missing_cols:
+                raise ValueError(f"raw interactions chunk: нет колонок {missing_cols}")
+
+            chunk = chunk[usecols].copy()
+            chunk = chunk.merge(book_to_item, on="book_id", how="inner")
+            chunk = chunk.drop(columns=["book_id"])
+
+            chunk["date_added"] = pd.to_datetime(
+                chunk["date_added"],
+                format="%a %b %d %H:%M:%S %z %Y",
+                errors="coerce",
+                utc=True,
+            )
+            chunk = chunk.dropna(subset=["date_added"]).copy()
+            chunk["date_added"] = chunk["date_added"].dt.tz_localize(None)
+
+            agg_dict = {"date_added": "min", "is_read": "max", "rating": "max"}
+            chunk_agg = chunk.groupby(["user_id", "item_id"], as_index=False).agg(agg_dict)
+            kept_rows += len(chunk_agg)
+            chunk_aggs.append(chunk_agg)
+
+            # Пробуем показать прогресс по сжатому файлу
+            compressed_pos = 0
+            try:
+                compressed_pos = gz.fileobj.tell()  # type: ignore[attr-defined]
+            except Exception:
+                compressed_pos = 0
+
+            elapsed = time.time() - started
+            if compressed_pos > 0 and total_compressed > 0:
+                ratio = min(1.0, compressed_pos / total_compressed)
+                eta = (elapsed / ratio - elapsed) if ratio > 0 else 0
+                logger.info(
+                    "Chunk %s: raw_rows=%s, agg_rows=%s, file=%.1f%%, прошло=%s, осталось~%s, chunk_time=%s",
+                    chunk_idx,
+                    current_rows,
+                    len(chunk_agg),
+                    ratio * 100.0,
+                    _fmt_seconds(elapsed),
+                    _fmt_seconds(eta),
+                    _fmt_seconds(time.time() - chunk_started),
+                )
+            else:
+                logger.info(
+                    "Chunk %s: raw_rows=%s, agg_rows=%s, total_raw=%s, chunk_time=%s",
+                    chunk_idx,
+                    current_rows,
+                    len(chunk_agg),
+                    total_rows,
+                    _fmt_seconds(time.time() - chunk_started),
+                )
+
+    if chunk_idx == 0:
+        raise ValueError("Файл interactions пустой или не прочитан")
+
+    logger.info(
+        "Финальная агрегация interactions из %s чанков (raw_rows=%s, chunk_agg_rows=%s)",
+        chunk_idx,
+        total_rows,
+        kept_rows,
+    )
+    all_aggs = pd.concat(chunk_aggs, ignore_index=True)
+    interactions = (
+        all_aggs.groupby(["user_id", "item_id"], as_index=False)
+        .agg({"date_added": "min", "is_read": "max", "rating": "max"})
+        .copy()
+    )
+    logger.info("После финальной агрегации interactions=%s", interactions.shape)
+    return interactions
