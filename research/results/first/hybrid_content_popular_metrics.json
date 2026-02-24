@@ -1,0 +1,18 @@
+{
+  "ndcg@10": 0.010085558003889564,
+  "recall@10": 0.01993867893501235,
+  "coverage@10": 0.3654928229665072,
+  "eval_users": 46091,
+  "warm_ndcg@10": 0.01000568256687334,
+  "warm_recall@10": 0.0198804138371472,
+  "warm_eval_users": 45832,
+  "cold_ndcg@10": 0.00620977037974082,
+  "cold_recall@10": 0.009721355791224786,
+  "cold_eval_users": 1603,
+  "model": "hybrid_content_popular",
+  "content_weight": 0.8,
+  "popularity_weight": 0.2,
+  "content_top_n": 200,
+  "pop_candidates_n": 200,
+  "elapsed_sec": 330.4
+}

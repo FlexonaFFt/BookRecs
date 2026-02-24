@@ -1,0 +1,15 @@
+[
+  {
+    "ndcg@10": 0.032903768191537376,
+    "recall@10": 0.04718351342909196,
+    "coverage@10": 0.001090909090909091,
+    "eval_users": 46091,
+    "warm_ndcg@10": 0.033158999638661237,
+    "warm_recall@10": 0.04757422380425874,
+    "warm_eval_users": 45832,
+    "cold_ndcg@10": 0.0,
+    "cold_recall@10": 0.0,
+    "cold_eval_users": 1603,
+    "model": "top_popular"
+  }
+]

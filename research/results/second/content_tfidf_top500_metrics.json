@@ -1,0 +1,17 @@
+{
+  "ndcg@10": 0.006716632072446168,
+  "recall@10": 0.012225908855945102,
+  "coverage@10": 0.39173205741626793,
+  "eval_users": 46091,
+  "warm_ndcg@10": 0.006613169161391842,
+  "warm_recall@10": 0.012115114344451937,
+  "warm_eval_users": 45832,
+  "cold_ndcg@10": 0.00620977037974082,
+  "cold_recall@10": 0.009721355791224786,
+  "cold_eval_users": 1603,
+  "model": "content_tfidf_top500",
+  "fit_max_features": 50000,
+  "fit_min_df": 2,
+  "candidate_top_n": 500,
+  "elapsed_sec": 339.05
+}
