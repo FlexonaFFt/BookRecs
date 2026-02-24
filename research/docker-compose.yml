@@ -1,0 +1,49 @@
+version: "3.9"
+
+x-research-base: &research-base
+  build:
+    context: ..
+    dockerfile: research/Dockerfile
+  working_dir: /app
+  volumes:
+    - ../:/app
+  environment:
+    PYTHONUNBUFFERED: "1"
+
+services:
+  # raw -> books.pq/train.pq/test.pq + local ML dataset
+  data_preprocess:
+    <<: *research-base
+    command: >
+      python data/creator.py
+      --rebuild-processed
+
+  # только локальный ML dataset, если parquet уже есть
+  data_build:
+    <<: *research-base
+    command: >
+      python data/creator.py
+
+  # одноразовая подготовка общего кэша research-данных
+  precompute:
+    <<: *research-base
+    command: >
+      python research/train/precompute.py
+
+  # baseline (TopPopular, опционально Random через override command)
+  baselines:
+    <<: *research-base
+    command: >
+      python research/train/run_experiments.py
+
+  # content TF-IDF
+  content:
+    <<: *research-base
+    command: >
+      python research/train/run_content.py
+
+  # hybrid content + popular
+  hybrid:
+    <<: *research-base
+    command: >
+      python research/train/run_hybrid.py
