@@ -19,7 +19,6 @@ INTERACTIONS_FILENAME = "interactions.json.gz"
 
 
 logger = logging.getLogger(__name__)
-
 if not logging.getLogger().handlers:
     logging.basicConfig(
         level=logging.INFO,
@@ -28,7 +27,6 @@ if not logging.getLogger().handlers:
     )
 
 
-# Отформатировать размер
 def _fmt_size(num_bytes: int) -> str:
     units = ["B", "KB", "MB", "GB", "TB"]
     size = float(num_bytes)
@@ -39,7 +37,6 @@ def _fmt_size(num_bytes: int) -> str:
     return f"{size:.1f} {units[unit]}"
 
 
-# Отформатировать секунды
 def _fmt_seconds(seconds: float) -> str:
     seconds = max(0, int(seconds))
     h = seconds // 3600
@@ -52,7 +49,6 @@ def _fmt_seconds(seconds: float) -> str:
     return f"{s}с"
 
 
-# Скачать файл с прогрессом
 def download_file(url: str, dst: Path, force: bool = False) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
     if dst.exists() and not force:
@@ -97,7 +93,6 @@ def download_file(url: str, dst: Path, force: bool = False) -> None:
     )
 
 
-# Скачать raw Goodreads YA в data/raw_data
 def download_goodreads_raw(raw_dir: str = "data/raw_data", force: bool = False) -> None:
     raw_path = Path(raw_dir)
     download_file(BOOKS_URL, raw_path / BOOKS_FILENAME, force=force)
@@ -105,7 +100,6 @@ def download_goodreads_raw(raw_dir: str = "data/raw_data", force: bool = False) 
     logger.info("Все raw файлы готовы в %s", raw_path)
 
 
-# CLI
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Скачать raw Goodreads YA в data/raw_data")
     parser.add_argument("--raw-dir", default="data/raw_data")
