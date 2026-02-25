@@ -3,6 +3,7 @@
 ### Документация проекта
 
 - [Ссылка на ML System Design Doc](docs/ML_System_Design.md)
+- [Итоги research (метрики, сравнение моделей, графики)](docs/Research_Results.md)
 
 ---
 

@@ -1,0 +1,16 @@
+.git
+.gitignore
+.idea
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Большие данные не кладем в образ, будем монтировать volume
+data/raw_data/
+data/processed/
+data/*.pq
+data/*.parquet
+research/results/
+research/weights/
