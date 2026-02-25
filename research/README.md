@@ -124,6 +124,7 @@ docker compose run --rm hybrid
 
 - JSON-метрики: `research/results/**/*.json`
 - сравнение в ноутбуке: `research/notebooks/metrics_comparison.ipynb`
+- итоговый summary с графиками и сравнением прогонов: `/Users/flexonafft/BookRecs/docs/Research_Results.md`
 
 ---
 

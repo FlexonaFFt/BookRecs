@@ -28,6 +28,7 @@ core/generated/*.json
 # Datasets and ML artifacts
 data/raw_data/
 data/processed/
+data/data06/
 data/*.pq
 data/*.parquet
 *.pq
