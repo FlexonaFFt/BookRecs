@@ -5,6 +5,8 @@
 *.iml
 out/
 
+.venv
+
 # Python cache and virtual envs
 __pycache__/
 *.py[cod]
@@ -22,3 +24,12 @@ venv/
 
 # Generated artifacts
 core/generated/*.json
+
+# Datasets and ML artifacts
+data/raw_data/
+data/processed/
+data/data06/
+data/*.pq
+data/*.parquet
+*.pq
+*.parquet

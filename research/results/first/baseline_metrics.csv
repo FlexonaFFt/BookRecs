@@ -1,0 +1,2 @@
+model,ndcg@10,recall@10,coverage@10,eval_users,warm_ndcg@10,warm_recall@10,warm_eval_users,cold_ndcg@10,cold_recall@10,cold_eval_users
+top_popular,0.032903768191537376,0.04718351342909196,0.001090909090909091,46091,0.033158999638661237,0.04757422380425874,45832,0.0,0.0,1603
