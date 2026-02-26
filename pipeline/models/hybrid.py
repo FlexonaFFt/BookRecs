@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import pandas as pd
 
 from models.content_tfidf import ContentTfidfRecommender
 from models.item2item import Item2ItemRecommender
+
+
+logger = logging.getLogger(__name__)
 
 
 class HybridRecommender:
@@ -121,8 +125,10 @@ class HybridRecommender:
 
         rows = []
         candidate_top_n = max(k, self.cf_top_n, self.content_top_n, self.pop_top_n)
+        total = len(user_ids)
+        step = max(1, total // 10) if total else 1
 
-        for user_id in user_ids:
+        for i, user_id in enumerate(user_ids, start=1):
             seen = seen_items_by_user.get(user_id, set())
             items, _ = self.score_user(seen_items=seen, top_n=candidate_top_n)
 
@@ -143,5 +149,7 @@ class HybridRecommender:
                         break
 
             rows.append({"user_id": user_id, "pred_items": recs})
+            if total and (i == total or i % step == 0):
+                logger.info("Hybrid recommend: %s/%s", i, total)
 
         return pd.DataFrame(rows)

@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from itertools import combinations
+import logging
 from math import sqrt
 from typing import Any, Optional
 
 import pandas as pd
+
+
+logger = logging.getLogger(__name__)
 
 
 class Item2ItemRecommender:
@@ -39,7 +43,11 @@ class Item2ItemRecommender:
         item_user_counts_counter: Counter[Any] = Counter()
         pair_counts: Counter[tuple[Any, Any]] = Counter()
 
-        for items in user_items.tolist():
+        user_items_list = user_items.tolist()
+        total_users = len(user_items_list)
+        step = max(1, total_users // 10) if total_users else 1
+
+        for i, items in enumerate(user_items_list, start=1):
             if not items:
                 continue
             uniq_items = list(dict.fromkeys(items))
@@ -58,6 +66,8 @@ class Item2ItemRecommender:
                     pair_counts[(a, b)] += 1
                 else:
                     pair_counts[(b, a)] += 1
+            if total_users and (i == total_users or i % step == 0):
+                logger.info("Item2Item fit cooccurrence: %s/%s users", i, total_users)
 
         self.item_user_counts = dict(item_user_counts_counter)
 
@@ -130,7 +140,9 @@ class Item2ItemRecommender:
             raise ValueError("fit() must be called before recommend()")
 
         rows = []
-        for user_id in user_ids:
+        total = len(user_ids)
+        step = max(1, total // 10) if total else 1
+        for i, user_id in enumerate(user_ids, start=1):
             seen = seen_items_by_user.get(user_id, set())
             items, _ = self.score_user(seen, top_n=max(candidate_top_n, k))
 
@@ -151,5 +163,7 @@ class Item2ItemRecommender:
                         break
 
             rows.append({"user_id": user_id, "pred_items": recs})
+            if total and (i == total or i % step == 0):
+                logger.info("Item2Item recommend: %s/%s", i, total)
 
         return pd.DataFrame(rows)

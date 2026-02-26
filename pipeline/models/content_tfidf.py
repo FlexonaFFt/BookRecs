@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import logging
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from typing import Any, Optional
+
+
+logger = logging.getLogger(__name__)
 
 
 class ContentTfidfRecommender:
@@ -82,7 +86,9 @@ class ContentTfidfRecommender:
             raise ValueError("fit() must be called before recommend()")
 
         rows = []
-        for user_id in user_ids:
+        total = len(user_ids)
+        step = max(1, total // 10) if total else 1
+        for i, user_id in enumerate(user_ids, start=1):
             seen = seen_items_by_user.get(user_id, set())
             items, _ = self.score_user(seen, top_n=max(candidate_top_n, k))
 
@@ -103,5 +109,7 @@ class ContentTfidfRecommender:
                         break
 
             rows.append({"user_id": user_id, "pred_items": recs})
+            if total and (i == total or i % step == 0):
+                logger.info("ContentTFIDF recommend: %s/%s", i, total)
 
         return pd.DataFrame(rows)

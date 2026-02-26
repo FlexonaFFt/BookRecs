@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 
 from pathlib import Path
 from artifacts.save import save_training_outputs
@@ -47,6 +48,11 @@ def args_to_config(args: argparse.Namespace) -> RunnerConfig:
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(message)s",
+        datefmt="%H:%M:%S",
+    )
     parser = build_parser()
     args = parser.parse_args()
     config = args_to_config(args)
