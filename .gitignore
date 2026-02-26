@@ -16,6 +16,7 @@ __pycache__/
 .venv/
 venv/
 .pycache_local/
+.pycache_tmp
 
 # Secrets
 .env
