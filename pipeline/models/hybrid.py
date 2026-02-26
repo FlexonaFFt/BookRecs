@@ -4,8 +4,8 @@ from typing import Any
 
 import pandas as pd
 
-from pipeline.models.content_tfidf import ContentTfidfRecommender
-from pipeline.models.item2item import Item2ItemRecommender
+from models.content_tfidf import ContentTfidfRecommender
+from models.item2item import Item2ItemRecommender
 
 
 class HybridRecommender:
