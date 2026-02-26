@@ -116,7 +116,6 @@ class HybridRecommender:
     def recommend(
         self, user_ids: list[Any],
         seen_items_by_user: dict[Any, set[Any]], k: int = 10) -> pd.DataFrame:
-        
         if not self.is_fitted:
             raise ValueError("fit() must be called before recommend()")
 
