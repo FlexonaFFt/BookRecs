@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 import argparse
+import os
 
 from source.application.use_cases import PrepareDataCommand, PrepareDataUseCase
 from source.domain.entities import DatasetSource, PreprocessingParams
-from source.infrastructure.preprocessing import NotebookStylePreprocessorStub
-from source.infrastructure.storage import InMemoryDatasetRegistry, InMemoryRunLog, LocalDatasetStore
+from source.infrastructure.preprocessing import PreprocessorStyle
+from source.infrastructure.storage import (
+    ClientPg,
+    RegistryMemory,
+    RegistryPg,
+    RunLogMemory,
+    RunLogPg,
+    StoreLocal,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -24,6 +32,8 @@ def build_parser() -> argparse.ArgumentParser:
     prep.add_argument("--warm-users-only", action=argparse.BooleanOptionalAction, default=True)
     prep.add_argument("--language-filter-enabled", action=argparse.BooleanOptionalAction, default=True)
     prep.add_argument("--interactions-chunksize", type=int, default=200_000)
+    prep.add_argument("--registry-backend", choices=["memory", "postgres"], default="memory")
+    prep.add_argument("--pg-dsn", default=os.getenv("BOOKRECS_PG_DSN", ""))
 
     return parser
 
@@ -48,11 +58,21 @@ def main() -> None:
         interactions_chunksize=args.interactions_chunksize,
     )
 
+    if args.registry_backend == "postgres":
+        if not args.pg_dsn.strip():
+            raise ValueError("pg-dsn is required when --registry-backend=postgres")
+        pg = ClientPg(args.pg_dsn)
+        dataset_registry = RegistryPg(pg)
+        run_log = RunLogPg(pg)
+    else:
+        dataset_registry = RegistryMemory()
+        run_log = RunLogMemory()
+
     use_case = PrepareDataUseCase(
-        preprocessor=NotebookStylePreprocessorStub(),
-        dataset_store=LocalDatasetStore(),
-        dataset_registry=InMemoryDatasetRegistry(),
-        run_log=InMemoryRunLog(),
+        preprocessor=PreprocessorStyle(),
+        dataset_store=StoreLocal(),
+        dataset_registry=dataset_registry,
+        run_log=run_log,
     )
 
     result = use_case.execute(

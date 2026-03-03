@@ -4,8 +4,8 @@ from source.application.ports import DatasetRegistryPort
 from source.domain.entities import DatasetVersion
 
 
-class InMemoryDatasetRegistry(DatasetRegistryPort):
-
+class RegistryMemory(DatasetRegistryPort):
+    """In-memory registry for local runs."""
 
     def __init__(self) -> None:
         self._by_key: dict[tuple[str, str], DatasetVersion] = {}

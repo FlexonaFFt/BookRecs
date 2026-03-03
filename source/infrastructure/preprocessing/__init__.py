@@ -1,7 +1,5 @@
-from source.infrastructure.preprocessing.notebook_style_preprocessor import (
-    NotebookStylePreprocessorStub,
-)
+from source.infrastructure.preprocessing.preprocessor_style import PreprocessorStyle
 
 __all__ = [
-    "NotebookStylePreprocessorStub",
+    "PreprocessorStyle",
 ]

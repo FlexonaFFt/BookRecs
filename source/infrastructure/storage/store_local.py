@@ -7,10 +7,8 @@ from source.application.ports import DatasetStorePort
 from source.domain.entities import DatasetArtifacts, DatasetVersion
 
 
-class LocalDatasetStore(DatasetStorePort):
-    """
-    Локальный аналог S3 для быстрой разработки.
-    """
+class StoreLocal(DatasetStorePort):
+
 
     def __init__(self, root_dir: str = "artifacts/datasets") -> None:
         self._root_dir = Path(root_dir)

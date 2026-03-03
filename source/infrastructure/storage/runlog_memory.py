@@ -4,10 +4,8 @@ from source.application.ports import RunLogPort
 from source.domain.entities import PipelineRun
 
 
-class InMemoryRunLog(RunLogPort):
-    """
-    Временный лог запусков вместо PostgreSQL.
-    """
+class RunLogMemory(RunLogPort):
+
 
     def __init__(self) -> None:
         self.started_runs: list[PipelineRun] = []
