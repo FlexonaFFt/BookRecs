@@ -7,6 +7,101 @@
 
 ---
 
+## Target Clean Architecture (from scratch)
+
+```text
+/Users/flexonafft/BookRecs
+├── pyproject.toml
+├── README.md
+├── configs
+│   ├── base.yaml
+│   ├── train.yaml
+│   ├── infer.yaml
+│   └── ab_test.yaml
+├── data
+│   ├── raw
+│   ├── processed
+│   └── splits
+├── artifacts
+│   ├── models
+│   ├── manifests
+│   └── reports
+├── src
+│   └── bookrecs
+│       ├── domain
+│       │   ├── entities
+│       │   │   ├── user.py
+│       │   │   ├── book.py
+│       │   │   ├── interaction.py
+│       │   │   └── recommendation.py
+│       │   ├── value_objects
+│       │   │   ├── score.py
+│       │   │   └── ranking_window.py
+│       │   └── services
+│       │       ├── business_rules.py
+│       │       └── diversity_policy.py
+│       ├── application
+│       │   ├── ports
+│       │   │   ├── candidate_source_port.py
+│       │   │   ├── preranker_port.py
+│       │   │   ├── final_ranker_port.py
+│       │   │   ├── recommendation_repo_port.py
+│       │   │   └── metrics_port.py
+│       │   ├── use_cases
+│       │   │   ├── generate_candidates.py
+│       │   │   ├── pre_rank_candidates.py
+│       │   │   ├── final_rank_and_postprocess.py
+│       │   │   ├── get_recommendations.py
+│       │   │   ├── get_similar_items.py
+│       │   │   └── train_pipeline.py
+│       │   └── dto
+│       │       ├── requests.py
+│       │       └── responses.py
+│       ├── infrastructure
+│       │   ├── data
+│       │   │   ├── parquet_reader.py
+│       │   │   └── feature_store.py
+│       │   ├── models
+│       │   │   ├── candidate_item2item.py
+│       │   │   ├── candidate_content.py
+│       │   │   ├── candidate_popular.py
+│       │   │   ├── preranker_linear.py
+│       │   │   └── final_ranker_hybrid.py
+│       │   ├── repositories
+│       │   │   ├── recommendation_repo.py
+│       │   │   └── artifact_repo.py
+│       │   └── observability
+│       │       ├── logger.py
+│       │       └── metrics.py
+│       ├── interfaces
+│       │   ├── api
+│       │   │   ├── app.py
+│       │   │   ├── routes_recommendations.py
+│       │   │   └── routes_similar.py
+│       │   └── batch
+│       │       ├── train_job.py
+│       │       ├── infer_job.py
+│       │       └── export_job.py
+│       └── main.py
+├── tests
+│   ├── unit
+│   ├── integration
+│   └── e2e
+└── docs
+    ├── architecture.md
+    ├── ml_system_design.md
+    └── api_contract.md
+```
+
+```mermaid
+flowchart LR
+UI["Interfaces (API/Batch)"] --> APP["Application (Use Cases + Ports)"]
+APP --> DOM["Domain (Entities + Rules)"]
+APP --> PORTS["Ports (Interfaces)"]
+PORTS --> INFRA["Infrastructure (Models/Repos/IO)"]
+INFRA --> DATA["Data/Artifacts/External Systems"]
+```
+
 Проект посвящен рекомендательной системе для Goodreads YA с приоритетом на устойчивый cold-start по книгам: новые книги должны получать релевантные рекомендации даже при ограниченной истории взаимодействий.
 
 Текущий фокус: построить воспроизводимый продуктовый pipeline, где отдельно контролируются warm/cold сегменты, а качество подтверждается прозрачными offline-метриками и артефактами запуска.
