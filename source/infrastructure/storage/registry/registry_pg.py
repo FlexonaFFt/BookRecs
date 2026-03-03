@@ -6,7 +6,7 @@ from datetime import datetime
 
 from source.application.ports import DatasetRegistryPort
 from source.domain.entities import DatasetVersion, PreprocessingParams
-from source.infrastructure.storage.client_pg import ClientPg
+from source.infrastructure.storage.client.client_pg import ClientPg
 
 
 class RegistryPg(DatasetRegistryPort):

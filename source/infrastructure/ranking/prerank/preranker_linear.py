@@ -5,7 +5,7 @@ from typing import Any
 
 from source.application.ports import PreRankerPort
 from source.domain.entities import Candidate, ScoredCandidate
-from source.infrastructure.prerank.feature_builder import FeatureBuilder
+from source.infrastructure.ranking.prerank.feature_builder import FeatureBuilder
 
 
 @dataclass(frozen=True)
@@ -19,7 +19,7 @@ class PreRankLinearConfig:
 
 
 class PreRankLinear(PreRankerPort):
-
+    """Simple linear pre-ranker used as Stage-2 baseline."""
 
     def __init__(
         self,

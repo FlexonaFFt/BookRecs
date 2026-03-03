@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from source.domain.entities.run_status import RunStatus
+from source.domain.entities.data.run_status import RunStatus
 
 
 @dataclass

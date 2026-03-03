@@ -16,7 +16,7 @@ class FeatureRow:
 
 
 class FeatureBuilder:
-
+    """Builds deterministic Stage-2 features from Stage-1 candidates."""
 
     def build(
         self,

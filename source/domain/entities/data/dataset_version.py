@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from source.domain.entities.preprocessing_params import PreprocessingParams
+from source.domain.entities.data.preprocessing_params import PreprocessingParams
 
 
 @dataclass(frozen=True)

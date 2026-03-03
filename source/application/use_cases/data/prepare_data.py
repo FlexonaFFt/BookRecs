@@ -21,9 +21,7 @@ from source.domain.entities import (
 
 @dataclass(frozen=True)
 class PrepareDataCommand:
-    #Вход use-case: что обрабатываем и куда публикуем результат.
-
-
+    """Input for dataset preparation flow."""
     dataset_name: str
     source: DatasetSource
     params: PreprocessingParams
@@ -32,8 +30,7 @@ class PrepareDataCommand:
 
 
 class PrepareDataUseCase:
-    #preprocess -> store -> registry -> run log
-
+    """Run full prepare-data flow: preprocess -> store -> registry -> runlog."""
 
     def __init__(
         self,

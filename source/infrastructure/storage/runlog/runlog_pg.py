@@ -4,7 +4,7 @@ import json
 
 from source.application.ports import RunLogPort
 from source.domain.entities import PipelineRun
-from source.infrastructure.storage.client_pg import ClientPg
+from source.infrastructure.storage.client.client_pg import ClientPg
 
 
 class RunLogPg(RunLogPort):

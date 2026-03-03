@@ -7,8 +7,7 @@ from source.domain.entities import Candidate, ScoredCandidate
 
 
 class PreRankerPort(ABC):
-
-
+    """Contract for Stage-2 pre-ranking model."""
     @abstractmethod
     def rank(
         self,

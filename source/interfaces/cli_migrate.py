@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from source.infrastructure.storage import ClientPg
@@ -17,12 +18,14 @@ def run_migration(pg_dsn: str, migration_file: str) -> None:
         client.execute(statement)
 
 
-if __name__ == "__main__":
-    import os
-
+def main() -> None:
     dsn = os.getenv("BOOKRECS_PG_DSN", "").strip()
     migration_file = os.getenv("BOOKRECS_PG_MIGRATION_FILE", "configs/sql/001_init.sql").strip()
     if not dsn:
         raise ValueError("BOOKRECS_PG_DSN is required for migration")
     run_migration(dsn, migration_file)
     print(f"Migration applied: {migration_file}")
+
+
+if __name__ == "__main__":
+    main()

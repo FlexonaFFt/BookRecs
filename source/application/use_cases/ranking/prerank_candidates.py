@@ -17,8 +17,7 @@ class PreRankCandidatesCommand:
 
 
 class PreRankCandidatesUseCase:
-    #сокращает candidate pool до top-M.
-
+    """Stage 2: reduce candidate pool to top-M."""
 
     def __init__(self, preranker: PreRankerPort) -> None:
         self._preranker = preranker
@@ -39,6 +38,7 @@ class PreRankCandidatesUseCase:
         if ranked:
             return ranked
 
+        # Fallback: preserve top-M by Stage-1 score.
         base_ranked = sorted(cmd.candidates, key=lambda c: c.score, reverse=True)[: cmd.top_m]
         return [
             ScoredCandidate(

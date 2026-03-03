@@ -35,7 +35,7 @@ if [[ "${REGISTRY_BACKEND}" == "postgres" ]]; then
     exit 1
   fi
   echo "[entrypoint] applying postgres migration: ${PG_MIGRATION_FILE}"
-  python -m source.interfaces.migrate
+  python -m source.interfaces.cli migrate
 fi
 
 # 1) If raw dataset is missing -> download it.

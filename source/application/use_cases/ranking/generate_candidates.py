@@ -16,21 +16,19 @@ class GenerateCandidatesCommand:
 
 
 class GenerateCandidatesUseCase:
-
+    """Stage 1: generate and merge candidates from multiple sources."""
 
     def __init__(
         self,
         sources: list[CandidateSourcePort],
         fallback_source: CandidateSourcePort,
     ) -> None:
-
         if not sources:
             raise ValueError("At least one candidate source is required")
         self._sources = sources
         self._fallback = fallback_source
 
     def execute(self, cmd: GenerateCandidatesCommand) -> list[Candidate]:
-
         if cmd.pool_size <= 0:
             raise ValueError("pool_size must be > 0")
         if cmd.per_source_limit <= 0:
@@ -50,6 +48,7 @@ class GenerateCandidatesUseCase:
         if len(ranked) >= cmd.pool_size:
             return ranked
 
+        # Refill from fallback if total pool is still too short.
         need = cmd.pool_size - len(ranked)
         refill = self._fallback.generate(
             user_id=cmd.user_id,
@@ -65,7 +64,6 @@ class GenerateCandidatesUseCase:
         candidates: list[Candidate],
         seen_items: set[Any],
     ) -> None:
-
         for cand in candidates:
             if cand.item_id in seen_items:
                 continue
@@ -80,7 +78,6 @@ class GenerateCandidatesUseCase:
 
     @staticmethod
     def _to_ranked(user_id: Any, merged: dict[Any, dict[str, Any]], limit: int) -> list[Candidate]:
-
         rows = []
         for item_id, payload in merged.items():
             src = "|".join(sorted(payload["sources"]))

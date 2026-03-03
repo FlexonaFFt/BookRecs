@@ -7,12 +7,7 @@ from source.domain.entities import FinalItem
 
 
 class PostprocessTemplate(PostProcessorPort):
-    """
-    Template post-processing:
-    - remove seen items;
-    - deduplicate item_id;
-    - trim to top_k.
-    """
+
 
     def apply(
         self,
