@@ -12,9 +12,9 @@ except ImportError:
     import sys
 
     sys.path.append(str(Path(__file__).resolve().parents[1]))
-    from research.train.content_model import ContentTfidfRecommender  # type: ignore
-    from research.train.evaluator import evaluate_predictions  # type: ignore
-    from research.train.preprocessor import load_research_bundle_cache  # type: ignore
+    from sketching.research.train.content_model import ContentTfidfRecommender  # type: ignore
+    from sketching.research.train.evaluator import evaluate_predictions  # type: ignore
+    from sketching.research.train.preprocessor import load_research_bundle_cache  # type: ignore
 
 
 logger = logging.getLogger(__name__)

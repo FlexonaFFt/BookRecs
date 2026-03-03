@@ -1,13 +1,12 @@
 import logging
 import time
-from typing import Optional
 
 import pandas as pd
 
 try:
     from content_model import ContentTfidfRecommender
 except ImportError:
-    from research.train.content_model import ContentTfidfRecommender  # type: ignore
+    from sketching.research.train.content_model import ContentTfidfRecommender  # type: ignore
 
 
 logger = logging.getLogger(__name__)

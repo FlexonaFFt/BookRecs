@@ -14,9 +14,9 @@ except ImportError:
     import sys
 
     sys.path.append(str(Path(__file__).resolve().parents[1]))
-    from research.train.baselines import RandomRecommender, TopPopularRecommender  # type: ignore
-    from research.train.evaluator import evaluate_predictions  # type: ignore
-    from research.train.preprocessor import prepare_research_bundle  # type: ignore
+    from sketching.research.train.baselines import RandomRecommender, TopPopularRecommender  # type: ignore
+    from sketching.research.train.evaluator import evaluate_predictions  # type: ignore
+    from sketching.research.train.preprocessor import prepare_research_bundle  # type: ignore
 
 
 logger = logging.getLogger(__name__)

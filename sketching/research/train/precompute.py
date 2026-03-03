@@ -9,7 +9,7 @@ except ImportError:
     import sys
 
     sys.path.append(str(Path(__file__).resolve().parents[1]))
-    from research.train.preprocessor import prepare_research_bundle, save_research_bundle_cache  # type: ignore
+    from sketching.research.train.preprocessor import prepare_research_bundle, save_research_bundle_cache  # type: ignore
 
 
 logger = logging.getLogger(__name__)
