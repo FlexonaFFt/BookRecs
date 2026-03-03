@@ -30,6 +30,10 @@ class PreprocessorStyle(PreprocessorPort):
         source.validate()
         params.validate()
 
+        cached = self._cached_artifacts(source.dataset_name)
+        if cached is not None:
+            return cached
+
         books_raw = self._read_books(source.books_raw_uri)
         books, book_to_item = self._prepare_books(books_raw, language_filter=params.language_filter_enabled)
 
@@ -123,6 +127,38 @@ class PreprocessorStyle(PreprocessorPort):
             local_val_cold_uri=str(local_val_cold_path),
             summary_uri=str(summary_path),
             manifest_uri=str(manifest_path),
+        )
+
+    def _cached_artifacts(self, dataset_name: str) -> DatasetArtifacts | None:
+        """
+        If local preprocessed artifacts already exist, reuse them.
+        This supports server restarts without repeating heavy preprocessing.
+        """
+        target = self._work_dir / dataset_name
+        required = {
+            "books": target / "books.parquet",
+            "train": target / "train.parquet",
+            "test": target / "test.parquet",
+            "local_train": target / "local_train.parquet",
+            "local_val": target / "local_val.parquet",
+            "local_val_warm": target / "local_val_warm.parquet",
+            "local_val_cold": target / "local_val_cold.parquet",
+            "summary": target / "summary.json",
+            "manifest": target / "manifest.json",
+        }
+        if not all(path.exists() for path in required.values()):
+            return None
+
+        return DatasetArtifacts(
+            books_uri=str(required["books"]),
+            train_uri=str(required["train"]),
+            test_uri=str(required["test"]),
+            local_train_uri=str(required["local_train"]),
+            local_val_uri=str(required["local_val"]),
+            local_val_warm_uri=str(required["local_val_warm"]),
+            local_val_cold_uri=str(required["local_val_cold"]),
+            summary_uri=str(required["summary"]),
+            manifest_uri=str(required["manifest"]),
         )
 
     @staticmethod

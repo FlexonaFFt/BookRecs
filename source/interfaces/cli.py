@@ -13,6 +13,7 @@ from source.infrastructure.storage import (
     RunLogMemory,
     RunLogPg,
     StoreLocal,
+    StoreS3,
 )
 
 
@@ -34,6 +35,10 @@ def build_parser() -> argparse.ArgumentParser:
     prep.add_argument("--interactions-chunksize", type=int, default=200_000)
     prep.add_argument("--registry-backend", choices=["memory", "postgres"], default="memory")
     prep.add_argument("--pg-dsn", default=os.getenv("BOOKRECS_PG_DSN", ""))
+    prep.add_argument("--store-backend", choices=["local", "s3"], default="local")
+    prep.add_argument("--s3-bucket", default=os.getenv("BOOKRECS_S3_BUCKET", ""))
+    prep.add_argument("--s3-region", default=os.getenv("BOOKRECS_S3_REGION", "us-east-1"))
+    prep.add_argument("--s3-endpoint", default=os.getenv("BOOKRECS_S3_ENDPOINT", ""))
 
     return parser
 
@@ -68,9 +73,18 @@ def main() -> None:
         dataset_registry = RegistryMemory()
         run_log = RunLogMemory()
 
+    if args.store_backend == "s3":
+        dataset_store = StoreS3(
+            bucket=args.s3_bucket,
+            region=args.s3_region,
+            endpoint_url=args.s3_endpoint,
+        )
+    else:
+        dataset_store = StoreLocal()
+
     use_case = PrepareDataUseCase(
         preprocessor=PreprocessorStyle(),
-        dataset_store=StoreLocal(),
+        dataset_store=dataset_store,
         dataset_registry=dataset_registry,
         run_log=run_log,
     )
