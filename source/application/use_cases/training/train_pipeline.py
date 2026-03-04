@@ -4,7 +4,7 @@ import itertools
 import json
 import math
 import pickle
-import re
+import random
 import time
 
 from collections import Counter, defaultdict
@@ -22,6 +22,12 @@ from source.application.use_cases.ranking.final_rank import FinalRankUseCase
 from source.application.use_cases.ranking.generate_candidates import GenerateCandidatesUseCase
 from source.application.use_cases.ranking.prerank_candidates import PreRankCandidatesUseCase
 from source.application.use_cases.ranking.reco_flow import RecoFlowCommand, RecoFlowUseCase
+from source.application.use_cases.training.artifacts import (
+    ARTIFACT_SCHEMA_VERSION,
+    ArtifactLayout,
+    TrainManifest,
+    build_layout,
+)
 from source.infrastructure.processing.postprocessing import PostprocessTemplate
 from source.infrastructure.ranking.candidates import SourceCf, SourceContent, SourcePop
 from source.infrastructure.ranking.finalrank import RankerTemplate
@@ -55,23 +61,31 @@ class TrainPipelineResult:
 
 
 class TrainPipelineUseCase:
-
-
     def execute(self, cmd: TrainPipelineCommand) -> TrainPipelineResult:
         if pd is None:
             raise RuntimeError("pandas is required for training. Install project dependencies first.")
         if cmd.eval_users_limit <= 0:
             raise ValueError("eval_users_limit must be > 0")
+        if cmd.final_top_k <= 0:
+            raise ValueError("final_top_k must be > 0")
+
+        random.seed(cmd.seed)
 
         run_id = cmd.run_name or str(uuid4())
         run_dir = Path(cmd.output_root) / run_id
-        model_dir = run_dir / "models"
+        layout = build_layout(run_dir)
         run_dir.mkdir(parents=True, exist_ok=True)
-        model_dir.mkdir(parents=True, exist_ok=True)
+        layout.model_dir.mkdir(parents=True, exist_ok=True)
 
-        logger = TrainLogger(run_id=run_id, log_file=run_dir / "train.log.jsonl")
+        logger = TrainLogger(run_id=run_id, log_file=layout.train_log)
         pipeline_started = time.time()
-        logger.event("RUN_START", run_dir=str(run_dir), dataset_dir=cmd.dataset_dir)
+        logger.event(
+            "RUN_START",
+            run_dir=str(run_dir),
+            dataset_dir=cmd.dataset_dir,
+            config=asdict(cmd),
+            artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
+        )
 
         data = self._load_dataset(cmd.dataset_dir)
         logger.event(
@@ -87,26 +101,30 @@ class TrainPipelineUseCase:
         step_started = time.time()
         stage1 = self._fit_stage1(data=data, cmd=cmd, logger=logger)
         timings["stage1_fit"] = round(time.time() - step_started, 3)
+        logger.event("STEP_TIMING", step="stage1_fit", duration_sec=timings["stage1_fit"])
 
         # Stage 2 fit (weight search)
         step_started = time.time()
         stage2_cfg = self._fit_stage2(data=data, stage1=stage1, cmd=cmd, logger=logger)
         timings["stage2_fit"] = round(time.time() - step_started, 3)
+        logger.event("STEP_TIMING", step="stage2_fit", duration_sec=timings["stage2_fit"])
 
         # Stage 3 fit (template; no extra params for now)
         step_started = time.time()
         stage3_cfg = self._fit_stage3(logger=logger)
         timings["stage3_fit"] = round(time.time() - step_started, 3)
+        logger.event("STEP_TIMING", step="stage3_fit", duration_sec=timings["stage3_fit"])
 
         # Evaluate
         step_started = time.time()
         metrics = self._evaluate(data=data, stage1=stage1, stage2_cfg=stage2_cfg, cmd=cmd, logger=logger)
         timings["evaluate"] = round(time.time() - step_started, 3)
+        logger.event("STEP_TIMING", step="evaluate", duration_sec=timings["evaluate"])
 
         # Publish local artifacts
         step_started = time.time()
         self._publish_local(
-            model_dir=model_dir,
+            layout=layout,
             stage1=stage1,
             stage2_cfg=stage2_cfg,
             stage3_cfg=stage3_cfg,
@@ -114,37 +132,32 @@ class TrainPipelineUseCase:
             logger=logger,
         )
         timings["publish"] = round(time.time() - step_started, 3)
+        logger.event("STEP_TIMING", step="publish", duration_sec=timings["publish"])
 
         duration_sec = round(time.time() - pipeline_started, 3)
-        manifest = {
-            "run_id": run_id,
-            "status": "SUCCESS",
-            "duration_sec": duration_sec,
-            "dataset_dir": cmd.dataset_dir,
-            "config": asdict(cmd),
-            "artifacts": {
-                "models_dir": "models",
-                "metrics_path": "metrics.json",
-                "timings_path": "timings.json",
-                "log_path": "train.log.jsonl",
-            },
-        }
+        manifest = TrainManifest.build(
+            run_id=run_id,
+            status="SUCCESS",
+            duration_sec=duration_sec,
+            dataset_dir=cmd.dataset_dir,
+            config=asdict(cmd),
+            layout=layout,
+            metrics=metrics,
+            timings=timings,
+        )
 
-        metrics_path = run_dir / "metrics.json"
-        timings_path = run_dir / "timings.json"
-        manifest_path = run_dir / "manifest.json"
-        metrics_path.write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
-        timings_path.write_text(json.dumps(timings, ensure_ascii=False, indent=2), encoding="utf-8")
-        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        layout.metrics.write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
+        layout.timings.write_text(json.dumps(timings, ensure_ascii=False, indent=2), encoding="utf-8")
+        layout.manifest.write_text(json.dumps(manifest.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
 
         logger.event("RUN_END", status="SUCCESS", duration_sec=duration_sec, metrics=metrics)
         return TrainPipelineResult(
             run_id=run_id,
             run_dir=str(run_dir),
-            manifest_path=str(manifest_path),
-            metrics_path=str(metrics_path),
-            timings_path=str(timings_path),
-            log_path=str(run_dir / "train.log.jsonl"),
+            manifest_path=str(layout.manifest),
+            metrics_path=str(layout.metrics),
+            timings_path=str(layout.timings),
+            log_path=str(layout.train_log),
         )
 
     @staticmethod
@@ -228,7 +241,8 @@ class TrainPipelineUseCase:
 
         best_cfg = grid[0]
         best_recall = -1.0
-        for cfg in grid:
+        for i, cfg in enumerate(grid, start=1):
+            logger.event("STAGE2_TRY_START", trial=i, total_trials=len(grid), config=asdict(cfg))
             stage2_uc = PreRankCandidatesUseCase(preranker=PreRankLinear(cfg=cfg))
             recall = self._evaluate_prerank_recall(
                 users=val_users,
@@ -239,12 +253,18 @@ class TrainPipelineUseCase:
                 stage2_uc=stage2_uc,
                 cmd=cmd,
             )
+            logger.event("STAGE2_TRY_END", trial=i, total_trials=len(grid), recall=round(recall, 6))
             if recall > best_recall:
                 best_recall = recall
                 best_cfg = cfg
 
         logger.progress("stage2_fit", done=1, total=1)
-        logger.end_step("stage2_fit", status="SUCCESS", best_recall=round(best_recall, 6))
+        logger.end_step(
+            "stage2_fit",
+            status="SUCCESS",
+            best_recall=round(best_recall, 6),
+            best_config=asdict(best_cfg),
+        )
         return best_cfg
 
     @staticmethod
@@ -332,7 +352,7 @@ class TrainPipelineUseCase:
 
     @staticmethod
     def _publish_local(
-        model_dir: Path,
+        layout: ArtifactLayout,
         stage1: dict[str, Any],
         stage2_cfg: PreRankLinearConfig,
         stage3_cfg: dict[str, Any],
@@ -341,28 +361,28 @@ class TrainPipelineUseCase:
     ) -> None:
         logger.start_step("publish", total=4)
 
-        with (model_dir / "stage1.pkl").open("wb") as f:
+        with layout.stage1_model.open("wb") as f:
             pickle.dump(stage1, f)
         logger.progress("publish", done=1, total=4)
 
-        (model_dir / "stage2.json").write_text(
+        layout.stage2_config.write_text(
             json.dumps(asdict(stage2_cfg), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         logger.progress("publish", done=2, total=4)
 
-        (model_dir / "stage3.json").write_text(
+        layout.stage3_config.write_text(
             json.dumps(stage3_cfg, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         logger.progress("publish", done=3, total=4)
 
-        (model_dir / "metrics_snapshot.json").write_text(
+        layout.metrics_snapshot.write_text(
             json.dumps(metrics, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         logger.progress("publish", done=4, total=4)
-        logger.end_step("publish", status="SUCCESS", model_dir=str(model_dir))
+        logger.end_step("publish", status="SUCCESS", model_dir=str(layout.model_dir))
 
     @staticmethod
     def _fit_popularity(train: Any) -> tuple[list[Any], dict[Any, float]]:
@@ -550,4 +570,3 @@ class TrainPipelineUseCase:
         ideal_len = min(len(gt_set), k)
         idcg = sum(1.0 / math.log2(rank + 1) for rank in range(1, ideal_len + 1))
         return float(dcg / idcg) if idcg > 0 else 0.0
-

@@ -3,21 +3,23 @@ from __future__ import annotations
 import argparse
 
 from source.application.use_cases.training import TrainPipelineCommand, TrainPipelineUseCase
+from source.infrastructure.config import load_settings
 
 
 def build_parser() -> argparse.ArgumentParser:
+    settings = load_settings()
     parser = argparse.ArgumentParser(description="Run training pipeline")
-    parser.add_argument("--dataset-dir", default="artifacts/tmp_preprocessed/goodreads_ya")
-    parser.add_argument("--output-root", default="artifacts/runs")
+    parser.add_argument("--dataset-dir", default=settings.train_dataset_dir)
+    parser.add_argument("--output-root", default=settings.train_output_root)
     parser.add_argument("--run-name", default=None)
-    parser.add_argument("--eval-users-limit", type=int, default=2000)
-    parser.add_argument("--candidate-pool-size", type=int, default=1000)
-    parser.add_argument("--candidate-per-source-limit", type=int, default=300)
-    parser.add_argument("--pre-top-m", type=int, default=300)
-    parser.add_argument("--final-top-k", type=int, default=10)
-    parser.add_argument("--cf-max-neighbors", type=int, default=120)
-    parser.add_argument("--content-max-neighbors", type=int, default=120)
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--eval-users-limit", type=int, default=settings.train_eval_users_limit)
+    parser.add_argument("--candidate-pool-size", type=int, default=settings.train_candidate_pool_size)
+    parser.add_argument("--candidate-per-source-limit", type=int, default=settings.train_candidate_per_source_limit)
+    parser.add_argument("--pre-top-m", type=int, default=settings.train_pre_top_m)
+    parser.add_argument("--final-top-k", type=int, default=settings.train_final_top_k)
+    parser.add_argument("--cf-max-neighbors", type=int, default=settings.train_cf_max_neighbors)
+    parser.add_argument("--content-max-neighbors", type=int, default=settings.train_content_max_neighbors)
+    parser.add_argument("--seed", type=int, default=settings.train_seed)
     return parser
 
 

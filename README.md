@@ -7,6 +7,28 @@
 
 ---
 
+## Training Artifact Contract
+
+Все запуски `train` сохраняются в `artifacts/runs/<run_id>/` по фиксированному контракту:
+
+```text
+artifacts/runs/<run_id>/
+├── manifest.json            # schema_version=1.0.0, config hash, пути, метрики, тайминги
+├── metrics.json             # итоговые offline-метрики
+├── timings.json             # длительности шагов
+├── train.log.jsonl          # структурированные события обучения
+└── models/
+    ├── stage1.pkl           # fitted Stage-1 источники (CF/content/pop)
+    ├── stage2.json          # лучший конфиг PreRank
+    ├── stage3.json          # конфиг FinalRank/Postprocess
+    └── metrics_snapshot.json
+```
+
+Контракт централизован в:
+- `source/application/use_cases/training/artifacts.py`
+
+Тренировочные настройки берутся из `.env` (см. `.env.example`, префикс `BOOKRECS_TRAIN_*`) и могут быть переопределены CLI-флагами.
+
 ## Target Clean Architecture (from scratch)
 
 ```text
