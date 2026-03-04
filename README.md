@@ -5,6 +5,42 @@
 - [Ссылка на ML System Design Doc](docs/ML_System_Design.md)
 - [Итоги research (метрики, сравнение моделей, графики)](docs/Research_Results.md)
 
+## Docker запуск
+
+`docker-compose.yml` запускает PostgreSQL, MinIO и единый сервис `pipeline`.
+
+Шаги:
+
+1. Подготовить `.env`:
+   ```bash
+   make init-env
+   ```
+2. Поднять только инфраструктуру (без запуска пайплайна):
+   ```bash
+   make infra-up
+   ```
+3. Запустить полный пайплайн:
+   ```bash
+   make pipeline-up
+   ```
+
+Полезные команды:
+
+```bash
+make ps
+make logs SERVICE=pipeline
+make down
+make down-volumes
+```
+
+Сервис `pipeline` теперь запускается напрямую командой:
+
+```bash
+python -m source.interfaces.cli run
+```
+
+Все ключевые параметры читаются из `BOOKRECS_*` переменных окружения и могут быть переопределены CLI-флагами.
+
 ---
 
 ## Training Artifact Contract

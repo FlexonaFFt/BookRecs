@@ -4,6 +4,7 @@ import argparse
 
 from source.application.use_cases.training import TrainPipelineCommand, TrainPipelineUseCase
 from source.infrastructure.config import load_settings
+from source.interfaces.commands.env_defaults import env_int, env_optional_str
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -11,15 +12,31 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run training pipeline")
     parser.add_argument("--dataset-dir", default=settings.train_dataset_dir)
     parser.add_argument("--output-root", default=settings.train_output_root)
-    parser.add_argument("--run-name", default=None)
-    parser.add_argument("--eval-users-limit", type=int, default=settings.train_eval_users_limit)
-    parser.add_argument("--candidate-pool-size", type=int, default=settings.train_candidate_pool_size)
-    parser.add_argument("--candidate-per-source-limit", type=int, default=settings.train_candidate_per_source_limit)
-    parser.add_argument("--pre-top-m", type=int, default=settings.train_pre_top_m)
-    parser.add_argument("--final-top-k", type=int, default=settings.train_final_top_k)
-    parser.add_argument("--cf-max-neighbors", type=int, default=settings.train_cf_max_neighbors)
-    parser.add_argument("--content-max-neighbors", type=int, default=settings.train_content_max_neighbors)
-    parser.add_argument("--seed", type=int, default=settings.train_seed)
+    parser.add_argument("--run-name", default=env_optional_str("BOOKRECS_TRAIN_RUN_NAME"))
+    parser.add_argument("--eval-users-limit", type=int, default=env_int("BOOKRECS_TRAIN_EVAL_USERS_LIMIT", settings.train_eval_users_limit))
+    parser.add_argument(
+        "--candidate-pool-size",
+        type=int,
+        default=env_int("BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE", settings.train_candidate_pool_size),
+    )
+    parser.add_argument(
+        "--candidate-per-source-limit",
+        type=int,
+        default=env_int("BOOKRECS_TRAIN_PER_SOURCE_LIMIT", settings.train_candidate_per_source_limit),
+    )
+    parser.add_argument("--pre-top-m", type=int, default=env_int("BOOKRECS_TRAIN_PRE_TOP_M", settings.train_pre_top_m))
+    parser.add_argument("--final-top-k", type=int, default=env_int("BOOKRECS_TRAIN_FINAL_TOP_K", settings.train_final_top_k))
+    parser.add_argument(
+        "--cf-max-neighbors",
+        type=int,
+        default=env_int("BOOKRECS_TRAIN_CF_MAX_NEIGHBORS", settings.train_cf_max_neighbors),
+    )
+    parser.add_argument(
+        "--content-max-neighbors",
+        type=int,
+        default=env_int("BOOKRECS_TRAIN_CONTENT_MAX_NEIGHBORS", settings.train_content_max_neighbors),
+    )
+    parser.add_argument("--seed", type=int, default=env_int("BOOKRECS_TRAIN_SEED", settings.train_seed))
     return parser
 
 

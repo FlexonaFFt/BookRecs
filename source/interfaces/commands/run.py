@@ -5,6 +5,7 @@ from pathlib import Path
 
 from data.goodreads import download_goodreads_raw
 from source.infrastructure.config import load_settings
+from source.interfaces.commands.env_defaults import env_bool, env_float, env_int, env_optional_str, env_str
 from source.interfaces.commands.migrate import run_migration
 from source.interfaces.commands.prepare import build_parser as build_prepare_parser
 from source.interfaces.commands.prepare import run_prepare
@@ -14,43 +15,73 @@ from source.interfaces.commands.train import run_train
 
 def build_parser() -> argparse.ArgumentParser:
     settings = load_settings()
+    dataset_name = env_str("BOOKRECS_DATASET_NAME", "goodreads_ya")
+    raw_dir = env_str("BOOKRECS_RAW_DIR", "data/raw_data")
     parser = argparse.ArgumentParser(description="Run full pipeline: download -> prepare -> train")
-    parser.add_argument("--dataset-name", default="goodreads_ya")
-    parser.add_argument("--raw-dir", default="data/raw_data")
-    parser.add_argument("--books-raw-uri", default=None)
-    parser.add_argument("--interactions-raw-uri", default=None)
-    parser.add_argument("--dataset-dir", default=None)
+    parser.add_argument("--dataset-name", default=dataset_name)
+    parser.add_argument("--raw-dir", default=raw_dir)
+    parser.add_argument("--books-raw-uri", default=env_optional_str("BOOKRECS_BOOKS_RAW_URI"))
+    parser.add_argument("--interactions-raw-uri", default=env_optional_str("BOOKRECS_INTERACTIONS_RAW_URI"))
+    parser.add_argument("--dataset-dir", default=env_optional_str("BOOKRECS_TRAIN_DATASET_DIR"))
     parser.add_argument("--output-root", default=settings.train_output_root)
-    parser.add_argument("--run-name", default=None)
-    parser.add_argument("--k-core", type=int, default=2)
-    parser.add_argument("--keep-recent-fraction", type=float, default=0.6)
-    parser.add_argument("--test-fraction", type=float, default=0.25)
-    parser.add_argument("--local-val-fraction", type=float, default=0.2)
-    parser.add_argument("--warm-users-only", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument("--language-filter-enabled", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument("--interactions-chunksize", type=int, default=200_000)
-    parser.add_argument("--store-backend", choices=["local", "s3"], default="local")
-    parser.add_argument("--registry-backend", choices=["memory", "postgres"], default="memory")
-    parser.add_argument("--s3-prefix", default=None)
+    parser.add_argument("--run-name", default=env_optional_str("BOOKRECS_TRAIN_RUN_NAME"))
+    parser.add_argument("--k-core", type=int, default=env_int("BOOKRECS_K_CORE", 2))
+    parser.add_argument("--keep-recent-fraction", type=float, default=env_float("BOOKRECS_KEEP_RECENT_FRACTION", 0.6))
+    parser.add_argument("--test-fraction", type=float, default=env_float("BOOKRECS_TEST_FRACTION", 0.25))
+    parser.add_argument("--local-val-fraction", type=float, default=env_float("BOOKRECS_LOCAL_VAL_FRACTION", 0.2))
+    parser.add_argument(
+        "--warm-users-only",
+        action=argparse.BooleanOptionalAction,
+        default=env_bool("BOOKRECS_WARM_USERS_ONLY", True),
+    )
+    parser.add_argument(
+        "--language-filter-enabled",
+        action=argparse.BooleanOptionalAction,
+        default=env_bool("BOOKRECS_LANGUAGE_FILTER_ENABLED", True),
+    )
+    parser.add_argument("--interactions-chunksize", type=int, default=env_int("BOOKRECS_INTERACTIONS_CHUNKSIZE", 200_000))
+    parser.add_argument("--store-backend", choices=["local", "s3"], default=env_str("BOOKRECS_STORE_BACKEND", "local"))
+    parser.add_argument(
+        "--registry-backend",
+        choices=["memory", "postgres"],
+        default=env_str("BOOKRECS_REGISTRY_BACKEND", "memory"),
+    )
+    parser.add_argument("--s3-prefix", default=env_optional_str("BOOKRECS_S3_PREFIX"))
     parser.add_argument("--s3-bucket", default=settings.s3_bucket)
     parser.add_argument("--s3-region", default=settings.s3_region)
     parser.add_argument("--s3-endpoint", default=settings.s3_endpoint)
     parser.add_argument("--pg-dsn", default=settings.pg_dsn)
     parser.add_argument(
         "--migration-path",
-        default="source/infrastructure/storage/postgres/migrations",
+        default=env_str("BOOKRECS_PG_MIGRATION_PATH", "source/infrastructure/storage/postgres/migrations"),
     )
-    parser.add_argument("--skip-prepare", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--skip-train", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--migrate", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument("--eval-users-limit", type=int, default=settings.train_eval_users_limit)
-    parser.add_argument("--candidate-pool-size", type=int, default=settings.train_candidate_pool_size)
-    parser.add_argument("--candidate-per-source-limit", type=int, default=settings.train_candidate_per_source_limit)
-    parser.add_argument("--pre-top-m", type=int, default=settings.train_pre_top_m)
-    parser.add_argument("--final-top-k", type=int, default=settings.train_final_top_k)
-    parser.add_argument("--cf-max-neighbors", type=int, default=settings.train_cf_max_neighbors)
-    parser.add_argument("--content-max-neighbors", type=int, default=settings.train_content_max_neighbors)
-    parser.add_argument("--seed", type=int, default=settings.train_seed)
+    parser.add_argument("--skip-prepare", action=argparse.BooleanOptionalAction, default=env_bool("BOOKRECS_SKIP_PREPARE", False))
+    parser.add_argument("--skip-train", action=argparse.BooleanOptionalAction, default=env_bool("BOOKRECS_SKIP_TRAIN", False))
+    parser.add_argument("--migrate", action=argparse.BooleanOptionalAction, default=env_bool("BOOKRECS_RUN_MIGRATE", True))
+    parser.add_argument("--eval-users-limit", type=int, default=env_int("BOOKRECS_TRAIN_EVAL_USERS_LIMIT", settings.train_eval_users_limit))
+    parser.add_argument(
+        "--candidate-pool-size",
+        type=int,
+        default=env_int("BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE", settings.train_candidate_pool_size),
+    )
+    parser.add_argument(
+        "--candidate-per-source-limit",
+        type=int,
+        default=env_int("BOOKRECS_TRAIN_PER_SOURCE_LIMIT", settings.train_candidate_per_source_limit),
+    )
+    parser.add_argument("--pre-top-m", type=int, default=env_int("BOOKRECS_TRAIN_PRE_TOP_M", settings.train_pre_top_m))
+    parser.add_argument("--final-top-k", type=int, default=env_int("BOOKRECS_TRAIN_FINAL_TOP_K", settings.train_final_top_k))
+    parser.add_argument(
+        "--cf-max-neighbors",
+        type=int,
+        default=env_int("BOOKRECS_TRAIN_CF_MAX_NEIGHBORS", settings.train_cf_max_neighbors),
+    )
+    parser.add_argument(
+        "--content-max-neighbors",
+        type=int,
+        default=env_int("BOOKRECS_TRAIN_CONTENT_MAX_NEIGHBORS", settings.train_content_max_neighbors),
+    )
+    parser.add_argument("--seed", type=int, default=env_int("BOOKRECS_TRAIN_SEED", settings.train_seed))
     return parser
 
 
