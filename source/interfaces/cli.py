@@ -5,6 +5,8 @@ import argparse
 from source.interfaces.cli_migrate import main as migrate_main
 from source.interfaces.cli_prepare import build_parser as build_prepare_parser
 from source.interfaces.cli_prepare import run_prepare
+from source.interfaces.cli_run import build_parser as build_run_parser
+from source.interfaces.cli_run import run_pipeline
 from source.interfaces.cli_train import build_parser as build_train_parser
 from source.interfaces.cli_train import run_train
 
@@ -27,6 +29,13 @@ def build_parser() -> argparse.ArgumentParser:
             continue
         train_sub._add_action(action)
 
+    run_sub = sub.add_parser("run", help="Run full pipeline (download, prepare, train)")
+    run_inner = build_run_parser()
+    for action in run_inner._actions:
+        if action.dest == "help":
+            continue
+        run_sub._add_action(action)
+
     sub.add_parser("migrate", help="Apply PostgreSQL migration file")
     return parser
 
@@ -39,6 +48,9 @@ def main() -> None:
         return
     if args.command == "train":
         run_train(args)
+        return
+    if args.command == "run":
+        run_pipeline(args)
         return
     if args.command == "migrate":
         migrate_main()
