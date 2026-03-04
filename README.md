@@ -55,8 +55,8 @@ artifacts/runs/<run_id>/
 ├── train.log.jsonl          # структурированные события обучения
 └── models/
     ├── stage1.pkl           # fitted Stage-1 источники (CF/content/pop)
-    ├── stage2.json          # лучший конфиг PreRank
-    ├── stage3.json          # конфиг FinalRank/Postprocess
+    ├── stage2.pkl           # обученная модель Stage-2 pre-ranker
+    ├── stage3.pkl           # обученная модель Stage-3 final re-ranker
     └── metrics_snapshot.json
 ```
 

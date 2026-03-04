@@ -23,6 +23,7 @@ from source.application.use_cases.training.pipeline.models import TrainPipelineC
 from source.application.use_cases.training.stages.evaluate import evaluate_pipeline
 from source.application.use_cases.training.stages.stage1_fit import fit_stage1
 from source.application.use_cases.training.stages.stage2_fit import fit_stage2
+from source.application.use_cases.training.stages.stage3_fit import fit_stage3
 from source.infrastructure.training import TrainLogger
 # Реализует сценарий пайплайна обучения.
 class TrainPipelineUseCase:
@@ -68,17 +69,30 @@ class TrainPipelineUseCase:
         logger.event("STEP_TIMING", step="stage1_fit", duration_sec=timings["stage1_fit"])
 
         step_started = time.time()
-        stage2_cfg = fit_stage2(data=data, stage1=stage1, cmd=cmd, logger=logger)
+        stage2_model = fit_stage2(data=data, stage1=stage1, cmd=cmd, logger=logger)
         timings["stage2_fit"] = round(time.time() - step_started, 3)
         logger.event("STEP_TIMING", step="stage2_fit", duration_sec=timings["stage2_fit"])
 
         step_started = time.time()
-        stage3_cfg = self._fit_stage3(logger=logger)
+        stage3_model = fit_stage3(
+            data=data,
+            stage1=stage1,
+            stage2_model=stage2_model,
+            cmd=cmd,
+            logger=logger,
+        )
         timings["stage3_fit"] = round(time.time() - step_started, 3)
         logger.event("STEP_TIMING", step="stage3_fit", duration_sec=timings["stage3_fit"])
 
         step_started = time.time()
-        metrics = evaluate_pipeline(data=data, stage1=stage1, stage2_cfg=stage2_cfg, cmd=cmd, logger=logger)
+        metrics = evaluate_pipeline(
+            data=data,
+            stage1=stage1,
+            stage2_model=stage2_model,
+            stage3_model=stage3_model,
+            cmd=cmd,
+            logger=logger,
+        )
         timings["evaluate"] = round(time.time() - step_started, 3)
         logger.event("STEP_TIMING", step="evaluate", duration_sec=timings["evaluate"])
 
@@ -86,8 +100,8 @@ class TrainPipelineUseCase:
         publish_local_artifacts(
             layout=layout,
             stage1=stage1,
-            stage2_cfg=stage2_cfg,
-            stage3_cfg=stage3_cfg,
+            stage2_model=stage2_model,
+            stage3_model=stage3_model,
             metrics=metrics,
             logger=logger,
         )
@@ -119,11 +133,3 @@ class TrainPipelineUseCase:
             timings_path=str(layout.timings),
             log_path=str(layout.train_log),
         )
-
-    @staticmethod
-    def _fit_stage3(logger: TrainLogger) -> dict[str, str]:
-        logger.start_step("stage3_fit", total=1)
-        logger.progress("stage3_fit", done=1, total=1)
-        cfg = {"ranker": "FinalRankerBaseline", "postprocessor": "DefaultPostprocessor"}
-        logger.end_step("stage3_fit", status="SUCCESS", config=cfg)
-        return cfg

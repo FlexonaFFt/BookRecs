@@ -14,14 +14,13 @@ from source.infrastructure.ranking.candidates import (
     ContentCandidateSource,
     PopularCandidateSource,
 )
-from source.infrastructure.ranking.finalrank import FinalRankerBaseline
-from source.infrastructure.ranking.prerank import LinearPreRanker
 
 
 def evaluate_pipeline(
     data: dict[str, Any],
     stage1: dict[str, Any],
-    stage2_cfg: Any,
+    stage2_model: Any,
+    stage3_model: Any,
     cmd: Any,
     logger: Any,
 ) -> dict[str, float]:
@@ -38,8 +37,8 @@ def evaluate_pipeline(
         ],
         fallback_source=PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
     )
-    stage2_uc = PreRankCandidatesUseCase(preranker=LinearPreRanker(cfg=stage2_cfg))
-    stage3_uc = FinalRankUseCase(FinalRankerBaseline(), DefaultPostprocessor())
+    stage2_uc = PreRankCandidatesUseCase(preranker=stage2_model)
+    stage3_uc = FinalRankUseCase(stage3_model, DefaultPostprocessor())
     flow = RecoFlowUseCase(stage1=stage1_uc, stage2=stage2_uc, stage3=stage3_uc)
 
     ndcg_scores: list[float] = []

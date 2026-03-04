@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import pickle
-from dataclasses import asdict
 from typing import Any
 
 from source.application.use_cases.training.artifacts import ArtifactLayout
@@ -11,8 +10,8 @@ from source.application.use_cases.training.artifacts import ArtifactLayout
 def publish_local_artifacts(
     layout: ArtifactLayout,
     stage1: dict[str, Any],
-    stage2_cfg: Any,
-    stage3_cfg: dict[str, Any],
+    stage2_model: Any,
+    stage3_model: Any,
     metrics: dict[str, float],
     logger: Any,
 ) -> None:
@@ -22,16 +21,12 @@ def publish_local_artifacts(
         pickle.dump(stage1, f)
     logger.progress("publish", done=1, total=4)
 
-    layout.stage2_config.write_text(
-        json.dumps(asdict(stage2_cfg), ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    with layout.stage2_model.open("wb") as f:
+        pickle.dump(stage2_model, f)
     logger.progress("publish", done=2, total=4)
 
-    layout.stage3_config.write_text(
-        json.dumps(stage3_cfg, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    with layout.stage3_model.open("wb") as f:
+        pickle.dump(stage3_model, f)
     logger.progress("publish", done=3, total=4)
 
     layout.metrics_snapshot.write_text(

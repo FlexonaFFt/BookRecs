@@ -20,7 +20,7 @@ from source.infrastructure.ranking.candidates import (
 from source.infrastructure.ranking.prerank import LinearPreRanker, LinearPreRankerConfig
 
 
-def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: Any) -> LinearPreRankerConfig:
+def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: Any) -> LinearPreRanker:
     logger.start_step("stage2_fit", total=1)
     val_users, gt_map = build_val_ground_truth(data["local_val"], limit=cmd.eval_users_limit)
     seen_by_user = build_seen_map(data["local_train"])
@@ -66,7 +66,7 @@ def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: A
         best_recall=round(best_recall, 6),
         best_config=asdict(best_cfg),
     )
-    return best_cfg
+    return LinearPreRanker(cfg=best_cfg)
 
 
 def evaluate_prerank_recall(

@@ -16,8 +16,8 @@ class ArtifactLayout:
     run_dir: Path
     model_dir: Path
     stage1_model: Path
-    stage2_config: Path
-    stage3_config: Path
+    stage2_model: Path
+    stage3_model: Path
     metrics_snapshot: Path
     metrics: Path
     timings: Path
@@ -28,8 +28,8 @@ class ArtifactLayout:
         return {
             "models_dir": self.model_dir.relative_to(self.run_dir).as_posix(),
             "stage1_model": self.stage1_model.relative_to(self.run_dir).as_posix(),
-            "stage2_config": self.stage2_config.relative_to(self.run_dir).as_posix(),
-            "stage3_config": self.stage3_config.relative_to(self.run_dir).as_posix(),
+            "stage2_model": self.stage2_model.relative_to(self.run_dir).as_posix(),
+            "stage3_model": self.stage3_model.relative_to(self.run_dir).as_posix(),
             "metrics_snapshot": self.metrics_snapshot.relative_to(self.run_dir).as_posix(),
             "metrics": self.metrics.relative_to(self.run_dir).as_posix(),
             "timings": self.timings.relative_to(self.run_dir).as_posix(),
@@ -44,8 +44,8 @@ def build_layout(run_dir: Path) -> ArtifactLayout:
         run_dir=run_dir,
         model_dir=model_dir,
         stage1_model=model_dir / "stage1.pkl",
-        stage2_config=model_dir / "stage2.json",
-        stage3_config=model_dir / "stage3.json",
+        stage2_model=model_dir / "stage2.pkl",
+        stage3_model=model_dir / "stage3.pkl",
         metrics_snapshot=model_dir / "metrics_snapshot.json",
         metrics=run_dir / "metrics.json",
         timings=run_dir / "timings.json",
