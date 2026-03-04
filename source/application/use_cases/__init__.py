@@ -13,6 +13,11 @@ from source.application.use_cases.ranking.reco_flow import (
     RecoFlowResult,
     RecoFlowUseCase,
 )
+from source.application.use_cases.training.train_pipeline import (
+    TrainPipelineCommand,
+    TrainPipelineResult,
+    TrainPipelineUseCase,
+)
 
 __all__ = [
     "FinalRankCommand",
@@ -26,4 +31,7 @@ __all__ = [
     "RecoFlowCommand",
     "RecoFlowResult",
     "RecoFlowUseCase",
+    "TrainPipelineCommand",
+    "TrainPipelineResult",
+    "TrainPipelineUseCase",
 ]
