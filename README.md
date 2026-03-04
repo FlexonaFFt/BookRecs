@@ -36,10 +36,10 @@ make down-volumes
 Сервис `pipeline` теперь запускается напрямую командой:
 
 ```bash
-python -m source.interfaces.cli run
+python -m source.interfaces.pipeline_entrypoint
 ```
 
-Все ключевые параметры читаются из `BOOKRECS_*` переменных окружения и могут быть переопределены CLI-флагами.
+Все ключевые параметры читаются из `BOOKRECS_*` переменных окружения.
 
 ---
 
@@ -63,7 +63,7 @@ artifacts/runs/<run_id>/
 Контракт централизован в:
 - `source/application/use_cases/training/artifacts.py`
 
-Тренировочные настройки берутся из `.env` (см. `.env.example`, префикс `BOOKRECS_TRAIN_*`) и могут быть переопределены CLI-флагами.
+Тренировочные настройки берутся из `.env` (см. `.env.example`, префикс `BOOKRECS_TRAIN_*`).
 
 ## Target Clean Architecture (from scratch)
 
