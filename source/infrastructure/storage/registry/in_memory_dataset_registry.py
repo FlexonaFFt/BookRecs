@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from source.application.ports import DatasetRegistryPort
 from source.domain.entities import DatasetVersion
-
-
-class RegistryMemory(DatasetRegistryPort):
+# Хранит версии датасета в памяти для локального выполнения.
+class InMemoryDatasetRegistry(DatasetRegistryPort):
     """In-memory registry for local runs."""
 
     def __init__(self) -> None:

@@ -20,6 +20,7 @@ from source.domain.entities import (
 
 
 @dataclass(frozen=True)
+# Содержит входные данные команды подготовки данных.
 class PrepareDataCommand:
     """Input for dataset preparation flow."""
     dataset_name: str
@@ -27,8 +28,7 @@ class PrepareDataCommand:
     params: PreprocessingParams
     s3_prefix: str
     metadata: dict[str, Any] | None = None
-
-
+# Реализует сценарий подготовки данных.
 class PrepareDataUseCase:
     """Run full prepare-data flow: preprocess -> store -> registry -> runlog."""
 

@@ -1,3 +1,3 @@
-from source.infrastructure.storage.postgres.client import ClientPg
+from source.infrastructure.storage.postgres.postgres_client import PostgresClient
 
-__all__ = ["ClientPg"]
+__all__ = ["PostgresClient"]

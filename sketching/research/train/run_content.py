@@ -27,7 +27,6 @@ if not logging.getLogger().handlers:
     )
 
 
-# Запустить content-метод и сохранить метрики
 def run_content_experiment(
     *,
     cache_dir: str = "research/results/cache/local_v1",
@@ -74,7 +73,6 @@ def run_content_experiment(
     return metrics
 
 
-# CLI
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Запуск content TF-IDF эксперимента")
     parser.add_argument("--cache-dir", default="research/results/cache/local_v1")

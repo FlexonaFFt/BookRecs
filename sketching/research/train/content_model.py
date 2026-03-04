@@ -10,7 +10,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 logger = logging.getLogger(__name__)
 
 
-# Форматировать время
 def _fmt_seconds(seconds: float) -> str:
     seconds = max(0, int(seconds))
     m = seconds // 60
@@ -20,7 +19,6 @@ def _fmt_seconds(seconds: float) -> str:
     return f"{s}с"
 
 
-# Лог прогресса с ETA
 def _log_progress(prefix: str, current: int, total: int, started_at: float, step: int) -> None:
     if total <= 0:
         return
@@ -33,9 +31,7 @@ def _log_progress(prefix: str, current: int, total: int, started_at: float, step
         "%s: %s/%s (%.1f%%), прошло=%s, осталось~%s",
         prefix, current, total, current * 100.0 / total, _fmt_seconds(elapsed), _fmt_seconds(eta)
     )
-
-
-# Простая контентная модель на TF-IDF
+# Описывает контентный рекомендатель на основе TF-IDF.
 class ContentTfidfRecommender:
     def __init__(
         self,
@@ -56,7 +52,6 @@ class ContentTfidfRecommender:
         self.popularity_fallback: list = []
         self.is_fitted = False
 
-    # Обучить контентную модель по текстам айтемов
     def fit(self, item_text: pd.DataFrame, item_popularity: Optional[pd.DataFrame] = None) -> "ContentTfidfRecommender":
         started = time.time()
         if "item_id" not in item_text.columns or "item_text" not in item_text.columns:
@@ -97,7 +92,6 @@ class ContentTfidfRecommender:
         )
         return self
 
-    # Посчитать скоры кандидатов для одного пользователя
     def score_user(self, seen_items: set, top_n: int = 200) -> tuple[list, list]:
         if not self.is_fitted or self.item_matrix is None:
             raise ValueError("Сначала вызовите fit()")
@@ -124,7 +118,6 @@ class ContentTfidfRecommender:
         vals = [float(scores[i]) for i in idx if np.isfinite(scores[i])]
         return items, vals
 
-    # Выдать рекомендации для списка пользователей
     def recommend(
         self,
         user_ids: list,

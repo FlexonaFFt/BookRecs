@@ -12,35 +12,39 @@ from source.application.use_cases.ranking.prerank_candidates import (
     PreRankCandidatesUseCase,
 )
 from source.application.use_cases.training.common.data_ops import build_seen_map, build_val_ground_truth, cold_items
-from source.infrastructure.ranking.candidates import SourceCf, SourceContent, SourcePop
-from source.infrastructure.ranking.prerank import PreRankLinear, PreRankLinearConfig
+from source.infrastructure.ranking.candidates import (
+    CfCandidateSource,
+    ContentCandidateSource,
+    PopularCandidateSource,
+)
+from source.infrastructure.ranking.prerank import LinearPreRanker, LinearPreRankerConfig
 
 
-def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: Any) -> PreRankLinearConfig:
+def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: Any) -> LinearPreRankerConfig:
     logger.start_step("stage2_fit", total=1)
     val_users, gt_map = build_val_ground_truth(data["local_val"], limit=cmd.eval_users_limit)
     seen_by_user = build_seen_map(data["local_train"])
     cold = cold_items(data["local_train"], data["local_val"])
 
     candidate_sources = [
-        SourceCf(stage1["cf_neighbors"]),
-        SourceContent(stage1["content_similar"]),
-        SourcePop(stage1["pop_items"], stage1["pop_scores"]),
+        CfCandidateSource(stage1["cf_neighbors"]),
+        ContentCandidateSource(stage1["content_similar"]),
+        PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
     ]
     stage1_uc = GenerateCandidatesUseCase(sources=candidate_sources, fallback_source=candidate_sources[-1])
 
     grid = [
-        PreRankLinearConfig(w_base=1.0, w_cf=0.2, w_content=0.2, w_pop=0.1, w_cold=0.1, w_history=0.02),
-        PreRankLinearConfig(w_base=1.0, w_cf=0.3, w_content=0.2, w_pop=0.1, w_cold=0.1, w_history=0.02),
-        PreRankLinearConfig(w_base=1.0, w_cf=0.25, w_content=0.25, w_pop=0.1, w_cold=0.15, w_history=0.02),
-        PreRankLinearConfig(w_base=1.0, w_cf=0.35, w_content=0.2, w_pop=0.1, w_cold=0.1, w_history=0.01),
+        LinearPreRankerConfig(w_base=1.0, w_cf=0.2, w_content=0.2, w_pop=0.1, w_cold=0.1, w_history=0.02),
+        LinearPreRankerConfig(w_base=1.0, w_cf=0.3, w_content=0.2, w_pop=0.1, w_cold=0.1, w_history=0.02),
+        LinearPreRankerConfig(w_base=1.0, w_cf=0.25, w_content=0.25, w_pop=0.1, w_cold=0.15, w_history=0.02),
+        LinearPreRankerConfig(w_base=1.0, w_cf=0.35, w_content=0.2, w_pop=0.1, w_cold=0.1, w_history=0.01),
     ]
 
     best_cfg = grid[0]
     best_recall = -1.0
     for i, cfg in enumerate(grid, start=1):
         logger.event("STAGE2_TRY_START", trial=i, total_trials=len(grid), config=asdict(cfg))
-        stage2_uc = PreRankCandidatesUseCase(preranker=PreRankLinear(cfg=cfg))
+        stage2_uc = PreRankCandidatesUseCase(preranker=LinearPreRanker(cfg=cfg))
         recall = evaluate_prerank_recall(
             users=val_users,
             gt_map=gt_map,

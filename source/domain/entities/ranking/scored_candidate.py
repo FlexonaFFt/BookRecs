@@ -5,6 +5,7 @@ from typing import Any
 
 
 @dataclass(frozen=True)
+# Описывает кандидата со скором.
 class ScoredCandidate:
     user_id: Any
     item_id: Any

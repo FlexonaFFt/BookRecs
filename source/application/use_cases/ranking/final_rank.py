@@ -8,13 +8,13 @@ from source.domain.entities import FinalItem, ScoredCandidate
 
 
 @dataclass(frozen=True)
+# Содержит входные данные команды финального ранжирования.
 class FinalRankCommand:
     user_id: Any
     candidates: list[ScoredCandidate]
     seen_items: set[Any]
     top_k: int = 10
-
-
+# Реализует сценарий финального ранжирования.
 class FinalRankUseCase:
     """
     Stage 3: final ranking + postprocessing.

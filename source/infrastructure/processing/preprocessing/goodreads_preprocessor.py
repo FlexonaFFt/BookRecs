@@ -9,14 +9,13 @@ from typing import Any
 
 try:
     import pandas as pd
-except ModuleNotFoundError:  # pragma: no cover
-    pd = None  # type: ignore[assignment]
+except ModuleNotFoundError:
+    pd = None
 
 from source.application.ports import PreprocessorPort
 from source.domain.entities import DatasetArtifacts, DatasetSource, PreprocessingParams
-
-
-class PreprocessorStyle(PreprocessorPort):
+# Готовит очищенные датасеты и локальные обучающие/валидационные сплиты из сырых данных Goodreads.
+class GoodreadsPreprocessor(PreprocessorPort):
 
 
     def __init__(self, work_dir: str = "artifacts/tmp_preprocessed") -> None:
@@ -183,8 +182,6 @@ class PreprocessorStyle(PreprocessorPort):
         data["authors"] = data["authors"].apply(_extract_authors)
 
         if language_filter:
-            # Lightweight filter:
-            # keep explicit english language_code or unknown.
             if "language_code" in data.columns:
                 language_code = data["language_code"].fillna("").astype(str).str.lower()
                 data = data[(language_code.str.contains("eng")) | (language_code == "")]

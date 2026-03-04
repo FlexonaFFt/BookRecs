@@ -87,7 +87,7 @@ artifacts/runs/<run_id>/
 │       │   │   ├── candidate_item2item.py
 │       │   │   ├── candidate_content.py
 │       │   │   ├── candidate_popular.py
-│       │   │   ├── preranker_linear.py
+│       │   │   ├── linear_preranker.py
 │       │   │   └── final_ranker_hybrid.py
 │       │   ├── repositories
 │       │   │   ├── recommendation_repo.py

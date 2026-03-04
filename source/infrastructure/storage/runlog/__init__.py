@@ -1,7 +1,7 @@
-from source.infrastructure.storage.runlog.runlog_memory import RunLogMemory
-from source.infrastructure.storage.runlog.runlog_pg import RunLogPg
+from source.infrastructure.storage.runlog.in_memory_run_log import InMemoryRunLog
+from source.infrastructure.storage.runlog.postgres_run_log import PostgresRunLog
 
 __all__ = [
-    "RunLogMemory",
-    "RunLogPg",
+    "InMemoryRunLog",
+    "PostgresRunLog",
 ]

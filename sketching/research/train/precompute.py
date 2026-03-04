@@ -22,7 +22,6 @@ if not logging.getLogger().handlers:
     )
 
 
-# Подготовить и сохранить общий кэш данных для research
 def run_precompute(
     data_dir: str = "data",
     local_name: str = "local_v1",
@@ -42,7 +41,6 @@ def run_precompute(
     logger.info("Precompute завершен за %.1f сек", time.time() - started)
 
 
-# CLI
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Подготовка кэша данных для research")
     parser.add_argument("--data-dir", default="data")

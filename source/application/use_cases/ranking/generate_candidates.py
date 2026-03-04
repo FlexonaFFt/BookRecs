@@ -8,13 +8,13 @@ from source.domain.entities import Candidate
 
 
 @dataclass(frozen=True)
+# Содержит входные данные команды генерации кандидатов.
 class GenerateCandidatesCommand:
     user_id: Any
     seen_items: set[Any]
     pool_size: int = 1000
     per_source_limit: int = 300
-
-
+# Реализует сценарий генерации кандидатов.
 class GenerateCandidatesUseCase:
     """Stage 1: generate and merge candidates from multiple sources."""
 
@@ -48,7 +48,6 @@ class GenerateCandidatesUseCase:
         if len(ranked) >= cmd.pool_size:
             return ranked
 
-        # Refill from fallback if total pool is still too short.
         need = cmd.pool_size - len(ranked)
         refill = self._fallback.generate(
             user_id=cmd.user_id,

@@ -9,8 +9,8 @@ from uuid import uuid4
 
 try:
     import pandas as pd
-except ModuleNotFoundError:  # pragma: no cover
-    pd = None  # type: ignore[assignment]
+except ModuleNotFoundError:
+    pd = None
 
 from source.application.use_cases.training.artifacts import (
     ARTIFACT_SCHEMA_VERSION,
@@ -24,8 +24,7 @@ from source.application.use_cases.training.stages.evaluate import evaluate_pipel
 from source.application.use_cases.training.stages.stage1_fit import fit_stage1
 from source.application.use_cases.training.stages.stage2_fit import fit_stage2
 from source.infrastructure.training import TrainLogger
-
-
+# Реализует сценарий пайплайна обучения.
 class TrainPipelineUseCase:
     def execute(self, cmd: TrainPipelineCommand) -> TrainPipelineResult:
         if pd is None:
@@ -125,6 +124,6 @@ class TrainPipelineUseCase:
     def _fit_stage3(logger: TrainLogger) -> dict[str, str]:
         logger.start_step("stage3_fit", total=1)
         logger.progress("stage3_fit", done=1, total=1)
-        cfg = {"ranker": "RankerTemplate", "postprocessor": "PostprocessTemplate"}
+        cfg = {"ranker": "FinalRankerBaseline", "postprocessor": "DefaultPostprocessor"}
         logger.end_step("stage3_fit", status="SUCCESS", config=cfg)
         return cfg

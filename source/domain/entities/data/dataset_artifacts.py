@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+# Описывает артефакты датасета.
 class DatasetArtifacts:
     books_uri: str
     train_uri: str

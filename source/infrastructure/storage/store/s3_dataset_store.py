@@ -9,12 +9,11 @@ from source.domain.entities import DatasetArtifacts, DatasetVersion
 try:
     import boto3
     from botocore.exceptions import ClientError
-except ModuleNotFoundError:  # pragma: no cover
-    boto3 = None  # type: ignore[assignment]
-    ClientError = Exception  # type: ignore[assignment]
-
-
-class StoreS3(DatasetStorePort):
+except ModuleNotFoundError:
+    boto3 = None
+    ClientError = Exception
+# Сохраняет артефакты датасета в S3-совместимое хранилище.
+class S3DatasetStore(DatasetStorePort):
 
 
     def __init__(

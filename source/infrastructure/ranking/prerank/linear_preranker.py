@@ -9,24 +9,24 @@ from source.infrastructure.ranking.prerank.feature_builder import FeatureBuilder
 
 
 @dataclass(frozen=True)
-class PreRankLinearConfig:
+# Хранит веса линейной модели предранжирования.
+class LinearPreRankerConfig:
     w_base: float = 1.0
     w_cf: float = 0.25
     w_content: float = 0.2
     w_pop: float = 0.1
     w_cold: float = 0.15
     w_history: float = 0.02
-
-
-class PreRankLinear(PreRankerPort):
+# Считает скор кандидатов линейной комбинацией ручных признаков.
+class LinearPreRanker(PreRankerPort):
     """Simple linear pre-ranker used as Stage-2 baseline."""
 
     def __init__(
         self,
-        cfg: PreRankLinearConfig | None = None,
+        cfg: LinearPreRankerConfig | None = None,
         feature_builder: FeatureBuilder | None = None,
     ) -> None:
-        self._cfg = cfg or PreRankLinearConfig()
+        self._cfg = cfg or LinearPreRankerConfig()
         self._feature_builder = feature_builder or FeatureBuilder()
 
     def rank(

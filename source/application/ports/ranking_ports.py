@@ -4,8 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from source.domain.entities import Candidate, FinalItem, ScoredCandidate
-
-
+# Определяет контракт порта источника кандидатов.
 class CandidateSourcePort(ABC):
     @property
     @abstractmethod
@@ -15,8 +14,7 @@ class CandidateSourcePort(ABC):
     @abstractmethod
     def generate(self, user_id: Any, seen_items: set[Any], limit: int) -> list[Candidate]:
         raise NotImplementedError
-
-
+# Определяет контракт порта предранжирования.
 class PreRankerPort(ABC):
     @abstractmethod
     def rank(
@@ -28,8 +26,7 @@ class PreRankerPort(ABC):
         top_m: int,
     ) -> list[ScoredCandidate]:
         raise NotImplementedError
-
-
+# Определяет контракт порта финального ранжирования.
 class FinalRankerPort(ABC):
     @abstractmethod
     def rank(
@@ -39,8 +36,7 @@ class FinalRankerPort(ABC):
         top_k: int,
     ) -> list[FinalItem]:
         raise NotImplementedError
-
-
+# Определяет контракт порта постобработки.
 class PostProcessorPort(ABC):
     @abstractmethod
     def apply(

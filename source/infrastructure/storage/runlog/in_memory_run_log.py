@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from source.application.ports import RunLogPort
 from source.domain.entities import PipelineRun
-
-
-class RunLogMemory(RunLogPort):
+# Хранит события запуска пайплайна в памяти для локального выполнения.
+class InMemoryRunLog(RunLogPort):
 
 
     def __init__(self) -> None:

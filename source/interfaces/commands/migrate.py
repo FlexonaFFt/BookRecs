@@ -3,10 +3,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from source.infrastructure.storage.postgres import ClientPg
+from source.infrastructure.storage.postgres import PostgresClient
 
 
-def _apply_sql(client: ClientPg, sql_path: Path) -> None:
+def _apply_sql(client: PostgresClient, sql_path: Path) -> None:
     sql = sql_path.read_text(encoding="utf-8")
     statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
     for statement in statements:
@@ -18,7 +18,7 @@ def run_migration(pg_dsn: str, migration_path: str) -> None:
     if not path.exists():
         raise FileNotFoundError(f"Migration path not found: {path}")
 
-    client = ClientPg(pg_dsn)
+    client = PostgresClient(pg_dsn)
     if path.is_file():
         _apply_sql(client, path)
         return

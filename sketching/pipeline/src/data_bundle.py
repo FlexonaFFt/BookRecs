@@ -8,6 +8,7 @@ import pandas as pd
 
 
 @dataclass
+# Описывает структуру набора данных для пайплайна.
 class DataBundle:
     books: pd.DataFrame
     local_train: pd.DataFrame

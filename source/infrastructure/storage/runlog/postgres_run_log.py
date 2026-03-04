@@ -4,13 +4,12 @@ import json
 
 from source.application.ports import RunLogPort
 from source.domain.entities import PipelineRun
-from source.infrastructure.storage.postgres.client import ClientPg
+from source.infrastructure.storage.postgres.postgres_client import PostgresClient
+# Сохраняет события запуска пайплайна в PostgreSQL.
+class PostgresRunLog(RunLogPort):
 
 
-class RunLogPg(RunLogPort):
-
-
-    def __init__(self, pg: ClientPg) -> None:
+    def __init__(self, pg: PostgresClient) -> None:
         self._pg = pg
 
     def start(self, run: PipelineRun) -> None:

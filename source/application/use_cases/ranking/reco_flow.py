@@ -16,6 +16,7 @@ from source.domain.entities import Candidate, FinalItem, ScoredCandidate
 
 
 @dataclass(frozen=True)
+# Содержит входные данные для оркестрации рекомендательного потока.
 class RecoFlowCommand:
     user_id: Any
     seen_items: set[Any]
@@ -28,12 +29,12 @@ class RecoFlowCommand:
 
 
 @dataclass(frozen=True)
+# Содержит результат выполнения рекомендательного потока.
 class RecoFlowResult:
     candidates: list[Candidate]
     preranked: list[ScoredCandidate]
     final_items: list[FinalItem]
-
-
+# Реализует сценарий оркестрации рекомендательного потока.
 class RecoFlowUseCase:
     """Unified recommendation orchestrator: Stage1 -> Stage2 -> Stage3."""
 

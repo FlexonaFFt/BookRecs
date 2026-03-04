@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+# Описывает параметры препроцессинга.
 class PreprocessingParams:
     k_core: int = 2
     keep_recent_fraction: float = 0.6

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+# Содержит входные данные команды пайплайна обучения.
 class TrainPipelineCommand:
     dataset_dir: str = "artifacts/tmp_preprocessed/goodreads_ya"
     output_root: str = "artifacts/runs"
@@ -19,6 +20,7 @@ class TrainPipelineCommand:
 
 
 @dataclass(frozen=True)
+# Содержит результат выполнения пайплайна обучения.
 class TrainPipelineResult:
     run_id: str
     run_dir: str

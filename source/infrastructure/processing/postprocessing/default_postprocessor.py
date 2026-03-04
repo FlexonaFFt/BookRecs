@@ -4,9 +4,8 @@ from typing import Any
 
 from source.application.ports import PostProcessorPort
 from source.domain.entities import FinalItem
-
-
-class PostprocessTemplate(PostProcessorPort):
+# Применяет финальные правила очистки рекомендаций.
+class DefaultPostprocessor(PostProcessorPort):
 
 
     def apply(

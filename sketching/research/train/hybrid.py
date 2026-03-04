@@ -12,7 +12,6 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-# Форматировать время
 def _fmt_seconds(seconds: float) -> str:
     seconds = max(0, int(seconds))
     m = seconds // 60
@@ -22,7 +21,6 @@ def _fmt_seconds(seconds: float) -> str:
     return f"{s}с"
 
 
-# Лог прогресса с ETA
 def _log_progress(prefix: str, current: int, total: int, started_at: float, step: int) -> None:
     if total <= 0:
         return
@@ -35,9 +33,7 @@ def _log_progress(prefix: str, current: int, total: int, started_at: float, step
         "%s: %s/%s (%.1f%%), прошло=%s, осталось~%s",
         prefix, current, total, current * 100.0 / total, _fmt_seconds(elapsed), _fmt_seconds(eta)
     )
-
-
-# Гибридная модель content + popularity
+# Описывает гибридный рекомендатель контент+популярное.
 class HybridContentPopularRecommender:
     def __init__(
         self,
@@ -58,7 +54,6 @@ class HybridContentPopularRecommender:
         self.pop_scores: dict = {}
         self.is_fitted = False
 
-    # Обучить гибридную модель
     def fit(self, item_text: pd.DataFrame, item_popularity: pd.DataFrame) -> "HybridContentPopularRecommender":
         started = time.time()
         if "item_id" not in item_popularity.columns:
@@ -86,7 +81,6 @@ class HybridContentPopularRecommender:
         logger.info("Hybrid готов за %s", _fmt_seconds(time.time() - started))
         return self
 
-    # Выдать рекомендации для списка пользователей
     def recommend(
         self,
         user_ids: list,

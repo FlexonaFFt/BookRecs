@@ -1,5 +1,5 @@
-from source.infrastructure.ranking.finalrank.ranker_template import RankerTemplate
+from source.infrastructure.ranking.finalrank.final_ranker_baseline import FinalRankerBaseline
 
 __all__ = [
-    "RankerTemplate",
+    "FinalRankerBaseline",
 ]

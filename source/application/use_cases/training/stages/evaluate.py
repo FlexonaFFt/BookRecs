@@ -8,10 +8,14 @@ from source.application.use_cases.ranking.prerank_candidates import PreRankCandi
 from source.application.use_cases.ranking.reco_flow import RecoFlowCommand, RecoFlowUseCase
 from source.application.use_cases.training.common.data_ops import build_seen_map, build_val_ground_truth, cold_items
 from source.application.use_cases.training.common.metrics import ndcg_at_k, recall_at_k
-from source.infrastructure.processing.postprocessing import PostprocessTemplate
-from source.infrastructure.ranking.candidates import SourceCf, SourceContent, SourcePop
-from source.infrastructure.ranking.finalrank import RankerTemplate
-from source.infrastructure.ranking.prerank import PreRankLinear
+from source.infrastructure.processing.postprocessing import DefaultPostprocessor
+from source.infrastructure.ranking.candidates import (
+    CfCandidateSource,
+    ContentCandidateSource,
+    PopularCandidateSource,
+)
+from source.infrastructure.ranking.finalrank import FinalRankerBaseline
+from source.infrastructure.ranking.prerank import LinearPreRanker
 
 
 def evaluate_pipeline(
@@ -28,14 +32,14 @@ def evaluate_pipeline(
 
     stage1_uc = GenerateCandidatesUseCase(
         sources=[
-            SourceCf(stage1["cf_neighbors"]),
-            SourceContent(stage1["content_similar"]),
-            SourcePop(stage1["pop_items"], stage1["pop_scores"]),
+            CfCandidateSource(stage1["cf_neighbors"]),
+            ContentCandidateSource(stage1["content_similar"]),
+            PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
         ],
-        fallback_source=SourcePop(stage1["pop_items"], stage1["pop_scores"]),
+        fallback_source=PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
     )
-    stage2_uc = PreRankCandidatesUseCase(preranker=PreRankLinear(cfg=stage2_cfg))
-    stage3_uc = FinalRankUseCase(RankerTemplate(), PostprocessTemplate())
+    stage2_uc = PreRankCandidatesUseCase(preranker=LinearPreRanker(cfg=stage2_cfg))
+    stage3_uc = FinalRankUseCase(FinalRankerBaseline(), DefaultPostprocessor())
     flow = RecoFlowUseCase(stage1=stage1_uc, stage2=stage2_uc, stage3=stage3_uc)
 
     ndcg_scores: list[float] = []

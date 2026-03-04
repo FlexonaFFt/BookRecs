@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+# Описывает настройки приложения.
 class Settings:
     pg_dsn: str
     s3_bucket: str

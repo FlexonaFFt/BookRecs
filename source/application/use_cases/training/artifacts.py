@@ -11,6 +11,7 @@ ARTIFACT_SCHEMA_VERSION = "1.0.0"
 
 
 @dataclass(frozen=True)
+# Описывает структуру хранения артефактов.
 class ArtifactLayout:
     run_dir: Path
     model_dir: Path
@@ -54,6 +55,7 @@ def build_layout(run_dir: Path) -> ArtifactLayout:
 
 
 @dataclass(frozen=True)
+# Описывает манифест обучения.
 class TrainManifest:
     schema_version: str
     run_id: str

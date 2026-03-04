@@ -5,6 +5,7 @@ from typing import Any
 
 
 @dataclass(frozen=True)
+# Описывает элемент финальной выдачи.
 class FinalItem:
     user_id: Any
     item_id: Any

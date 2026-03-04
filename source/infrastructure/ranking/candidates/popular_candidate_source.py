@@ -4,9 +4,8 @@ from typing import Any
 
 from source.application.ports import CandidateSourcePort
 from source.domain.entities import Candidate
-
-
-class SourcePop(CandidateSourcePort):
+# Генерирует кандидатов из глобального рейтинга популярности.
+class PopularCandidateSource(CandidateSourcePort):
 
 
     def __init__(self, top_items: list[Any], item_score: dict[Any, float] | None = None) -> None:

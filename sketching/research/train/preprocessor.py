@@ -17,14 +17,12 @@ if not logging.getLogger().handlers:
     )
 
 
-# Проверить обязательные колонки
 def _check_columns(df: pd.DataFrame, required: list[str], name: str) -> None:
     missing = [c for c in required if c not in df.columns]
     if missing:
         raise ValueError(f"{name}: нет колонок {missing}. Есть: {list(df.columns)}")
 
 
-# Загрузить parquet с логом
 def _load_parquet(path: Path, name: str) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Не найден файл {name}: {path}")
@@ -34,7 +32,6 @@ def _load_parquet(path: Path, name: str) -> pd.DataFrame:
     return df
 
 
-# Собрать текст книги для content-моделей
 def build_item_text(books: pd.DataFrame) -> pd.DataFrame:
     books = books.copy()
     _check_columns(books, ["item_id"], "books")
@@ -68,7 +65,6 @@ def build_item_text(books: pd.DataFrame) -> pd.DataFrame:
     return books[["item_id", "item_text", "title", "tags", "authors", "series"]].copy()
 
 
-# Посчитать популярность айтемов из train
 def build_item_popularity(local_train: pd.DataFrame) -> pd.DataFrame:
     _check_columns(local_train, ["item_id"], "local_train")
     if "interaction_weight" in local_train.columns:
@@ -98,7 +94,6 @@ def build_item_popularity(local_train: pd.DataFrame) -> pd.DataFrame:
     return popularity
 
 
-# Собрать словарь просмотренных айтемов по пользователю
 def build_seen_items_by_user(local_train: pd.DataFrame) -> dict:
     _check_columns(local_train, ["user_id", "item_id"], "local_train")
     return (
@@ -108,7 +103,6 @@ def build_seen_items_by_user(local_train: pd.DataFrame) -> dict:
     )
 
 
-# Отобрать подмножество пользователей валидации для быстрых экспериментов
 def sample_eval_users(
     eval_ground_truth: pd.DataFrame,
     sample_users_n: Optional[int] = None,
@@ -127,7 +121,6 @@ def sample_eval_users(
     return sampled
 
 
-# Подготовить единый набор данных для всех моделей research
 def prepare_research_bundle(
     data_dir: Union[str, Path] = "data",
     local_name: str = "local_v1",
@@ -151,14 +144,12 @@ def prepare_research_bundle(
     _check_columns(local_val_cold, ["user_id", "item_id"], "local_val_cold")
     _check_columns(eval_ground_truth, ["user_id", "item_id"], "eval_ground_truth")
 
-    # Нормализуем datetime
     if "date_added" in local_train.columns and not pd.api.types.is_datetime64_any_dtype(local_train["date_added"]):
         local_train["date_added"] = pd.to_datetime(local_train["date_added"], errors="coerce")
 
     eval_users = sample_eval_users(eval_ground_truth, sample_users_n=sample_users_n, seed=seed)
     eval_user_set = set(eval_users)
 
-    # Фильтруем все eval-срезы одними и теми же пользователями
     eval_ground_truth = eval_ground_truth[eval_ground_truth["user_id"].isin(eval_user_set)].reset_index(drop=True)
     local_val = local_val[local_val["user_id"].isin(eval_user_set)].reset_index(drop=True)
     local_val_warm = local_val_warm[local_val_warm["user_id"].isin(eval_user_set)].reset_index(drop=True)
@@ -199,7 +190,6 @@ def prepare_research_bundle(
     }
 
 
-# Сохранить подготовленный bundle в кэш
 def save_research_bundle_cache(bundle: dict, cache_dir: Union[str, Path]) -> None:
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -236,7 +226,6 @@ def save_research_bundle_cache(bundle: dict, cache_dir: Union[str, Path]) -> Non
     logger.info("Кэш research bundle сохранен в %s", cache_dir)
 
 
-# Загрузить bundle из кэша
 def load_research_bundle_cache(cache_dir: Union[str, Path]) -> dict:
     cache_dir = Path(cache_dir)
     if not cache_dir.exists():

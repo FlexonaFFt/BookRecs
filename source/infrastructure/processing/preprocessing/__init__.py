@@ -1,5 +1,5 @@
-from source.infrastructure.processing.preprocessing.preprocessor_style import PreprocessorStyle
+from source.infrastructure.processing.preprocessing.goodreads_preprocessor import GoodreadsPreprocessor
 
 __all__ = [
-    "PreprocessorStyle",
+    "GoodreadsPreprocessor",
 ]

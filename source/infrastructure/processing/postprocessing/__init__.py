@@ -1,5 +1,5 @@
-from source.infrastructure.processing.postprocessing.postprocess_template import PostprocessTemplate
+from source.infrastructure.processing.postprocessing.default_postprocessor import DefaultPostprocessor
 
 __all__ = [
-    "PostprocessTemplate",
+    "DefaultPostprocessor",
 ]

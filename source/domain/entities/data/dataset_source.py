@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+# Описывает источник датасета.
 class DatasetSource:
     dataset_name: str
     books_raw_uri: str

@@ -6,13 +6,12 @@ from datetime import datetime
 
 from source.application.ports import DatasetRegistryPort
 from source.domain.entities import DatasetVersion, PreprocessingParams
-from source.infrastructure.storage.postgres.client import ClientPg
+from source.infrastructure.storage.postgres.postgres_client import PostgresClient
+# Сохраняет версии датасета в PostgreSQL.
+class PostgresDatasetRegistry(DatasetRegistryPort):
 
 
-class RegistryPg(DatasetRegistryPort):
-
-
-    def __init__(self, pg: ClientPg) -> None:
+    def __init__(self, pg: PostgresClient) -> None:
         self._pg = pg
 
     def find_success_by_hash(self, dataset_name: str, params_hash: str) -> DatasetVersion | None:

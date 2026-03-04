@@ -5,7 +5,7 @@ import argparse
 from source.application.use_cases import PrepareDataCommand, PrepareDataUseCase
 from source.domain.entities import DatasetSource, PreprocessingParams
 from source.infrastructure.config import load_settings
-from source.infrastructure.processing.preprocessing import PreprocessorStyle
+from source.infrastructure.processing.preprocessing import GoodreadsPreprocessor
 from source.infrastructure.storage import build_prepare_storage_backends
 
 
@@ -58,7 +58,7 @@ def run_prepare(args: argparse.Namespace) -> None:
     )
 
     use_case = PrepareDataUseCase(
-        preprocessor=PreprocessorStyle(),
+        preprocessor=GoodreadsPreprocessor(),
         dataset_store=storage_backends.dataset_store,
         dataset_registry=storage_backends.dataset_registry,
         run_log=storage_backends.run_log,

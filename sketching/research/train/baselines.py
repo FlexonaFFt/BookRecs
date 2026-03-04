@@ -1,15 +1,12 @@
 import numpy as np
 import pandas as pd
 from typing import Optional
-
-
-# TopPopular baseline для сравнения
+# Описывает рекомендатель на основе самых популярных объектов.
 class TopPopularRecommender:
     def __init__(self) -> None:
         self.top_items: list = []
         self.is_fitted = False
 
-    # Обучить baseline по train
     def fit(self, local_train: pd.DataFrame) -> "TopPopularRecommender":
         if "item_id" not in local_train.columns:
             raise ValueError("local_train должен содержать item_id")
@@ -41,7 +38,6 @@ class TopPopularRecommender:
         self.is_fitted = True
         return self
 
-    # Выдать top-k рекомендаций пользователям
     def recommend(
         self,
         user_ids: list,
@@ -66,9 +62,7 @@ class TopPopularRecommender:
                     break
             rows.append({"user_id": user_id, "pred_items": recs})
         return pd.DataFrame(rows)
-
-
-# Random baseline только для sanity-check
+# Описывает случайный рекомендатель.
 class RandomRecommender:
     def __init__(self, seed: int = 42) -> None:
         self.seed = seed
@@ -76,13 +70,11 @@ class RandomRecommender:
         self.candidate_item_ids: list = []
         self.is_fitted = False
 
-    # Сохранить пул кандидатов
     def fit(self, candidate_item_ids: list) -> "RandomRecommender":
         self.candidate_item_ids = list(candidate_item_ids)
         self.is_fitted = True
         return self
 
-    # Выдать случайные рекомендации
     def recommend(
         self,
         user_ids: list,
