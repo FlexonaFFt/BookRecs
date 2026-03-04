@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import argparse
 
-from source.interfaces.cli_migrate import main as migrate_main
-from source.interfaces.cli_prepare import build_parser as build_prepare_parser
-from source.interfaces.cli_prepare import run_prepare
-from source.interfaces.cli_run import build_parser as build_run_parser
-from source.interfaces.cli_run import run_pipeline
-from source.interfaces.cli_train import build_parser as build_train_parser
-from source.interfaces.cli_train import run_train
+from source.interfaces.commands.migrate import main as migrate_main
+from source.interfaces.commands.prepare import build_parser as build_prepare_parser
+from source.interfaces.commands.prepare import run_prepare
+from source.interfaces.commands.run import build_parser as build_run_parser
+from source.interfaces.commands.run import run_pipeline
+from source.interfaces.commands.train import build_parser as build_train_parser
+from source.interfaces.commands.train import run_train
 
 
 def build_parser() -> argparse.ArgumentParser:
