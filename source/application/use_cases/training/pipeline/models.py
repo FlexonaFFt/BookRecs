@@ -14,7 +14,9 @@ class TrainPipelineCommand:
     candidate_per_source_limit: int = 300
     pre_top_m: int = 300
     final_top_k: int = 10
+    cf_mode: str = "auto"
     cf_max_neighbors: int = 120
+    cf_max_items_per_user: int = 150
     content_max_neighbors: int = 120
     seed: int = 42
 

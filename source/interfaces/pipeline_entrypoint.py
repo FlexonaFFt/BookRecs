@@ -60,7 +60,11 @@ def run_pipeline_from_env() -> None:
     candidate_per_source_limit = _env_int("BOOKRECS_TRAIN_PER_SOURCE_LIMIT", settings.train_candidate_per_source_limit)
     pre_top_m = _env_int("BOOKRECS_TRAIN_PRE_TOP_M", settings.train_pre_top_m)
     final_top_k = _env_int("BOOKRECS_TRAIN_FINAL_TOP_K", settings.train_final_top_k)
+    cf_mode = _env_str("BOOKRECS_TRAIN_CF_MODE", "auto").strip().lower()
+    if cf_mode not in {"auto", "fixed"}:
+        raise ValueError("BOOKRECS_TRAIN_CF_MODE must be one of: auto, fixed")
     cf_max_neighbors = _env_int("BOOKRECS_TRAIN_CF_MAX_NEIGHBORS", settings.train_cf_max_neighbors)
+    cf_max_items_per_user = _env_int("BOOKRECS_TRAIN_CF_MAX_ITEMS_PER_USER", 150)
     content_max_neighbors = _env_int("BOOKRECS_TRAIN_CONTENT_MAX_NEIGHBORS", settings.train_content_max_neighbors)
     seed = _env_int("BOOKRECS_TRAIN_SEED", settings.train_seed)
 
@@ -130,7 +134,9 @@ def run_pipeline_from_env() -> None:
                 candidate_per_source_limit=candidate_per_source_limit,
                 pre_top_m=pre_top_m,
                 final_top_k=final_top_k,
+                cf_mode=cf_mode,
                 cf_max_neighbors=cf_max_neighbors,
+                cf_max_items_per_user=cf_max_items_per_user,
                 content_max_neighbors=content_max_neighbors,
                 seed=seed,
             )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import math
+import os
 from collections import Counter, defaultdict
 from typing import Any
 
@@ -16,7 +17,9 @@ def fit_stage1(data: dict[str, Any], cmd: Any, logger: Any) -> dict[str, Any]:
 
     cf_neighbors = fit_cf_neighbors(
         interactions=train,
+        cf_mode=getattr(cmd, "cf_mode", "auto"),
         max_neighbors=cmd.cf_max_neighbors,
+        max_items_per_user=getattr(cmd, "cf_max_items_per_user", 150),
         logger=logger,
     )
     logger.progress("stage1_fit", done=2, total=3)
@@ -53,7 +56,13 @@ def fit_popularity(train: Any) -> tuple[list[Any], dict[Any, float]]:
     return top_items, scores
 
 
-def fit_cf_neighbors(interactions: Any, max_neighbors: int, logger: Any) -> dict[Any, list[tuple[Any, float]]]:
+def fit_cf_neighbors(
+    interactions: Any,
+    cf_mode: str,
+    max_neighbors: int,
+    max_items_per_user: int,
+    logger: Any,
+) -> dict[Any, list[tuple[Any, float]]]:
     user_items = (
         interactions[["user_id", "item_id"]]
         .drop_duplicates(["user_id", "item_id"])
@@ -62,15 +71,63 @@ def fit_cf_neighbors(interactions: Any, max_neighbors: int, logger: Any) -> dict
     )
     pair_counts: Counter[tuple[Any, Any]] = Counter()
     item_counts: Counter[Any] = Counter()
+    truncated_users = 0
+    effective_mode = cf_mode if cf_mode in {"auto", "fixed"} else "auto"
+    memory_limit_mb = _read_memory_limit_mb()
+    current_cap = _resolve_initial_cap(
+        mode=effective_mode,
+        fixed_cap=max_items_per_user,
+        memory_limit_mb=memory_limit_mb,
+    )
+    min_cap = 20
 
     users_total = len(user_items)
+    logger.event(
+        "STAGE1_CF_MODE",
+        mode=effective_mode,
+        memory_limit_mb=memory_limit_mb,
+        initial_cap=current_cap,
+    )
     for i, items in enumerate(user_items.tolist(), start=1):
         uniq = list(dict.fromkeys(items))
+        if current_cap > 0 and len(uniq) > current_cap:
+            truncated_users += 1
+            # Оставляем хвост истории, чтобы ограничить число пар и избежать OOM.
+            uniq = uniq[-current_cap:]
         item_counts.update(uniq)
         for a, b in itertools.combinations(sorted(uniq), 2):
             pair_counts[(a, b)] += 1
+
+        if effective_mode == "auto" and memory_limit_mb is not None and i % 2000 == 0:
+            rss_mb = _read_process_rss_mb()
+            ratio = (rss_mb / memory_limit_mb) if memory_limit_mb > 0 else None
+            if ratio is not None and ratio >= 0.82 and current_cap > min_cap:
+                next_cap = max(min_cap, int(current_cap * 0.8))
+                if next_cap < current_cap:
+                    current_cap = next_cap
+                    logger.event(
+                        "STAGE1_CF_ADAPT",
+                        done=i,
+                        total=users_total,
+                        rss_mb=rss_mb,
+                        memory_limit_mb=memory_limit_mb,
+                        memory_ratio=round(ratio, 4),
+                        new_cap=current_cap,
+                    )
+
         if i % max(1, users_total // 20) == 0 or i == users_total:
-            logger.event("STAGE1_CF_PROGRESS", done=i, total=users_total)
+            rss_mb = _read_process_rss_mb()
+            ratio = (rss_mb / memory_limit_mb) if memory_limit_mb and memory_limit_mb > 0 else None
+            logger.event(
+                "STAGE1_CF_PROGRESS",
+                done=i,
+                total=users_total,
+                truncated_users=truncated_users,
+                max_items_per_user=current_cap,
+                rss_mb=rss_mb,
+                memory_limit_mb=memory_limit_mb,
+                memory_ratio=(None if ratio is None else round(ratio, 4)),
+            )
 
     neighbors: dict[Any, list[tuple[Any, float]]] = defaultdict(list)
     for (a, b), co in pair_counts.items():
@@ -86,6 +143,62 @@ def fit_cf_neighbors(interactions: Any, max_neighbors: int, logger: Any) -> dict
         vals.sort(key=lambda x: x[1], reverse=True)
         out[item_id] = vals[:max_neighbors]
     return out
+
+
+def _resolve_initial_cap(mode: str, fixed_cap: int, memory_limit_mb: int | None) -> int:
+    if mode == "fixed":
+        return max(1, fixed_cap)
+    if memory_limit_mb is None:
+        return max(1, fixed_cap)
+    if memory_limit_mb <= 8 * 1024:
+        return 40
+    if memory_limit_mb <= 16 * 1024:
+        return 70
+    if memory_limit_mb <= 32 * 1024:
+        return 110
+    return max(1, fixed_cap)
+
+
+def _read_process_rss_mb() -> int:
+    status_path = "/proc/self/status"
+    try:
+        with open(status_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if not line.startswith("VmRSS:"):
+                    continue
+                value_kb = int(line.split()[1])
+                return max(0, value_kb // 1024)
+    except (OSError, ValueError, IndexError):
+        return 0
+    return 0
+
+
+def _read_memory_limit_mb() -> int | None:
+    candidates = [
+        "/sys/fs/cgroup/memory.max",
+        "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+    ]
+    for path in candidates:
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                raw = f.read().strip()
+        except OSError:
+            continue
+        if not raw or raw.lower() == "max":
+            continue
+        try:
+            value_bytes = int(raw)
+        except ValueError:
+            continue
+        if value_bytes <= 0:
+            continue
+        # Некоторые среды возвращают "почти бесконечность" вместо реального лимита.
+        if value_bytes >= 1 << 60:
+            continue
+        return value_bytes // (1024 * 1024)
+    return None
 
 
 def fit_content_neighbors(books: Any, max_neighbors: int, logger: Any) -> dict[Any, list[tuple[Any, float]]]:
