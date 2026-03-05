@@ -31,6 +31,10 @@ class S3DatasetStore(DatasetStorePort):
 
         bucket, base_prefix = self._resolve_prefix(dataset_version.s3_prefix)
         version_prefix = self._join_key(base_prefix, dataset_version.version_id)
+        print(
+            f"[prepare] Публикация в S3: bucket={bucket}, prefix={version_prefix}",
+            flush=True,
+        )
 
         books_uri = self._upload(artifacts.books_uri, bucket, self._join_key(version_prefix, "books.parquet"))
         train_uri = self._upload(artifacts.train_uri, bucket, self._join_key(version_prefix, "train.parquet"))
@@ -89,7 +93,9 @@ class S3DatasetStore(DatasetStorePort):
         src = Path(local_path)
         if not src.exists():
             raise FileNotFoundError(f"Artifact not found: {src}")
+        print(f"[prepare] Upload -> s3://{bucket}/{key}", flush=True)
         self._s3().upload_file(str(src), bucket, key)
+        print(f"[prepare] Upload завершен: s3://{bucket}/{key}", flush=True)
         return f"s3://{bucket}/{key}"
 
     def _resolve_prefix(self, s3_prefix: str) -> tuple[str, str]:

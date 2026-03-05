@@ -15,6 +15,7 @@ class LocalDatasetStore(DatasetStorePort):
     def save(self, dataset_version: DatasetVersion, artifacts: DatasetArtifacts) -> DatasetArtifacts:
         target_dir = self._target_dir(dataset_version)
         target_dir.mkdir(parents=True, exist_ok=True)
+        print(f"[prepare] Публикация в локальное хранилище: {target_dir}", flush=True)
 
         books_uri = self._copy_to_target(artifacts.books_uri, target_dir / "books.parquet")
         train_uri = self._copy_to_target(artifacts.train_uri, target_dir / "train.parquet")

@@ -31,33 +31,53 @@ class GoodreadsPreprocessor(PreprocessorPort):
 
         cached = self._cached_artifacts(source.dataset_name)
         if cached is not None:
+            print("[prepare] Используются локальные кэшированные артефакты.", flush=True)
             return cached
 
+        print(f"[prepare] Чтение books из {source.books_raw_uri}", flush=True)
         books_raw = self._read_books(source.books_raw_uri)
+        print(f"[prepare] Книги загружены: {len(books_raw)} строк", flush=True)
+        print("[prepare] Подготовка таблицы книг и item_id маппинга", flush=True)
         books, book_to_item = self._prepare_books(books_raw, language_filter=params.language_filter_enabled)
+        print(f"[prepare] Подготовлено книг: {len(books)}", flush=True)
 
+        print(f"[prepare] Чтение interactions из {source.interactions_raw_uri}", flush=True)
         interactions = self._prepare_interactions(
             interactions_uri=source.interactions_raw_uri,
             book_to_item=book_to_item,
             chunksize=params.interactions_chunksize,
         )
+        print(f"[prepare] Interactions после merge: {len(interactions)}", flush=True)
+        print(f"[prepare] Применение k-core: {params.k_core}", flush=True)
         interactions = self._apply_k_core(interactions, params.k_core)
+        print(f"[prepare] После k-core: {len(interactions)}", flush=True)
+        print(f"[prepare] Отбор хвоста по времени: {params.keep_recent_fraction}", flush=True)
         interactions = self._keep_recent_tail(interactions, params.keep_recent_fraction)
+        print(f"[prepare] После keep_recent_tail: {len(interactions)}", flush=True)
 
+        print("[prepare] Построение train/test split", flush=True)
         train, test, split_ts = self._build_train_test(
             interactions=interactions,
             test_fraction=params.test_fraction,
             warm_users_only=params.warm_users_only,
         )
+        print(f"[prepare] Split train/test: {len(train)} / {len(test)}", flush=True)
+        print("[prepare] Построение local_train/local_val split", flush=True)
         local_train, local_val, local_val_warm, local_val_cold, local_split_ts = self._build_local_split(
             train=train,
             val_fraction=params.local_val_fraction,
             warm_users_only=params.warm_users_only,
         )
         local_train = self._add_interaction_weight(local_train)
+        print(
+            f"[prepare] Local split train/val/warm/cold: {len(local_train)} / {len(local_val)} / "
+            f"{len(local_val_warm)} / {len(local_val_cold)}",
+            flush=True,
+        )
 
         target = self._work_dir / source.dataset_name
         target.mkdir(parents=True, exist_ok=True)
+        print(f"[prepare] Сохранение локальных parquet/json в {target}", flush=True)
 
         books_path = target / "books.parquet"
         train_path = target / "train.parquet"
@@ -115,6 +135,7 @@ class GoodreadsPreprocessor(PreprocessorPort):
             ],
         }
         manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        print("[prepare] Локальные артефакты успешно сохранены.", flush=True)
 
         return DatasetArtifacts(
             books_uri=str(books_path),
@@ -236,7 +257,9 @@ class GoodreadsPreprocessor(PreprocessorPort):
         partials: list[pd.DataFrame] = []
 
         reader = pd.read_json(path, lines=True, compression="gzip", chunksize=chunksize)
-        for chunk in reader:
+        total_rows = 0
+        for chunk_idx, chunk in enumerate(reader, start=1):
+            total_rows += len(chunk)
             _require_columns(chunk, required, "interactions_chunk")
             chunk = chunk[required].copy()
 
@@ -259,6 +282,12 @@ class GoodreadsPreprocessor(PreprocessorPort):
                 )
             )
             partials.append(agg)
+            if chunk_idx % 10 == 0:
+                print(
+                    f"[prepare] Обработано чанков interactions: {chunk_idx}, "
+                    f"сырьевых строк: {total_rows}, агрегированных блоков: {len(partials)}",
+                    flush=True,
+                )
 
         if not partials:
             raise ValueError("No interactions after preprocessing")

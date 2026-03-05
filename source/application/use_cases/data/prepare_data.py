@@ -58,20 +58,25 @@ class PrepareDataUseCase:
             metadata={"dataset_name": cmd.dataset_name},
         )
         self._run_log.start(run)
+        print(f"[prepare] Старт подготовки dataset={cmd.dataset_name}, run_id={run.run_id}", flush=True)
 
         try:
             params_hash = self._build_params_hash(cmd)
+            print(f"[prepare] params_hash={params_hash}", flush=True)
             existing = self._dataset_registry.find_success_by_hash(
                 dataset_name=cmd.dataset_name,
                 params_hash=params_hash,
             )
 
             if existing is not None and self._dataset_store.exists(existing):
+                print("[prepare] Найден готовый датасет с тем же params_hash, шаг подготовки пропущен.", flush=True)
                 run.mark_skipped("Dataset already exists for the same params hash.")
                 self._run_log.finish(run)
                 return existing
 
+            print("[prepare] Запуск preprocessor.run(...)", flush=True)
             local_artifacts = self._preprocessor.run(cmd.source, cmd.params)
+            print("[prepare] Локальные артефакты готовы, начинаем публикацию в storage backend.", flush=True)
 
             dataset_version = DatasetVersion(
                 dataset_name=cmd.dataset_name,
@@ -84,6 +89,7 @@ class PrepareDataUseCase:
             dataset_version.validate()
 
             remote_artifacts = self._dataset_store.save(dataset_version, local_artifacts)
+            print("[prepare] Публикация артефактов завершена, обновляем registry.", flush=True)
             dataset_version = DatasetVersion(
                 dataset_name=dataset_version.dataset_name,
                 version_id=dataset_version.version_id,
@@ -109,13 +115,20 @@ class PrepareDataUseCase:
             )
 
             self._dataset_registry.upsert(dataset_version)
+            print(
+                f"[prepare] DatasetVersion сохранен: version_id={dataset_version.version_id}, "
+                f"s3_prefix={dataset_version.s3_prefix}",
+                flush=True,
+            )
 
             run.mark_success("Dataset prepared and published.")
             self._run_log.finish(run)
+            print(f"[prepare] Завершено успешно, run_id={run.run_id}", flush=True)
             return dataset_version
         except Exception as exc:
             run.mark_failed(str(exc))
             self._run_log.finish(run)
+            print(f"[prepare] Ошибка: {exc}", flush=True)
             raise
 
     @staticmethod
