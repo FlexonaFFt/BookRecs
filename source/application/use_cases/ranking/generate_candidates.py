@@ -14,6 +14,7 @@ class GenerateCandidatesCommand:
     seen_items: set[Any]
     pool_size: int = 1000
     per_source_limit: int = 300
+    source_limits: dict[str, int] | None = None
 # Реализует сценарий генерации кандидатов.
 class GenerateCandidatesUseCase:
     """Stage 1: generate and merge candidates from multiple sources."""
@@ -37,10 +38,15 @@ class GenerateCandidatesUseCase:
         merged: dict[Any, dict[str, Any]] = {}
 
         for source in self._sources:
+            source_limit = cmd.per_source_limit
+            if cmd.source_limits is not None:
+                source_limit = int(cmd.source_limits.get(source.name, cmd.per_source_limit))
+            if source_limit <= 0:
+                continue
             generated = source.generate(
                 user_id=cmd.user_id,
                 seen_items=cmd.seen_items,
-                limit=cmd.per_source_limit,
+                limit=source_limit,
             )
             self._merge_candidates(merged, generated, cmd.seen_items)
 
@@ -49,10 +55,16 @@ class GenerateCandidatesUseCase:
             return ranked
 
         need = cmd.pool_size - len(ranked)
+        fallback_limit = max(need * 2, cmd.per_source_limit)
+        if cmd.source_limits is not None:
+            fallback_limit = max(
+                fallback_limit,
+                int(cmd.source_limits.get(self._fallback.name, cmd.per_source_limit)),
+            )
         refill = self._fallback.generate(
             user_id=cmd.user_id,
             seen_items=cmd.seen_items,
-            limit=max(need * 2, cmd.per_source_limit),
+            limit=fallback_limit,
         )
         self._merge_candidates(merged, refill, cmd.seen_items)
         return self._to_ranked(cmd.user_id, merged, cmd.pool_size)
