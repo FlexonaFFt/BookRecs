@@ -8,14 +8,14 @@ from source.domain.entities import Candidate, ScoredCandidate
 
 
 @dataclass(frozen=True)
+# Содержит входные данные команды предранжирования кандидатов.
 class PreRankCandidatesCommand:
     user_id: Any
     candidates: list[Candidate]
     history_len: int
     cold_item_ids: set[Any]
     top_m: int = 300
-
-
+# Реализует сценарий предранжирования кандидатов.
 class PreRankCandidatesUseCase:
     """Stage 2: reduce candidate pool to top-M."""
 
@@ -38,7 +38,6 @@ class PreRankCandidatesUseCase:
         if ranked:
             return ranked
 
-        # Fallback: preserve top-M by Stage-1 score.
         base_ranked = sorted(cmd.candidates, key=lambda c: c.score, reverse=True)[: cmd.top_m]
         return [
             ScoredCandidate(

@@ -5,8 +5,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-
-
+# Описывает логгер обучения.
 class TrainLogger:
     def __init__(self, run_id: str, log_file: Path) -> None:
         self._run_id = run_id

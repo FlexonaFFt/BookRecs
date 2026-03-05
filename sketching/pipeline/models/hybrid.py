@@ -10,8 +10,7 @@ from models.item2item import Item2ItemRecommender
 
 
 logger = logging.getLogger(__name__)
-
-
+# Описывает гибридный рекомендатель.
 class HybridRecommender:
     def __init__(
         self, cf_weight: float = 0.5,

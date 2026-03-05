@@ -4,11 +4,11 @@ from source.application.use_cases.training.artifacts import (
     TrainManifest,
     build_layout,
 )
-from source.application.use_cases.training.train_pipeline import (
+from source.application.use_cases.training.pipeline.models import (
     TrainPipelineCommand,
     TrainPipelineResult,
-    TrainPipelineUseCase,
 )
+from source.application.use_cases.training.pipeline.use_case import TrainPipelineUseCase
 
 __all__ = [
     "ARTIFACT_SCHEMA_VERSION",

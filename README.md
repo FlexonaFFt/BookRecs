@@ -5,6 +5,42 @@
 - [Ссылка на ML System Design Doc](docs/ML_System_Design.md)
 - [Итоги research (метрики, сравнение моделей, графики)](docs/Research_Results.md)
 
+## Docker запуск
+
+`docker-compose.yml` запускает PostgreSQL, MinIO и единый сервис `pipeline`.
+
+Шаги:
+
+1. Подготовить `.env`:
+   ```bash
+   make init-env
+   ```
+2. Поднять только инфраструктуру (без запуска пайплайна):
+   ```bash
+   make infra-up
+   ```
+3. Запустить полный пайплайн:
+   ```bash
+   make pipeline-up
+   ```
+
+Полезные команды:
+
+```bash
+make ps
+make logs SERVICE=pipeline
+make down
+make down-volumes
+```
+
+Сервис `pipeline` теперь запускается напрямую командой:
+
+```bash
+python -m source.interfaces.pipeline_entrypoint
+```
+
+Все ключевые параметры читаются из `BOOKRECS_*` переменных окружения.
+
 ---
 
 ## Training Artifact Contract
@@ -19,15 +55,15 @@ artifacts/runs/<run_id>/
 ├── train.log.jsonl          # структурированные события обучения
 └── models/
     ├── stage1.pkl           # fitted Stage-1 источники (CF/content/pop)
-    ├── stage2.json          # лучший конфиг PreRank
-    ├── stage3.json          # конфиг FinalRank/Postprocess
+    ├── stage2.pkl           # обученная модель Stage-2 pre-ranker
+    ├── stage3.pkl           # обученная модель Stage-3 final re-ranker
     └── metrics_snapshot.json
 ```
 
 Контракт централизован в:
 - `source/application/use_cases/training/artifacts.py`
 
-Тренировочные настройки берутся из `.env` (см. `.env.example`, префикс `BOOKRECS_TRAIN_*`) и могут быть переопределены CLI-флагами.
+Тренировочные настройки берутся из `.env` (см. `.env.example`, префикс `BOOKRECS_TRAIN_*`).
 
 ## Target Clean Architecture (from scratch)
 
@@ -87,7 +123,7 @@ artifacts/runs/<run_id>/
 │       │   │   ├── candidate_item2item.py
 │       │   │   ├── candidate_content.py
 │       │   │   ├── candidate_popular.py
-│       │   │   ├── preranker_linear.py
+│       │   │   ├── linear_preranker.py
 │       │   │   └── final_ranker_hybrid.py
 │       │   ├── repositories
 │       │   │   ├── recommendation_repo.py

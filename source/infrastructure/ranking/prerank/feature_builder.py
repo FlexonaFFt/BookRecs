@@ -7,14 +7,14 @@ from source.domain.entities import Candidate
 
 
 @dataclass(frozen=True)
+# Хранит признаки для одной пары пользователь-элемент.
 class FeatureRow:
     user_id: Any
     item_id: Any
     source: str
     base_score: float
     features: dict[str, float]
-
-
+# Строит строки признаков для этапа предранжирования.
 class FeatureBuilder:
     """Builds deterministic Stage-2 features from Stage-1 candidates."""
 

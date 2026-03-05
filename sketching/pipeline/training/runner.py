@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+# Хранит конфигурацию раннера.
 class RunnerConfig:
     data_root: str = "data/data06"
     split_name: str = "local_v1"

@@ -4,14 +4,12 @@ from typing import Optional
 import pandas as pd
 
 
-# Проверить колонки
 def _check_columns(df: pd.DataFrame, required: list[str], name: str) -> None:
     missing = [c for c in required if c not in df.columns]
     if missing:
         raise ValueError(f"{name}: нет колонок {missing}. Есть: {list(df.columns)}")
 
 
-# Нормализовать значение в список айтемов
 def _to_items_list(value) -> list:
     if isinstance(value, list):
         return value
@@ -19,7 +17,6 @@ def _to_items_list(value) -> list:
         return list(value)
     if isinstance(value, set):
         return list(value)
-    # pyarrow/pandas после parquet часто возвращают ndarray/object
     try:
         import numpy as np  # локальный импорт, чтобы не требовать зависимость при разборе файла
 
@@ -30,7 +27,6 @@ def _to_items_list(value) -> list:
     return []
 
 
-# Подготовить таблицу предсказаний к grouped формату user_id -> pred_items
 def ensure_grouped_predictions(
     predictions: pd.DataFrame,
     pred_col: str = "pred_items",
@@ -51,7 +47,6 @@ def ensure_grouped_predictions(
     raise ValueError("predictions должны содержать pred_items или item_id")
 
 
-# Слить gt и predictions в единую таблицу
 def build_eval_table(
     eval_ground_truth: pd.DataFrame,
     predictions: pd.DataFrame,
@@ -65,7 +60,6 @@ def build_eval_table(
     return merged
 
 
-# Рассчитать dcg@k для бинарной релевантности
 def _dcg_at_k(pred_items: list, gt_items_set: set, k: int) -> float:
     score = 0.0
     for rank, item_id in enumerate(pred_items[:k], start=1):
@@ -74,7 +68,6 @@ def _dcg_at_k(pred_items: list, gt_items_set: set, k: int) -> float:
     return score
 
 
-# Рассчитать ndcg@k и recall@k по сегменту
 def _segment_ranking_metrics(
     eval_table: pd.DataFrame,
     *,
@@ -113,7 +106,6 @@ def _segment_ranking_metrics(
     }
 
 
-# Рассчитать coverage@k
 def coverage_at_k(
     predictions: pd.DataFrame,
     *,
@@ -131,7 +123,6 @@ def coverage_at_k(
     return float(len(uniq) / catalog_size)
 
 
-# Оставить в gt только items из выбранного сегмента
 def filter_ground_truth_by_items(
     eval_ground_truth: pd.DataFrame,
     item_ids: set,
@@ -143,7 +134,6 @@ def filter_ground_truth_by_items(
     return out
 
 
-# Полная оценка: overall + warm + cold + coverage
 def evaluate_predictions(
     eval_ground_truth: pd.DataFrame,
     predictions: pd.DataFrame,

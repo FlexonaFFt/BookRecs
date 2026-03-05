@@ -8,8 +8,7 @@ from typing import Any, Optional
 
 
 logger = logging.getLogger(__name__)
-
-
+# Описывает контентный рекомендатель на основе TF-IDF.
 class ContentTfidfRecommender:
     def __init__(self, max_features: int = 50000,
         min_df: int = 2, ngram_range: tuple[int, int] = (1, 2)) -> None:

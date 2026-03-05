@@ -10,8 +10,7 @@ import pandas as pd
 
 
 logger = logging.getLogger(__name__)
-
-
+# Описывает рекомендатель Item2Item.
 class Item2ItemRecommender:
     def __init__(self, min_cooccurrence: int = 2,
         max_neighbors: int = 200, max_user_items: int = 50,

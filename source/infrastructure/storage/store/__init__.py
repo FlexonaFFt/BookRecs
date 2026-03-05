@@ -1,7 +1,7 @@
-from source.infrastructure.storage.store.store_local import StoreLocal
-from source.infrastructure.storage.store.store_s3 import StoreS3
+from source.infrastructure.storage.store.local_dataset_store import LocalDatasetStore
+from source.infrastructure.storage.store.s3_dataset_store import S3DatasetStore
 
 __all__ = [
-    "StoreLocal",
-    "StoreS3",
+    "LocalDatasetStore",
+    "S3DatasetStore",
 ]

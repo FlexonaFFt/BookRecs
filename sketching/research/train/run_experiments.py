@@ -29,7 +29,6 @@ if not logging.getLogger().handlers:
     )
 
 
-# Запустить baseline-эксперименты и сохранить таблицу метрик
 def run_baseline_experiments(
     *,
     data_dir: str = "data",
@@ -100,7 +99,6 @@ def run_baseline_experiments(
     return metrics_df
 
 
-# CLI
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Запуск baseline экспериментов")
     parser.add_argument("--data-dir", default="data")

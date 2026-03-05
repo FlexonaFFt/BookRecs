@@ -8,6 +8,7 @@ from source.domain.entities.data.preprocessing_params import PreprocessingParams
 
 
 @dataclass(frozen=True)
+# Описывает версию датасета.
 class DatasetVersion:
     dataset_name: str
     version_id: str

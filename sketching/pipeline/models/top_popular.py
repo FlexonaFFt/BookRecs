@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 import pandas as pd
-
-
+# Описывает рекомендатель на основе самых популярных объектов.
 class TopPopularRecommender:
     def __init__(self) -> None:
         self.top_items: list[Any] = []

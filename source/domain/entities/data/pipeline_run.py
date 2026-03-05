@@ -8,6 +8,7 @@ from source.domain.entities.data.run_status import RunStatus
 
 
 @dataclass
+# Описывает запуск пайплайна.
 class PipelineRun:
     run_id: str
     pipeline_name: str

@@ -1,11 +1,15 @@
-from source.application.ports.data.dataset_registry_port import DatasetRegistryPort
-from source.application.ports.data.dataset_store_port import DatasetStorePort
-from source.application.ports.data.preprocessor_port import PreprocessorPort
-from source.application.ports.data.run_log_port import RunLogPort
-from source.application.ports.ranking.candidate_source_port import CandidateSourcePort
-from source.application.ports.ranking.final_ranker_port import FinalRankerPort
-from source.application.ports.ranking.postprocessor_port import PostProcessorPort
-from source.application.ports.ranking.preranker_port import PreRankerPort
+from source.application.ports.data_ports import (
+    DatasetRegistryPort,
+    DatasetStorePort,
+    PreprocessorPort,
+    RunLogPort,
+)
+from source.application.ports.ranking_ports import (
+    CandidateSourcePort,
+    FinalRankerPort,
+    PostProcessorPort,
+    PreRankerPort,
+)
 
 __all__ = [
     "CandidateSourcePort",
