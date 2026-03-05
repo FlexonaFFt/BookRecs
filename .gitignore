@@ -34,3 +34,5 @@ data/*.pq
 data/*.parquet
 *.pq
 *.parquet
+artifacts/tmp_preprocessed/
+artifacts/baselines/

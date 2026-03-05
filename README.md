@@ -5,7 +5,191 @@
 - [Ссылка на ML System Design Doc](docs/ML_System_Design.md)
 - [Итоги research (метрики, сравнение моделей, графики)](docs/Research_Results.md)
 
+## Docker запуск
+
+`docker-compose.yml` запускает PostgreSQL, MinIO, batch `pipeline` и `api` (FastAPI inference).
+
+Шаги:
+
+1. Подготовить `.env`:
+   ```bash
+   make init-env
+   ```
+2. Поднять только инфраструктуру (без запуска пайплайна):
+   ```bash
+   make infra-up
+   ```
+3. Запустить полный пайплайн:
+   ```bash
+   make pipeline-up
+   ```
+4. Запустить API инференса:
+   ```bash
+   make api-up
+   ```
+
+Полезные команды:
+
+```bash
+make ps
+make logs SERVICE=pipeline
+make logs SERVICE=api
+make down
+make down-volumes
+```
+
+Сервис `pipeline` теперь запускается напрямую командой:
+
+```bash
+python -m source.interfaces.pipeline_entrypoint
+```
+
+Сервис `api` запускается напрямую:
+
+```bash
+python -m source.interfaces.api_entrypoint
+```
+
+Все ключевые параметры читаются из `BOOKRECS_*` переменных окружения.
+
+### FastAPI Endpoints (MVP)
+
+- `GET /healthz` — статус API + проверка подключения к Postgres/S3 + активная модель
+- `POST /v1/recommendations` — основной inference endpoint рекомендаций `top-K`
+- `GET /v1/items/{item_id}/similar` — похожие книги (content + CF neighbors)
+- `POST /v1/interactions` — запись взаимодействия пользователя в Postgres для истории
+
+Минимальный пример запроса рекомендаций:
+
+```bash
+curl -X POST http://localhost:8000/v1/recommendations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "u_42",
+    "top_k": 10,
+    "seen_items": [12, 24, 36],
+    "use_history": true
+  }'
+```
+
 ---
+
+## Training Artifact Contract
+
+Все запуски `train` сохраняются в `artifacts/runs/<run_id>/` по фиксированному контракту:
+
+```text
+artifacts/runs/<run_id>/
+├── manifest.json            # schema_version=1.0.0, config hash, пути, метрики, тайминги
+├── metrics.json             # итоговые offline-метрики
+├── timings.json             # длительности шагов
+├── train.log.jsonl          # структурированные события обучения
+└── models/
+    ├── stage1.pkl           # fitted Stage-1 источники (CF/content/pop)
+    ├── stage2.pkl           # обученная модель Stage-2 pre-ranker
+    ├── stage3.pkl           # обученная модель Stage-3 final re-ranker
+    └── metrics_snapshot.json
+```
+
+Контракт централизован в:
+- `source/application/use_cases/training/artifacts.py`
+
+Тренировочные настройки берутся из `.env` (см. `.env.example`, префикс `BOOKRECS_TRAIN_*`).
+
+## Target Clean Architecture (from scratch)
+
+```text
+/Users/flexonafft/BookRecs
+├── pyproject.toml
+├── README.md
+├── configs
+│   ├── base.yaml
+│   ├── train.yaml
+│   ├── infer.yaml
+│   └── ab_test.yaml
+├── data
+│   ├── raw
+│   ├── processed
+│   └── splits
+├── artifacts
+│   ├── models
+│   ├── manifests
+│   └── reports
+├── src
+│   └── bookrecs
+│       ├── domain
+│       │   ├── entities
+│       │   │   ├── user.py
+│       │   │   ├── book.py
+│       │   │   ├── interaction.py
+│       │   │   └── recommendation.py
+│       │   ├── value_objects
+│       │   │   ├── score.py
+│       │   │   └── ranking_window.py
+│       │   └── services
+│       │       ├── business_rules.py
+│       │       └── diversity_policy.py
+│       ├── application
+│       │   ├── ports
+│       │   │   ├── candidate_source_port.py
+│       │   │   ├── preranker_port.py
+│       │   │   ├── final_ranker_port.py
+│       │   │   ├── recommendation_repo_port.py
+│       │   │   └── metrics_port.py
+│       │   ├── use_cases
+│       │   │   ├── generate_candidates.py
+│       │   │   ├── pre_rank_candidates.py
+│       │   │   ├── final_rank_and_postprocess.py
+│       │   │   ├── get_recommendations.py
+│       │   │   ├── get_similar_items.py
+│       │   │   └── train_pipeline.py
+│       │   └── dto
+│       │       ├── requests.py
+│       │       └── responses.py
+│       ├── infrastructure
+│       │   ├── data
+│       │   │   ├── parquet_reader.py
+│       │   │   └── feature_store.py
+│       │   ├── models
+│       │   │   ├── candidate_item2item.py
+│       │   │   ├── candidate_content.py
+│       │   │   ├── candidate_popular.py
+│       │   │   ├── linear_preranker.py
+│       │   │   └── final_ranker_hybrid.py
+│       │   ├── repositories
+│       │   │   ├── recommendation_repo.py
+│       │   │   └── artifact_repo.py
+│       │   └── observability
+│       │       ├── logger.py
+│       │       └── metrics.py
+│       ├── interfaces
+│       │   ├── api
+│       │   │   ├── app.py
+│       │   │   ├── routes_recommendations.py
+│       │   │   └── routes_similar.py
+│       │   └── batch
+│       │       ├── train_job.py
+│       │       ├── infer_job.py
+│       │       └── export_job.py
+│       └── main.py
+├── tests
+│   ├── unit
+│   ├── integration
+│   └── e2e
+└── docs
+    ├── architecture.md
+    ├── ml_system_design.md
+    └── api_contract.md
+```
+
+```mermaid
+flowchart LR
+UI["Interfaces (API/Batch)"] --> APP["Application (Use Cases + Ports)"]
+APP --> DOM["Domain (Entities + Rules)"]
+APP --> PORTS["Ports (Interfaces)"]
+PORTS --> INFRA["Infrastructure (Models/Repos/IO)"]
+INFRA --> DATA["Data/Artifacts/External Systems"]
+```
 
 Проект посвящен рекомендательной системе для Goodreads YA с приоритетом на устойчивый cold-start по книгам: новые книги должны получать релевантные рекомендации даже при ограниченной истории взаимодействий.
 
