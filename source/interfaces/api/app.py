@@ -50,12 +50,16 @@ def create_app() -> FastAPI:
         log_table = os.getenv("BOOKRECS_API_INFERENCE_LOG_TABLE", "inference_requests").strip()
 
         pg = PostgresClient(pg_dsn) if pg_dsn else None
+        runtime_pg = None
         if pg is not None:
             try:
                 row = pg.fetchone("SELECT 1 AS ok")
                 state.postgres_ok = bool(row and row.get("ok") == 1)
+                if state.postgres_ok:
+                    runtime_pg = pg
             except Exception:
                 state.postgres_ok = False
+                runtime_pg = None
 
         loader = ModelBundleLoader(
             s3_region=s3_region,
@@ -66,8 +70,8 @@ def create_app() -> FastAPI:
         state.s3_ok = _check_s3_available(bundle.model_dir, model_uri, s3_region, s3_endpoint)
         state.service = InferenceService(
             bundle=bundle,
-            history=UserHistoryProvider(pg=pg, table_name=history_table),
-            request_logger=InferenceRequestLogger(pg=pg, table_name=log_table),
+            history=UserHistoryProvider(pg=runtime_pg, table_name=history_table),
+            request_logger=InferenceRequestLogger(pg=runtime_pg, table_name=log_table),
         )
         yield
 
@@ -107,16 +111,22 @@ def create_app() -> FastAPI:
     def similar_items(item_id: str, limit: int = 10) -> SimilarItemsResponse:
         svc = _service_or_503(state)
         safe_limit = min(max(1, int(limit)), 100)
-        return SimilarItemsResponse(**svc.similar_items(item_id=item_id, limit=safe_limit))
+        try:
+            return SimilarItemsResponse(**svc.similar_items(item_id=item_id, limit=safe_limit))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.post("/v1/interactions")
     def add_interaction(payload: InteractionRequest) -> dict[str, Any]:
         svc = _service_or_503(state)
-        svc.register_interaction(
-            user_id=payload.user_id,
-            item_id=payload.item_id,
-            event_type=payload.event_type,
-        )
+        try:
+            svc.register_interaction(
+                user_id=payload.user_id,
+                item_id=payload.item_id,
+                event_type=payload.event_type,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {"status": "ok"}
 
     return app

@@ -101,6 +101,12 @@ class ModelBundleLoader:
         for name in ["stage1.pkl", "stage2.pkl", "stage3.pkl", "metrics_snapshot.json"]:
             key = f"{prefix}/{name}" if prefix else name
             dst = cache_dir / name
+            if name == "metrics_snapshot.json":
+                try:
+                    self._s3().download_file(bucket, key, str(dst))
+                except Exception:
+                    pass
+                continue
             self._s3().download_file(bucket, key, str(dst))
         return cache_dir
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from source.infrastructure.storage.postgres import PostgresClient
@@ -13,13 +14,17 @@ class UserHistoryProvider:
         table_name: str = "user_item_interactions",
     ) -> None:
         self._pg = pg
+        _validate_table_name(table_name)
         self._table_name = table_name
         self._bootstrap_done = False
 
     def get_seen_items(self, user_id: Any, limit: int = 500) -> set[Any]:
         if self._pg is None:
             return set()
-        self._ensure_table()
+        try:
+            self._ensure_table()
+        except Exception:
+            return set()
         if limit <= 0:
             return set()
         query = (
@@ -28,20 +33,26 @@ class UserHistoryProvider:
             "ORDER BY interacted_at DESC "
             "LIMIT %s"
         )
-        rows = self._pg.fetchall(query, (str(user_id), int(limit)))
-        return {row["item_id"] for row in rows}
+        try:
+            rows = self._pg.fetchall(query, (str(user_id), int(limit)))
+            return {row["item_id"] for row in rows}
+        except Exception:
+            return set()
 
     def add_interaction(self, user_id: Any, item_id: Any, event_type: str = "implicit") -> None:
         if self._pg is None:
             return
-        self._ensure_table()
-        self._pg.execute(
-            f"""
-            INSERT INTO {self._table_name} (user_id, item_id, event_type)
-            VALUES (%s, %s, %s)
-            """,
-            (str(user_id), str(item_id), str(event_type)),
-        )
+        try:
+            self._ensure_table()
+            self._pg.execute(
+                f"""
+                INSERT INTO {self._table_name} (user_id, item_id, event_type)
+                VALUES (%s, %s, %s)
+                """,
+                (str(user_id), str(item_id), str(event_type)),
+            )
+        except Exception:
+            return
 
     def _ensure_table(self) -> None:
         if self._bootstrap_done:
@@ -64,3 +75,8 @@ class UserHistoryProvider:
             """
         )
         self._bootstrap_done = True
+
+
+def _validate_table_name(table_name: str) -> None:
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", table_name or ""):
+        raise ValueError("Invalid PostgreSQL table name")

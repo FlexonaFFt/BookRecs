@@ -110,27 +110,32 @@ class InferenceService:
                 for x in result.final_items
             ],
         }
-        self._request_logger.log(
-            {
-                "user_id": req.user_id,
-                "endpoint": "/v1/recommendations",
-                "request": {
-                    "top_k": req.top_k,
-                    "candidate_pool_size": req.candidate_pool_size,
-                    "candidate_per_source_limit": req.candidate_per_source_limit,
-                    "pre_top_m": req.pre_top_m,
-                    "seen_items": list(req.seen_items),
-                    "use_history": req.use_history,
-                },
-                "response": {"items_count": len(response["items"])},
-                "model_dir": self.model_dir,
-                "latency_ms": latency_ms,
-            }
-        )
+        try:
+            self._request_logger.log(
+                {
+                    "user_id": req.user_id,
+                    "endpoint": "/v1/recommendations",
+                    "request": {
+                        "top_k": req.top_k,
+                        "candidate_pool_size": req.candidate_pool_size,
+                        "candidate_per_source_limit": req.candidate_per_source_limit,
+                        "pre_top_m": req.pre_top_m,
+                        "seen_items": list(req.seen_items),
+                        "use_history": req.use_history,
+                    },
+                    "response": {"items_count": len(response["items"])},
+                    "model_dir": self.model_dir,
+                    "latency_ms": latency_ms,
+                }
+            )
+        except Exception:
+            pass
         return response
 
     def similar_items(self, item_id: Any, limit: int = 10) -> dict[str, Any]:
         norm_item_id = self._normalize_item_id(item_id)
+        if norm_item_id is None:
+            raise ValueError("item_id is invalid for current model id type")
         content_rows = self._content_similar.get(norm_item_id, [])[: max(1, limit)]
         cf_rows = self._cf_neighbors.get(norm_item_id, [])[: max(1, limit)]
         return {
@@ -140,9 +145,12 @@ class InferenceService:
         }
 
     def register_interaction(self, user_id: Any, item_id: Any, event_type: str = "implicit") -> None:
+        norm_item_id = self._normalize_item_id(item_id)
+        if norm_item_id is None:
+            raise ValueError("item_id is invalid for current model id type")
         self._history.add_interaction(
             user_id=user_id,
-            item_id=self._normalize_item_id(item_id),
+            item_id=norm_item_id,
             event_type=event_type,
         )
 
