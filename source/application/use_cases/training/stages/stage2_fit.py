@@ -28,7 +28,10 @@ def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: A
 
     candidate_sources = [
         CfCandidateSource(stage1["cf_neighbors"]),
-        ContentCandidateSource(stage1["content_similar"]),
+        ContentCandidateSource(
+            stage1["content_similar"],
+            popularity_scores=stage1["pop_scores"],
+        ),
         PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
     ]
     stage1_uc = GenerateCandidatesUseCase(sources=candidate_sources, fallback_source=candidate_sources[-1])

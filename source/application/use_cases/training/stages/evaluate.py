@@ -32,7 +32,10 @@ def evaluate_pipeline(
     stage1_uc = GenerateCandidatesUseCase(
         sources=[
             CfCandidateSource(stage1["cf_neighbors"]),
-            ContentCandidateSource(stage1["content_similar"]),
+            ContentCandidateSource(
+                stage1["content_similar"],
+                popularity_scores=stage1["pop_scores"],
+            ),
             PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
         ],
         fallback_source=PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),

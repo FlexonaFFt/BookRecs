@@ -11,12 +11,20 @@ class ContentCandidateSource(CandidateSourcePort):
     def __init__(
         self,
         similar_items: dict[Any, list[tuple[Any, float]]],
+        popularity_scores: dict[Any, float] | None = None,
         second_hop_decay: float = 0.35,
         second_hop_limit_factor: int = 3,
+        novelty_boost: float = 0.35,
+        cold_quota_ratio: float = 0.35,
+        cold_popularity_threshold: float = 0.02,
     ) -> None:
         self._similar_items = similar_items
+        self._popularity_scores = popularity_scores or {}
         self._second_hop_decay = max(0.0, float(second_hop_decay))
         self._second_hop_limit_factor = max(1, int(second_hop_limit_factor))
+        self._novelty_boost = max(0.0, float(novelty_boost))
+        self._cold_quota_ratio = min(1.0, max(0.0, float(cold_quota_ratio)))
+        self._cold_popularity_threshold = min(1.0, max(0.0, float(cold_popularity_threshold)))
 
     @property
     def name(self) -> str:
@@ -44,8 +52,51 @@ class ContentCandidateSource(CandidateSourcePort):
                         continue
                     score_map[candidate_id] = score_map.get(candidate_id, 0.0) + float(seed_score) * float(score) * self._second_hop_decay
 
-        ranked = sorted(score_map.items(), key=lambda x: x[1], reverse=True)[:limit]
+        # Усиливает long-tail/новые объекты, которые чаще являются cold-кандидатами.
+        adjusted_rows: list[tuple[Any, float, float]] = []
+        for item_id, score in score_map.items():
+            pop_score = self._popularity(item_id)
+            adjusted_score = float(score) * (1.0 + self._novelty_boost * (1.0 - pop_score))
+            adjusted_rows.append((item_id, adjusted_score, pop_score))
+
+        adjusted_rows.sort(key=lambda x: x[1], reverse=True)
+        ranked = self._apply_cold_quota(adjusted_rows, limit=limit)
         return [
             Candidate(user_id=user_id, item_id=item_id, source=self.name, score=float(score))
             for item_id, score in ranked
         ]
+
+    def _apply_cold_quota(self, rows: list[tuple[Any, float, float]], limit: int) -> list[tuple[Any, float]]:
+        if limit <= 0:
+            return []
+        cold_limit = int(limit * self._cold_quota_ratio)
+        if cold_limit <= 0:
+            return [(item_id, score) for item_id, score, _ in rows[:limit]]
+
+        selected: list[tuple[Any, float]] = []
+        used: set[Any] = set()
+
+        for item_id, score, pop_score in rows:
+            if len(selected) >= cold_limit:
+                break
+            if pop_score > self._cold_popularity_threshold:
+                continue
+            selected.append((item_id, score))
+            used.add(item_id)
+
+        for item_id, score, _ in rows:
+            if len(selected) >= limit:
+                break
+            if item_id in used:
+                continue
+            selected.append((item_id, score))
+            used.add(item_id)
+        return selected[:limit]
+
+    def _popularity(self, item_id: Any) -> float:
+        value = float(self._popularity_scores.get(item_id, 0.0))
+        if value < 0.0:
+            return 0.0
+        if value > 1.0:
+            return 1.0
+        return value
