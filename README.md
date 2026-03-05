@@ -7,7 +7,7 @@
 
 ## Docker запуск
 
-`docker-compose.yml` запускает PostgreSQL, MinIO и единый сервис `pipeline`.
+`docker-compose.yml` запускает PostgreSQL, MinIO, batch `pipeline` и `api` (FastAPI inference).
 
 Шаги:
 
@@ -23,12 +23,17 @@
    ```bash
    make pipeline-up
    ```
+4. Запустить API инференса:
+   ```bash
+   make api-up
+   ```
 
 Полезные команды:
 
 ```bash
 make ps
 make logs SERVICE=pipeline
+make logs SERVICE=api
 make down
 make down-volumes
 ```
@@ -39,7 +44,33 @@ make down-volumes
 python -m source.interfaces.pipeline_entrypoint
 ```
 
+Сервис `api` запускается напрямую:
+
+```bash
+python -m source.interfaces.api_entrypoint
+```
+
 Все ключевые параметры читаются из `BOOKRECS_*` переменных окружения.
+
+### FastAPI Endpoints (MVP)
+
+- `GET /healthz` — статус API + проверка подключения к Postgres/S3 + активная модель
+- `POST /v1/recommendations` — основной inference endpoint рекомендаций `top-K`
+- `GET /v1/items/{item_id}/similar` — похожие книги (content + CF neighbors)
+- `POST /v1/interactions` — запись взаимодействия пользователя в Postgres для истории
+
+Минимальный пример запроса рекомендаций:
+
+```bash
+curl -X POST http://localhost:8000/v1/recommendations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "u_42",
+    "top_k": 10,
+    "seen_items": [12, 24, 36],
+    "use_history": true
+  }'
+```
 
 ---
 

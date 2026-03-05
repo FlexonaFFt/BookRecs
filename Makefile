@@ -1,4 +1,4 @@
-.PHONY: help init-env infra-up pipeline-up up down down-volumes logs ps restart-pipeline
+.PHONY: help init-env infra-up pipeline-up api-up up down down-volumes logs ps restart-pipeline restart-api
 
 SERVICE ?= pipeline
 
@@ -7,6 +7,7 @@ help:
 	@echo "  make init-env         # создать .env из .env.example (если .env отсутствует)"
 	@echo "  make infra-up         # поднять postgres + minio + minio-init"
 	@echo "  make pipeline-up      # собрать образ и запустить pipeline"
+	@echo "  make api-up           # собрать образ и запустить inference API"
 	@echo "  make up               # infra-up + pipeline-up"
 	@echo "  make down             # остановить все сервисы"
 	@echo "  make down-volumes     # остановить сервисы и удалить volumes"
@@ -28,6 +29,9 @@ infra-up: init-env
 pipeline-up: init-env
 	docker compose up --build pipeline
 
+api-up: init-env
+	docker compose up --build api
+
 up: infra-up pipeline-up
 
 down:
@@ -44,3 +48,6 @@ ps: init-env
 
 restart-pipeline: init-env
 	docker compose up --build --force-recreate pipeline
+
+restart-api: init-env
+	docker compose up --build --force-recreate api

@@ -35,3 +35,11 @@ class PostgresClient:
                 cur.execute(query, params)
                 row = cur.fetchone()
         return row
+
+    def fetchall(self, query: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        self._ensure_driver()
+        with psycopg.connect(self._dsn, row_factory=dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                rows = cur.fetchall()
+        return list(rows)
