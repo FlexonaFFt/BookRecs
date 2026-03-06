@@ -60,24 +60,6 @@ python -m source.interfaces.pipeline_entrypoint
 python -m source.interfaces.api_entrypoint
 ```
 
-### Основные API эндпоинты
-- `GET /healthz`
-- `POST /v1/recommendations`
-- `GET /v1/items/{item_id}/similar`
-- `POST /v1/interactions`
-
-Пример inference-запроса:
-```bash
-curl -X POST http://localhost:8000/v1/recommendations \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "u_42",
-    "top_k": 10,
-    "seen_items": [12, 24, 36],
-    "use_history": true
-  }'
-```
-
 </details>
 
 ## Product Pipeline
@@ -101,7 +83,8 @@ BookRecs/
 │   ├── domain/                 # сущности и доменные модели
 │   ├── application/            # use-cases и порты
 │   ├── infrastructure/         # storage, ranking, preprocessing, inference
-│   └── interfaces/             # entrypoints: pipeline + api
+│   ├── interfaces/             # entrypoints: pipeline + api
+│   └── tests/
 ├── docs/                       # проектная документация
 ├── artifacts/                  # модели и артефакты запусков
 ├── data/                       # raw/data assets
