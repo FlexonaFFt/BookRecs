@@ -10,7 +10,7 @@ except ModuleNotFoundError:
     dict_row = None
 # Предоставляет низкоуровневые утилиты для выполнения запросов PostgreSQL.
 class PostgresClient:
-    
+
 
     def __init__(self, dsn: str) -> None:
         self._dsn = dsn

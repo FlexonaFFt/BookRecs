@@ -1,66 +1,72 @@
-# ML System Design
+# BookRecs
 
-### Документация проекта
+## Описание проекта
+BookRecs — это ML-система рекомендаций книг (Goodreads YA) с фокусом на гибридный pipeline и устойчивость к cold-start по айтемам. Проект объединяет подготовку данных, обучение моделей, офлайн-оценку и онлайн-инференс через FastAPI.
 
-- [Ссылка на ML System Design Doc](docs/ML_System_Design.md)
-- [Итоги research (метрики, сравнение моделей, графики)](docs/Research_Results.md)
+Система построена в стиле Clean Architecture: доменная модель и use-case логика отделены от инфраструктуры (PostgreSQL, S3/MinIO, docker-сервисы). На текущем этапе реализованы batch training pipeline и inference API, которые работают с сохраненными артефактами `stage1/stage2/stage3`.
 
-## Docker запуск
+## Ссылки на документацию проекта
+- [ML System Design Doc](docs/ML_System_Design.md)
+- [Research Results](docs/Research_Results.md)
 
-`docker-compose.yml` запускает PostgreSQL, MinIO, batch `pipeline` и `api` (FastAPI inference).
+<details>
+<summary><h2>Как запустить проект</h2></summary>
 
-Шаги:
+### 1. Подготовка окружения
+```bash
+make init-env
+```
 
-1. Подготовить `.env`:
-   ```bash
-   make init-env
-   ```
-2. Поднять только инфраструктуру (без запуска пайплайна):
-   ```bash
-   make infra-up
-   ```
-3. Запустить полный пайплайн:
-   ```bash
-   make pipeline-up
-   ```
-4. Запустить API инференса:
-   ```bash
-   make api-up
-   ```
+Проверь в `.env` ключевые параметры:
+- `BOOKRECS_API_MODEL_URI` (например `artifacts/baselines/testmodel/models`)
+- `BOOKRECS_PG_DSN`
+- `BOOKRECS_S3_ENDPOINT`, `BOOKRECS_S3_BUCKET`
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
 
-Полезные команды:
+### 2. Запуск инфраструктуры
+```bash
+make infra-up
+```
+Поднимутся `postgres`, `minio`, `minio-init`.
 
+### 3. Запуск batch pipeline (опционально)
+```bash
+make pipeline-up
+```
+
+### 4. Запуск API инференса
+```bash
+make api-up
+```
+
+### 5. Проверка API
+```bash
+curl http://localhost:8000/healthz
+```
+
+### Полезные команды
 ```bash
 make ps
-make logs SERVICE=pipeline
 make logs SERVICE=api
+make logs SERVICE=pipeline
+make test
 make down
 make down-volumes
 ```
 
-Сервис `pipeline` теперь запускается напрямую командой:
-
+### Локальный запуск без docker compose
 ```bash
 python -m source.interfaces.pipeline_entrypoint
-```
-
-Сервис `api` запускается напрямую:
-
-```bash
 python -m source.interfaces.api_entrypoint
 ```
 
-Все ключевые параметры читаются из `BOOKRECS_*` переменных окружения.
+### Основные API эндпоинты
+- `GET /healthz`
+- `POST /v1/recommendations`
+- `GET /v1/items/{item_id}/similar`
+- `POST /v1/interactions`
 
-### FastAPI Endpoints (MVP)
-
-- `GET /healthz` — статус API + проверка подключения к Postgres/S3 + активная модель
-- `POST /v1/recommendations` — основной inference endpoint рекомендаций `top-K`
-- `GET /v1/items/{item_id}/similar` — похожие книги (content + CF neighbors)
-- `POST /v1/interactions` — запись взаимодействия пользователя в Postgres для истории
-
-Минимальный пример запроса рекомендаций:
-
+Пример inference-запроса:
 ```bash
 curl -X POST http://localhost:8000/v1/recommendations \
   -H "Content-Type: application/json" \
@@ -72,172 +78,95 @@ curl -X POST http://localhost:8000/v1/recommendations \
   }'
 ```
 
----
+</details>
 
-## Training Artifact Contract
+## Product Pipeline
+![Recommendation pipeline](docs/images/pipeline.png)
 
-Все запуски `train` сохраняются в `artifacts/runs/<run_id>/` по фиксированному контракту:
+Pipeline состоит из пяти шагов:
+1. `Data & Split` — загрузка и предобработка interactions/metadata, time split, разметка warm/cold.
+2. `Candidate Generation` — объединение кандидатов из `CF`, `Content`, `Popular`.
+3. `Pre-ranking` — легкий Stage-2 отбор top-M кандидатов.
+4. `Final Ranking` — Stage-3 финальное ранжирование и postprocessing.
+5. `Evaluation & Publish` — метрики (`NDCG@K`, `Recall@K`, `Coverage@K`, cold-срезы) и сохранение артефактов.
 
-```text
-artifacts/runs/<run_id>/
-├── manifest.json            # schema_version=1.0.0, config hash, пути, метрики, тайминги
-├── metrics.json             # итоговые offline-метрики
-├── timings.json             # длительности шагов
-├── train.log.jsonl          # структурированные события обучения
-└── models/
-    ├── stage1.pkl           # fitted Stage-1 источники (CF/content/pop)
-    ├── stage2.pkl           # обученная модель Stage-2 pre-ranker
-    ├── stage3.pkl           # обученная модель Stage-3 final re-ranker
-    └── metrics_snapshot.json
-```
+<details>
+<summary><h2>Architecture</h2></summary>
 
-Контракт централизован в:
-- `source/application/use_cases/training/artifacts.py`
-
-Тренировочные настройки берутся из `.env` (см. `.env.example`, префикс `BOOKRECS_TRAIN_*`).
-
-## Target Clean Architecture (from scratch)
+Текущая структура проекта:
 
 ```text
-/Users/flexonafft/BookRecs
-├── pyproject.toml
-├── README.md
-├── configs
-│   ├── base.yaml
-│   ├── train.yaml
-│   ├── infer.yaml
-│   └── ab_test.yaml
-├── data
-│   ├── raw
-│   ├── processed
-│   └── splits
-├── artifacts
-│   ├── models
-│   ├── manifests
-│   └── reports
-├── src
-│   └── bookrecs
-│       ├── domain
-│       │   ├── entities
-│       │   │   ├── user.py
-│       │   │   ├── book.py
-│       │   │   ├── interaction.py
-│       │   │   └── recommendation.py
-│       │   ├── value_objects
-│       │   │   ├── score.py
-│       │   │   └── ranking_window.py
-│       │   └── services
-│       │       ├── business_rules.py
-│       │       └── diversity_policy.py
-│       ├── application
-│       │   ├── ports
-│       │   │   ├── candidate_source_port.py
-│       │   │   ├── preranker_port.py
-│       │   │   ├── final_ranker_port.py
-│       │   │   ├── recommendation_repo_port.py
-│       │   │   └── metrics_port.py
-│       │   ├── use_cases
-│       │   │   ├── generate_candidates.py
-│       │   │   ├── pre_rank_candidates.py
-│       │   │   ├── final_rank_and_postprocess.py
-│       │   │   ├── get_recommendations.py
-│       │   │   ├── get_similar_items.py
-│       │   │   └── train_pipeline.py
-│       │   └── dto
-│       │       ├── requests.py
-│       │       └── responses.py
-│       ├── infrastructure
-│       │   ├── data
-│       │   │   ├── parquet_reader.py
-│       │   │   └── feature_store.py
-│       │   ├── models
-│       │   │   ├── candidate_item2item.py
-│       │   │   ├── candidate_content.py
-│       │   │   ├── candidate_popular.py
-│       │   │   ├── linear_preranker.py
-│       │   │   └── final_ranker_hybrid.py
-│       │   ├── repositories
-│       │   │   ├── recommendation_repo.py
-│       │   │   └── artifact_repo.py
-│       │   └── observability
-│       │       ├── logger.py
-│       │       └── metrics.py
-│       ├── interfaces
-│       │   ├── api
-│       │   │   ├── app.py
-│       │   │   ├── routes_recommendations.py
-│       │   │   └── routes_similar.py
-│       │   └── batch
-│       │       ├── train_job.py
-│       │       ├── infer_job.py
-│       │       └── export_job.py
-│       └── main.py
-├── tests
-│   ├── unit
-│   ├── integration
-│   └── e2e
-└── docs
-    ├── architecture.md
-    ├── ml_system_design.md
-    └── api_contract.md
+BookRecs/
+├── source/
+│   ├── domain/                 # сущности и доменные модели
+│   ├── application/            # use-cases и порты
+│   ├── infrastructure/         # storage, ranking, preprocessing, inference
+│   └── interfaces/             # entrypoints: pipeline + api
+├── docs/                       # проектная документация
+├── artifacts/                  # модели и артефакты запусков
+├── data/                       # raw/data assets
+├── docker-compose.yml
+├── Dockerfile
+└── README.md
 ```
+
+Слои взаимодействуют так:
 
 ```mermaid
 flowchart LR
 UI["Interfaces (API/Batch)"] --> APP["Application (Use Cases + Ports)"]
-APP --> DOM["Domain (Entities + Rules)"]
-APP --> PORTS["Ports (Interfaces)"]
-PORTS --> INFRA["Infrastructure (Models/Repos/IO)"]
-INFRA --> DATA["Data/Artifacts/External Systems"]
+APP --> DOM["Domain (Entities)"]
+APP --> INFRA["Infrastructure (Storage/Models/Processing)"]
+INFRA --> EXT["Postgres / S3 / Local Artifacts"]
 ```
 
-Проект посвящен рекомендательной системе для Goodreads YA с приоритетом на устойчивый cold-start по книгам: новые книги должны получать релевантные рекомендации даже при ограниченной истории взаимодействий.
+</details>
 
-Текущий фокус: построить воспроизводимый продуктовый pipeline, где отдельно контролируются warm/cold сегменты, а качество подтверждается прозрачными offline-метриками и артефактами запуска.
+<details>
+<summary><h2>Artifacts</h2></summary>
 
----
-
-## Product Pipeline (MVP)
-
-В системе используется двухэтапный подход: генерация кандидатов из нескольких источников и последующее объединение сигналов в итоговый ранжированный список.
-
-Сигналы и модели:
-
-- `TopPopular` — базовый baseline и fallback
-- `Content TF-IDF` — основной источник для cold-item сценариев
-- `Item2Item CF` — персонализация для warm-пользователей
-- `Hybrid` (`CF + Content + Popular`) — итоговая модель MVP
-
-Pipeline обучает модели офлайн, считает `overall/warm/cold` метрики, сохраняет артефакты (`models`, `reports`, `run_manifest`) и запускается как batch-job.
-
-![Recommendation pipeline](docs/images/pipeline.png)
+### Training run artifacts
+Каждый run обучения сохраняется в каталоге:
 
 ```text
-Рекомендательный pipeline (end-to-end)
-
-1) Data & Split
-- Загрузка interactions + metadata
-- Temporal split (train/val)
-- Разметка сегментов: warm/cold items
-
-2) Candidate Generation
-- CF candidates (Item2Item) для warm history
-- Content candidates (TF-IDF) для cold-item сценариев
-- Popular/Trending fallback
-
-3) Gating (segment-aware)
-- history_len = 0 -> content + popular
-- history_len = 1..5 -> content-heavy blend
-- history_len > 5 -> CF-heavy blend
-
-4) Hybrid Ranking
-- Объединение сигналов: CF + Content + Popular
-- Удаление seen items, дедуп кандидатов, top-K
-
-5) Evaluation & Artifacts
-- Метрики: NDCG@10, Recall@10, Coverage@10
-- Срезы: overall / warm / cold
-- Сохранение: models, reports, run_manifest
+artifacts/runs/<run_id>/
+├── manifest.json
+├── metrics.json
+├── timings.json
+├── train.log.jsonl
+└── models/
+    ├── stage1.pkl
+    ├── stage2.pkl
+    ├── stage3.pkl
+    └── metrics_snapshot.json
 ```
 
----
+### Baseline/test artifacts
+Для быстрых запусков и smoke-тестов используется:
+
+```text
+artifacts/baselines/testmodel/
+└── models/
+    ├── stage1.pkl
+    ├── stage2.pkl
+    ├── stage3.pkl
+    └── metrics_snapshot.json
+```
+
+### Prepared dataset artifacts
+После `prepare` сохраняются:
+
+```text
+artifacts/tmp_preprocessed/goodreads_ya/
+├── books.parquet
+├── train.parquet
+├── test.parquet
+├── local_train.parquet
+├── local_val.parquet
+├── local_val_warm.parquet
+├── local_val_cold.parquet
+├── summary.json
+└── manifest.json
+```
+
+</details>
