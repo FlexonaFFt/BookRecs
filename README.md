@@ -49,6 +49,7 @@ curl http://localhost:8000/healthz
 make ps
 make logs SERVICE=api
 make logs SERVICE=pipeline
+make test
 make down
 make down-volumes
 ```
