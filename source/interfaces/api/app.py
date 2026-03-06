@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
@@ -21,6 +20,7 @@ from source.infrastructure.inference import (
 )
 from source.infrastructure.inference.service import InferenceRequest
 from source.infrastructure.storage.postgres import PostgresClient
+from source.infrastructure.config import load_api_runtime_settings
 from source.interfaces.api.schemas import (
     HealthResponse,
     InteractionRequest,
@@ -42,14 +42,9 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        model_uri = os.getenv("BOOKRECS_API_MODEL_URI", "").strip()
-        s3_region = os.getenv("BOOKRECS_S3_REGION", "us-east-1")
-        s3_endpoint = os.getenv("BOOKRECS_S3_ENDPOINT", "").strip()
-        pg_dsn = os.getenv("BOOKRECS_PG_DSN", "").strip()
-        history_table = os.getenv("BOOKRECS_API_HISTORY_TABLE", "user_item_interactions").strip()
-        log_table = os.getenv("BOOKRECS_API_INFERENCE_LOG_TABLE", "inference_requests").strip()
+        settings = load_api_runtime_settings()
 
-        pg = PostgresClient(pg_dsn) if pg_dsn else None
+        pg = PostgresClient(settings.pg_dsn) if settings.pg_dsn else None
         runtime_pg = None
         if pg is not None:
             try:
@@ -62,16 +57,25 @@ def create_app() -> FastAPI:
                 runtime_pg = None
 
         loader = ModelBundleLoader(
-            s3_region=s3_region,
-            s3_endpoint=s3_endpoint,
-            local_cache_root=os.getenv("BOOKRECS_API_MODEL_CACHE_DIR", "artifacts/cache/models"),
+            s3_region=settings.s3_region,
+            s3_endpoint=settings.s3_endpoint,
+            local_cache_root=settings.model_cache_dir,
+            aws_access_key_id=settings.aws_access_key_id,
+            aws_secret_access_key=settings.aws_secret_access_key,
         )
-        bundle = loader.load(model_uri=model_uri)
-        state.s3_ok = _check_s3_available(bundle.model_dir, model_uri, s3_region, s3_endpoint)
+        bundle = loader.load(model_uri=settings.model_uri)
+        state.s3_ok = _check_s3_available(
+            bundle.model_dir,
+            settings.model_uri,
+            settings.s3_region,
+            settings.s3_endpoint,
+            settings.aws_access_key_id,
+            settings.aws_secret_access_key,
+        )
         state.service = InferenceService(
             bundle=bundle,
-            history=UserHistoryProvider(pg=runtime_pg, table_name=history_table),
-            request_logger=InferenceRequestLogger(pg=runtime_pg, table_name=log_table),
+            history=UserHistoryProvider(pg=runtime_pg, table_name=settings.history_table),
+            request_logger=InferenceRequestLogger(pg=runtime_pg, table_name=settings.inference_log_table),
         )
         yield
 
@@ -141,7 +145,14 @@ def _service_or_503(state: AppState) -> InferenceService:
     return state.service
 
 
-def _check_s3_available(model_dir: str, model_uri: str, region: str, endpoint: str) -> bool:
+def _check_s3_available(
+    model_dir: str,
+    model_uri: str,
+    region: str,
+    endpoint: str,
+    aws_access_key_id: str | None,
+    aws_secret_access_key: str | None,
+) -> bool:
     _ = model_dir
     if not model_uri or not model_uri.startswith("s3://"):
         return False
@@ -157,8 +168,8 @@ def _check_s3_available(model_dir: str, model_uri: str, region: str, endpoint: s
             "s3",
             region_name=region,
             endpoint_url=(endpoint or None),
-            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
         )
         client.head_object(Bucket=bucket, Key=f"{key}/stage1.pkl")
         return True

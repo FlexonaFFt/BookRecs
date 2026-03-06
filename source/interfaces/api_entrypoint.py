@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import os
-
 import uvicorn
+
+from source.infrastructure.config import load_api_server_settings
 
 
 def main() -> None:
-    host = os.getenv("BOOKRECS_API_HOST", "0.0.0.0")
-    port = int(os.getenv("BOOKRECS_API_PORT", "8000"))
-    uvicorn.run("source.interfaces.api.app:app", host=host, port=port, reload=False)
+    settings = load_api_server_settings()
+    uvicorn.run("source.interfaces.api.app:app", host=settings.host, port=settings.port, reload=False)
 
 
 if __name__ == "__main__":

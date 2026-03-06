@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import pickle
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,10 +29,14 @@ class ModelBundleLoader:
         s3_region: str,
         s3_endpoint: str,
         local_cache_root: str = "artifacts/cache/models",
+        aws_access_key_id: str | None = None,
+        aws_secret_access_key: str | None = None,
     ) -> None:
         self._s3_region = s3_region or "us-east-1"
         self._s3_endpoint = s3_endpoint or None
         self._local_cache_root = Path(local_cache_root)
+        self._aws_access_key_id = aws_access_key_id
+        self._aws_secret_access_key = aws_secret_access_key
         self._s3_client = None
 
     def load(self, model_uri: str | None) -> ModelBundle:
@@ -118,7 +121,7 @@ class ModelBundleLoader:
                 "s3",
                 region_name=self._s3_region,
                 endpoint_url=self._s3_endpoint,
-                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+                aws_access_key_id=self._aws_access_key_id,
+                aws_secret_access_key=self._aws_secret_access_key,
             )
         return self._s3_client

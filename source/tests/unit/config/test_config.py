@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import pytest
 
-from source.infrastructure.config.settings import EnvSettingsIO, Settings, load_settings
+from source.infrastructure.config.settings import (
+    ApiRuntimeSettings,
+    ApiServerSettings,
+    EnvSettingsIO,
+    PipelineSettings,
+    Settings,
+    load_settings,
+)
 
 
 def test_load_settings_reads_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -119,3 +126,21 @@ def test_env_settings_io_read_and_write() -> None:
     )
     io.write(updated)
     assert env["BOOKRECS_TRAIN_EVAL_USERS_LIMIT"] == "777"
+
+
+def test_api_runtime_settings_reads_defaults() -> None:
+    settings = ApiRuntimeSettings.from_mapping({})
+    assert settings.model_uri == ""
+    assert settings.model_cache_dir == "artifacts/cache/models"
+    assert settings.s3_region == "us-east-1"
+    assert settings.history_table == "user_item_interactions"
+
+
+def test_api_server_settings_raises_for_invalid_port() -> None:
+    with pytest.raises(ValueError):
+        ApiServerSettings.from_mapping({"BOOKRECS_API_PORT": "0"})
+
+
+def test_pipeline_settings_validates_cf_mode() -> None:
+    with pytest.raises(ValueError):
+        PipelineSettings.from_mapping({"BOOKRECS_TRAIN_CF_MODE": "bad"})
