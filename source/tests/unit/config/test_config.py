@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from source.infrastructure.config.settings import load_settings
+from source.infrastructure.config.settings import EnvSettingsIO, Settings, load_settings
 
 
 def test_load_settings_reads_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -78,3 +78,44 @@ def test_load_settings_raises_for_invalid_positive_ints(
     monkeypatch.setenv(key, value)
     with pytest.raises(ValueError):
         load_settings()
+
+
+def test_env_settings_io_read_and_write() -> None:
+    env = {
+        "BOOKRECS_PG_DSN": "postgresql://local",
+        "BOOKRECS_S3_BUCKET": "bookrecs",
+        "BOOKRECS_S3_REGION": "us-east-1",
+        "BOOKRECS_S3_ENDPOINT": "http://localhost:9000",
+        "BOOKRECS_TRAIN_DATASET_DIR": "artifacts/tmp_preprocessed/goodreads_ya",
+        "BOOKRECS_TRAIN_OUTPUT_ROOT": "artifacts/runs",
+        "BOOKRECS_TRAIN_EVAL_USERS_LIMIT": "123",
+        "BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE": "1000",
+        "BOOKRECS_TRAIN_PER_SOURCE_LIMIT": "300",
+        "BOOKRECS_TRAIN_PRE_TOP_M": "300",
+        "BOOKRECS_TRAIN_FINAL_TOP_K": "10",
+        "BOOKRECS_TRAIN_CF_MAX_NEIGHBORS": "120",
+        "BOOKRECS_TRAIN_CONTENT_MAX_NEIGHBORS": "120",
+        "BOOKRECS_TRAIN_SEED": "42",
+    }
+    io = EnvSettingsIO(environ=env)
+    settings = io.read()
+    assert settings.train_eval_users_limit == 123
+
+    updated = Settings(
+        pg_dsn=settings.pg_dsn,
+        s3_bucket=settings.s3_bucket,
+        s3_region=settings.s3_region,
+        s3_endpoint=settings.s3_endpoint,
+        train_dataset_dir=settings.train_dataset_dir,
+        train_output_root=settings.train_output_root,
+        train_eval_users_limit=777,
+        train_candidate_pool_size=settings.train_candidate_pool_size,
+        train_candidate_per_source_limit=settings.train_candidate_per_source_limit,
+        train_pre_top_m=settings.train_pre_top_m,
+        train_final_top_k=settings.train_final_top_k,
+        train_cf_max_neighbors=settings.train_cf_max_neighbors,
+        train_content_max_neighbors=settings.train_content_max_neighbors,
+        train_seed=settings.train_seed,
+    )
+    io.write(updated)
+    assert env["BOOKRECS_TRAIN_EVAL_USERS_LIMIT"] == "777"
