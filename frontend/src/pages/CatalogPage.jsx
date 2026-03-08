@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 const styles = {
@@ -8,16 +8,14 @@ const styles = {
   bookWrapper: { perspective: '2000px', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '380px', marginBottom: '18px' },
 };
 
-const books = [
-  { id: 1, title: 'The Art of Silent Hours', titleLines: ['The Art of', 'Silent Hours'], author: 'Eleanor Voss', price: '$24.00', color: 'green', genre: 'Fiction' },
-  { id: 2, title: 'Echoes of The Empire', titleLines: ['Echoes of', 'The Empire'], author: 'Marcus Harl', price: '$28.00', color: 'burgundy', genre: 'History' },
-  { id: 3, title: 'Deep Water Navigation', titleLines: ['Deep Water', 'Navigation'], author: 'S. J. Thorne', price: '$32.00', color: 'navy', genre: 'Science' },
-  { id: 4, title: 'Clay & Memory', titleLines: ['Clay &', 'Memory'], author: 'Ada L. Rose', price: '$22.00', color: 'terracotta', genre: 'Poetry' },
-  { id: 5, title: 'Architects of Shadow', titleLines: ['Architects', 'of Shadow'], author: 'D. K. Vane', price: '$26.00', color: 'charcoal', genre: 'Fiction' },
-  { id: 6, title: 'Wild Gardens', titleLines: ['Wild', 'Gardens'], author: 'Flora West', price: '$35.00', color: 'olive', genre: 'Essays' },
-  { id: 7, title: 'Night Vision', titleLines: ['Night', 'Vision'], author: 'C. R. Stoker', price: '$21.00', color: 'purple', genre: 'Fiction' },
-  { id: 8, title: 'The Cold Calculus', titleLines: ['The Cold', 'Calculus'], author: 'Ian M. Banks', price: '$29.00', color: 'blue', genre: 'Science' },
+const fallbackBooks = [
+  { id: 1, item_id: 1, title: 'The Art of Silent Hours', titleLines: ['The Art of', 'Silent Hours'], author: 'Eleanor Voss', price: '$24.00', color: 'green', genre: 'Fiction' },
+  { id: 2, item_id: 2, title: 'Echoes of The Empire', titleLines: ['Echoes of', 'The Empire'], author: 'Marcus Harl', price: '$28.00', color: 'burgundy', genre: 'History' },
+  { id: 3, item_id: 3, title: 'Deep Water Navigation', titleLines: ['Deep Water', 'Navigation'], author: 'S. J. Thorne', price: '$32.00', color: 'navy', genre: 'Science' },
+  { id: 4, item_id: 4, title: 'Clay & Memory', titleLines: ['Clay &', 'Memory'], author: 'Ada L. Rose', price: '$22.00', color: 'terracotta', genre: 'Poetry' },
 ];
+
+const colorKeys = ['green', 'burgundy', 'navy', 'terracotta', 'charcoal', 'olive', 'purple', 'blue'];
 
 const gradients = {
   green: ['linear-gradient(160deg, #3B5249 0%, #2A3D33 100%)', 'linear-gradient(90deg, #1E2B24 0%, #2A3D33 100%)'],
@@ -29,6 +27,40 @@ const gradients = {
   purple: ['linear-gradient(160deg, #4A3B52 0%, #2F2236 100%)', 'linear-gradient(90deg, #2F2236 0%, #4A3B52 100%)'],
   blue: ['linear-gradient(160deg, #3B4A52 0%, #222F36 100%)', 'linear-gradient(90deg, #222F36 0%, #3B4A52 100%)'],
 };
+
+function priceFromId(itemId) {
+  const base = 20 + (Number(itemId) % 16);
+  return `$${base}.00`;
+}
+
+function titleLines(title) {
+  const text = String(title || '').trim();
+  if (!text) {
+    return ['Untitled', 'Book'];
+  }
+  const parts = text.split(/\s+/);
+  if (parts.length === 1) {
+    return [parts[0], ''];
+  }
+  const mid = Math.ceil(parts.length / 2);
+  return [parts.slice(0, mid).join(' '), parts.slice(mid).join(' ')];
+}
+
+function normalizeBook(raw, idx = 0) {
+  const id = Number(raw.item_id ?? raw.id ?? idx + 1);
+  const authors = Array.isArray(raw.authors) ? raw.authors : [];
+  const tags = Array.isArray(raw.tags) ? raw.tags : [];
+  return {
+    id,
+    item_id: id,
+    title: String(raw.title || `Book ${id}`),
+    titleLines: titleLines(raw.title),
+    author: authors.length > 0 ? String(authors[0]) : 'Unknown Author',
+    price: priceFromId(id),
+    color: colorKeys[id % colorKeys.length],
+    genre: tags.length > 0 ? String(tags[0]) : 'All',
+  };
+}
 
 function BookCard({ book, onAddToCart }) {
   const [hovered, setHovered] = useState(false);
@@ -106,13 +138,72 @@ export default function CatalogPage() {
   const [activeFilter, setActiveFilter] = useState('All');
   const [cartCount, setCartCount] = useState(2);
   const [notification, setNotification] = useState(null);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [books, setBooks] = useState(fallbackBooks);
+  const [total, setTotal] = useState(fallbackBooks.length);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
+  const limit = 24;
   const filters = ['All', 'Fiction', 'Poetry', 'Essays', 'History', 'Science'];
 
-  const filteredBooks = useMemo(
-    () => (activeFilter === 'All' ? books : books.filter((b) => b.genre === activeFilter)),
-    [activeFilter]
-  );
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchCatalog() {
+      setLoading(true);
+      setError('');
+      try {
+        const offset = page * limit;
+        const params = new URLSearchParams({
+          limit: String(limit),
+          offset: String(offset),
+        });
+        if (search.trim()) {
+          params.set('q', search.trim());
+        }
+        if (activeFilter !== 'All') {
+          params.set('genre', activeFilter.toLowerCase());
+        }
+        const res = await fetch(`/v1/demo/catalog?${params.toString()}`);
+        if (!res.ok) {
+          throw new Error(`catalog http ${res.status}`);
+        }
+        const payload = await res.json();
+        const items = Array.isArray(payload.items)
+          ? payload.items.map((x, idx) => normalizeBook(x, idx))
+          : [];
+        if (!cancelled) {
+          setBooks(items);
+          setTotal(Number(payload.total || 0));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError('Catalog API unavailable, fallback mode enabled');
+          const filtered = fallbackBooks.filter((b) => {
+            const genreOk = activeFilter === 'All' ? true : b.genre === activeFilter;
+            const q = search.trim().toLowerCase();
+            const qOk = q ? b.title.toLowerCase().includes(q) : true;
+            return genreOk && qOk;
+          });
+          setBooks(filtered);
+          setTotal(filtered.length);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchCatalog();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeFilter, search, page]);
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / limit)), [total]);
 
   const onAddToCart = (book) => {
     setCartCount((prev) => prev + 1);
@@ -140,15 +231,65 @@ export default function CatalogPage() {
         <div style={{ minHeight: '60px', borderBottom: '1px solid #1A1A1A', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 24px', gap: '12px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {filters.map((f) => (
-              <button key={f} onClick={() => setActiveFilter(f)} style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '8px 14px', border: activeFilter === f ? '1px solid #1A1A1A' : '1px solid transparent', borderRadius: activeFilter === f ? '99px' : '0', cursor: 'pointer', backgroundColor: 'transparent' }}>{f}</button>
+              <button
+                key={f}
+                onClick={() => {
+                  setActiveFilter(f);
+                  setPage(0);
+                }}
+                style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '8px 14px', border: activeFilter === f ? '1px solid #1A1A1A' : '1px solid transparent', borderRadius: activeFilter === f ? '99px' : '0', cursor: 'pointer', backgroundColor: 'transparent' }}
+              >
+                {f}
+              </button>
             ))}
           </div>
+          <input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(0);
+            }}
+            placeholder="Search title"
+            style={{ minWidth: '220px', border: '1px solid #1A1A1A', background: 'transparent', padding: '8px 10px', fontSize: '12px' }}
+          />
         </div>
 
+        {error && (
+          <div style={{ padding: '10px 24px', borderBottom: '1px solid #1A1A1A', fontSize: '12px', color: '#7f1d1d' }}>
+            {error}
+          </div>
+        )}
+
         <main style={styles.grid}>
-          {filteredBooks.map((book) => <BookCard key={book.id} book={book} onAddToCart={onAddToCart} />)}
-          {filteredBooks.length === 0 && <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '80px 0', fontSize: '13px', color: '#888', textTransform: 'uppercase' }}>No books found in this category</div>}
+          {loading && books.length === 0 && (
+            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '80px 0', fontSize: '13px', color: '#666', textTransform: 'uppercase' }}>
+              Loading catalog...
+            </div>
+          )}
+          {!loading && books.map((book) => <BookCard key={book.id} book={book} onAddToCart={onAddToCart} />)}
+          {!loading && books.length === 0 && <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '80px 0', fontSize: '13px', color: '#888', textTransform: 'uppercase' }}>No books found</div>}
         </main>
+
+        <footer style={{ borderTop: '1px solid #1A1A1A', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 24px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <span>{total} books</span>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page <= 0}
+              style={{ background: 'none', border: '1px solid #1A1A1A', padding: '6px 10px', cursor: page <= 0 ? 'not-allowed' : 'pointer', opacity: page <= 0 ? 0.4 : 1 }}
+            >
+              Prev
+            </button>
+            <span>Page {page + 1} / {totalPages}</span>
+            <button
+              onClick={() => setPage((p) => (p + 1 < totalPages ? p + 1 : p))}
+              disabled={page + 1 >= totalPages}
+              style={{ background: 'none', border: '1px solid #1A1A1A', padding: '6px 10px', cursor: page + 1 >= totalPages ? 'not-allowed' : 'pointer', opacity: page + 1 >= totalPages ? 0.4 : 1 }}
+            >
+              Next
+            </button>
+          </div>
+        </footer>
       </div>
     </div>
   );

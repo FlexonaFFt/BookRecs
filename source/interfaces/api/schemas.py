@@ -46,3 +46,31 @@ class HealthResponse(BaseModel):
     model_dir: str
     postgres: bool
     s3: bool
+
+
+class DemoUser(BaseModel):
+    user_id: str
+    history_len: int
+
+
+class DemoUsersResponse(BaseModel):
+    items: list[DemoUser]
+    total: int
+
+
+class DemoBook(BaseModel):
+    item_id: int
+    title: str
+    description: str
+    url: str
+    image_url: str
+    authors: list[str]
+    tags: list[str]
+    series: list[str]
+
+
+class DemoCatalogResponse(BaseModel):
+    items: list[DemoBook]
+    total: int
+    limit: int
+    offset: int

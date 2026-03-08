@@ -49,10 +49,19 @@ curl http://localhost:8000/healthz
 make ps
 make logs SERVICE=api
 make logs SERVICE=pipeline
+make demo-seed
 make test
 make down
 make down-volumes
 ```
+
+`make demo-seed` загружает demo-таблицы для фронтенда в PostgreSQL из preprocessed датасета:
+- источник по умолчанию: `artifacts/tmp_preprocessed/goodreads_ya`
+- миграции: `source/infrastructure/storage/postgres/migrations`
+- лимиты по умолчанию:
+  - `BOOKRECS_DEMO_USERS_LIMIT=2000`
+  - `BOOKRECS_DEMO_MAX_HISTORY_PER_USER=100`
+  - `BOOKRECS_DEMO_RESET=true`
 
 ### Локальный запуск без docker compose
 ```bash
