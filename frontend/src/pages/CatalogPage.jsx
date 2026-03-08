@@ -5,7 +5,7 @@ const styles = {
   body: { backgroundColor: '#EAE8E0', display: 'flex', justifyContent: 'center', minHeight: '100vh', padding: '20px' },
   marketContainer: { backgroundColor: '#F6F4EC', width: '100%', maxWidth: '1400px', border: '1px solid #1A1A1A', display: 'flex', flexDirection: 'column' },
   grid: { flex: 1, padding: '48px', display: 'grid', gridTemplateColumns: 'repeat(4, minmax(220px, 1fr))', gap: '32px 32px', rowGap: '64px', backgroundColor: '#F6F4EC' },
-  bookWrapper: { perspective: '2000px', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '330px', marginBottom: '18px' },
+  bookWrapper: { perspective: '2000px', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '380px', marginBottom: '18px' },
 };
 
 const books = [
@@ -37,17 +37,59 @@ function BookCard({ book, onAddToCart }) {
   return (
     <article onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
       <div style={styles.bookWrapper}>
-        <div style={{ transformStyle: 'preserve-3d', transform: hovered ? 'scale(1) rotateY(-10deg) rotateX(5deg)' : 'scale(0.9) rotateY(-32deg) rotateX(10deg)', transition: 'transform 0.7s cubic-bezier(0.25,0.46,0.45,0.94)' }}>
+        <div
+          style={{
+            transformStyle: 'preserve-3d',
+            transform: hovered ? 'scale(1) rotateY(-10deg) rotateX(5deg)' : 'scale(0.9) rotateY(-32deg) rotateX(10deg)',
+            transition: 'transform 0.7s cubic-bezier(0.25,0.46,0.45,0.94)',
+          }}
+        >
           <div style={{ position: 'relative', width: '200px', height: '280px', transformStyle: 'preserve-3d' }}>
-            <div style={{ position: 'absolute', width: '200px', height: '280px', transform: 'translateZ(25px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', background: cover }}>
-              <div style={{ fontFamily: "'Cinzel', serif", color: '#D4C89A', fontSize: '16px', textAlign: 'center', textTransform: 'uppercase' }}>{book.titleLines[0]}<br />{book.titleLines[1]}</div>
+            <div
+              style={{
+                position: 'absolute',
+                width: '200px',
+                height: '280px',
+                transform: 'translateZ(25px)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px',
+                background: cover,
+                boxShadow: 'inset -4px 0 12px rgba(0,0,0,0.25)',
+              }}
+            >
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  border: '1px solid #D4C89A',
+                  opacity: '0.4',
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                }}
+              ></div>
+              <div style={{ fontFamily: "'Cinzel', serif", color: '#D4C89A', fontSize: '16px', textAlign: 'center', textTransform: 'uppercase' }}>
+                {book.titleLines[0]}<br />{book.titleLines[1]}
+              </div>
+              <div style={{ width: '40px', height: '1px', background: '#D4C89A', margin: '12px 0', opacity: 0.6 }}></div>
+              <div style={{ color: '#D4C89A', fontSize: '8px', letterSpacing: '0.15em', textTransform: 'uppercase', opacity: 0.8 }}>{book.author}</div>
             </div>
+
             <div style={{ position: 'absolute', width: '50px', height: '280px', transform: 'rotateY(-90deg) translateZ(25px)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: spine }}>
-              <div style={{ fontFamily: "'Cinzel', serif", color: '#D4C89A', fontSize: '9px', writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>{book.title}</div>
+              <div style={{ fontFamily: "'Cinzel', serif", color: '#D4C89A', fontSize: '9px', letterSpacing: '0.12em', textTransform: 'uppercase', writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>{book.title}</div>
             </div>
+
+            <div style={{ position: 'absolute', width: '200px', height: '280px', background: '#222', transform: 'translateZ(-25px) rotateY(180deg)' }}></div>
+            <div style={{ position: 'absolute', width: '48px', height: '276px', background: 'repeating-linear-gradient(to bottom, #F6F4EC 0px, #F6F4EC 1px, #E8E5DB 2px, #E8E5DB 3px)', transform: 'rotateY(90deg) translateZ(174px)', top: '2px' }}></div>
+            <div style={{ position: 'absolute', width: '200px', height: '280px', transform: 'translateZ(-26px)', boxShadow: hovered ? '0 24px 42px rgba(0,0,0,0.25)' : '0 18px 30px rgba(0,0,0,0.18)' }}></div>
           </div>
         </div>
       </div>
+
       <div style={{ textAlign: 'center' }}>
         <h3 style={{ fontFamily: "'Cinzel', serif", marginBottom: '4px' }}>{book.title}</h3>
         <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#6b7280', marginBottom: '12px' }}>{book.author}</p>
@@ -81,7 +123,7 @@ export default function CatalogPage() {
   return (
     <div style={styles.body}>
       <div style={styles.marketContainer}>
-        {notification && <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#1A1A1A', color: '#F6F4EC', padding: '12px 24px', fontSize: '12px' }}>{notification}</div>}
+        {notification && <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#1A1A1A', color: '#F6F4EC', padding: '12px 24px', fontSize: '12px', zIndex: 9999 }}>{notification}</div>}
 
         <header style={{ height: '60px', borderBottom: '1px solid #1A1A1A', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '0 24px', backgroundColor: '#F6F4EC' }}>
           <nav style={{ display: 'flex', gap: '24px', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
