@@ -18,10 +18,14 @@ from source.infrastructure.inference import (
     ModelBundleLoader,
     UserHistoryProvider,
 )
+from source.infrastructure.inference.demo_store import DemoStore
 from source.infrastructure.inference.service import InferenceRequest
 from source.infrastructure.storage.postgres import PostgresClient
 from source.infrastructure.config import load_api_runtime_settings
 from source.interfaces.api.schemas import (
+    DemoBook,
+    DemoCatalogResponse,
+    DemoUsersResponse,
     HealthResponse,
     InteractionRequest,
     RecommendationRequest,
@@ -33,6 +37,7 @@ from source.interfaces.api.schemas import (
 @dataclass
 class AppState:
     service: InferenceService | None = None
+    demo_store: DemoStore | None = None
     postgres_ok: bool = False
     s3_ok: bool = False
 
@@ -77,6 +82,7 @@ def create_app() -> FastAPI:
             history=UserHistoryProvider(pg=runtime_pg, table_name=settings.history_table),
             request_logger=InferenceRequestLogger(pg=runtime_pg, table_name=settings.inference_log_table),
         )
+        state.demo_store = DemoStore(pg=runtime_pg)
         yield
 
     app = FastAPI(
@@ -111,6 +117,26 @@ def create_app() -> FastAPI:
         )
         return RecommendationResponse(**result)
 
+    @app.post("/v1/demo/recommendations", response_model=RecommendationResponse)
+    def demo_recommendations(payload: RecommendationRequest) -> RecommendationResponse:
+        svc = _service_or_503(state)
+        store = _demo_store_or_503(state)
+        demo_seen = set(store.list_user_seen_items(user_id=payload.user_id, limit=1000))
+        payload_seen = set(payload.seen_items)
+        seen_items = demo_seen | payload_seen
+        result = svc.recommend(
+            InferenceRequest(
+                user_id=payload.user_id,
+                top_k=payload.top_k,
+                candidate_pool_size=payload.candidate_pool_size,
+                candidate_per_source_limit=payload.candidate_per_source_limit,
+                pre_top_m=payload.pre_top_m,
+                seen_items=seen_items,
+                use_history=True,
+            )
+        )
+        return RecommendationResponse(**result)
+
     @app.get("/v1/items/{item_id}/similar", response_model=SimilarItemsResponse)
     def similar_items(item_id: str, limit: int = 10) -> SimilarItemsResponse:
         svc = _service_or_503(state)
@@ -133,6 +159,47 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {"status": "ok"}
 
+    @app.get("/v1/demo/users", response_model=DemoUsersResponse)
+    def demo_users(limit: int = 100) -> DemoUsersResponse:
+        store = _demo_store_or_503(state)
+        safe_limit = min(max(1, int(limit)), 5000)
+        items = store.list_users(limit=safe_limit)
+        return DemoUsersResponse(
+            items=[{"user_id": x.user_id, "history_len": x.history_len} for x in items],
+            total=len(items),
+        )
+
+    @app.get("/v1/demo/catalog", response_model=DemoCatalogResponse)
+    def demo_catalog(
+        limit: int = 40,
+        offset: int = 0,
+        q: str = "",
+        genre: str = "",
+    ) -> DemoCatalogResponse:
+        store = _demo_store_or_503(state)
+        safe_limit = min(max(1, int(limit)), 100)
+        safe_offset = max(0, int(offset))
+        items, total = store.list_books(
+            limit=safe_limit,
+            offset=safe_offset,
+            q=q,
+            genre=genre,
+        )
+        return DemoCatalogResponse(
+            items=[_to_demo_book(x) for x in items],
+            total=total,
+            limit=safe_limit,
+            offset=safe_offset,
+        )
+
+    @app.get("/v1/demo/books/{item_id}", response_model=DemoBook)
+    def demo_book(item_id: int) -> DemoBook:
+        store = _demo_store_or_503(state)
+        book = store.get_book(item_id=item_id)
+        if book is None:
+            raise HTTPException(status_code=404, detail=f"Book {item_id} not found")
+        return _to_demo_book(book)
+
     return app
 
 
@@ -143,6 +210,25 @@ def _service_or_503(state: AppState) -> InferenceService:
     if state.service is None:
         raise HTTPException(status_code=503, detail="Inference service is not initialized")
     return state.service
+
+
+def _demo_store_or_503(state: AppState) -> DemoStore:
+    if state.demo_store is None:
+        raise HTTPException(status_code=503, detail="Demo store is not initialized")
+    return state.demo_store
+
+
+def _to_demo_book(book: Any) -> DemoBook:
+    return DemoBook(
+        item_id=int(book.item_id),
+        title=str(book.title),
+        description=str(book.description),
+        url=str(book.url),
+        image_url=str(book.image_url),
+        authors=list(book.authors),
+        tags=list(book.tags),
+        series=list(book.series),
+    )
 
 
 def _check_s3_available(

@@ -1,4 +1,4 @@
-.PHONY: help init-env infra-up pipeline-up api-up test up down down-volumes logs ps restart-pipeline restart-api
+.PHONY: help init-env infra-up pipeline-up api-up demo-seed test up down down-volumes logs ps restart-pipeline restart-api
 
 SERVICE ?= pipeline
 
@@ -8,6 +8,7 @@ help:
 	@echo "  make infra-up         # поднять postgres + minio + minio-init"
 	@echo "  make pipeline-up      # собрать образ и запустить pipeline"
 	@echo "  make api-up           # собрать образ и запустить inference API"
+	@echo "  make demo-seed        # загрузить demo-таблицы в postgres из preprocessed parquet"
 	@echo "  make test             # запустить unit-тесты"
 	@echo "  make up               # infra-up + pipeline-up"
 	@echo "  make down             # остановить все сервисы"
@@ -32,6 +33,9 @@ pipeline-up: init-env
 
 api-up: init-env
 	docker compose up --build api
+
+demo-seed: init-env
+	docker compose run --build --rm api python -m source.interfaces.demo_seed_entrypoint
 
 test:
 	python3 -m pytest
