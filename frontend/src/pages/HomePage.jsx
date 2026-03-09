@@ -1,5 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import UserSwitcher from '../components/UserSwitcher';
+import {
+  fetchDemoBook,
+  fetchDemoUsers,
+  fetchRecommendations,
+  getStoredUserId,
+  setStoredUserId,
+} from '../api/demoApi';
+
+const fallbackBook = {
+  item_id: 1,
+  title: 'The Art of Silent Hours',
+  authors: ['Eleanor Voss'],
+  tags: ['fiction'],
+  series: [],
+};
 
 const styles = {
   body: {
@@ -228,6 +244,23 @@ const styles = {
   },
 };
 
+function firstOf(list, fallback = '') {
+  return Array.isArray(list) && list.length > 0 ? String(list[0]) : fallback;
+}
+
+function splitTitle(title) {
+  const text = String(title || '').trim();
+  if (!text) {
+    return ['Untitled', 'Book'];
+  }
+  const parts = text.split(/\s+/);
+  if (parts.length < 2) {
+    return [parts[0], ''];
+  }
+  const mid = Math.ceil(parts.length / 2);
+  return [parts.slice(0, mid).join(' '), parts.slice(mid).join(' ')];
+}
+
 function SpecItem({ label, value, last }) {
   return (
     <div style={last ? styles.specItemLast : styles.specItem}>
@@ -237,7 +270,8 @@ function SpecItem({ label, value, last }) {
   );
 }
 
-function Book3D({ hovered }) {
+function Book3D({ hovered, title, author }) {
+  const parts = splitTitle(title);
   return (
     <div
       style={{
@@ -248,11 +282,11 @@ function Book3D({ hovered }) {
       <div style={styles.book}>
         <div style={styles.bookCover}>
           <div style={styles.bookCoverOrnament}></div>
-          <div style={styles.bookCoverTitle}>The Art of<br />Silent Hours</div>
+          <div style={styles.bookCoverTitle}>{parts[0]}<br />{parts[1]}</div>
           <div style={styles.bookCoverRule}></div>
-          <div style={styles.bookCoverAuthor}>Eleanor Voss</div>
+          <div style={styles.bookCoverAuthor}>{author || 'Unknown Author'}</div>
         </div>
-        <div style={styles.bookSpine}><div style={styles.bookSpineText}>The Art of Silent Hours</div></div>
+        <div style={styles.bookSpine}><div style={styles.bookSpineText}>{title || 'Untitled Book'}</div></div>
         <div style={styles.bookBack}></div>
         <div style={styles.bookPages}></div>
         <div style={styles.bookTop}></div>
@@ -265,6 +299,82 @@ function Book3D({ hovered }) {
 export default function HomePage() {
   const [isHovered, setIsHovered] = useState(false);
   const [ctaHovered, setCtaHovered] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
+  const [users, setUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [recommendedBook, setRecommendedBook] = useState(fallbackBook);
+  const [loadingReco, setLoadingReco] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadUsers() {
+      try {
+        const list = await fetchDemoUsers(200);
+        if (!cancelled) {
+          setUsers(list);
+          const stored = getStoredUserId();
+          const available = new Set(list.map((x) => x.user_id));
+          const initial = stored && available.has(stored) ? stored : (list[0]?.user_id || '');
+          setSelectedUserId(initial);
+          if (initial) {
+            setStoredUserId(initial);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setUsers([]);
+          setSelectedUserId('');
+        }
+      }
+    }
+    loadUsers();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadTop1Recommendation() {
+      if (!selectedUserId) {
+        return;
+      }
+      setLoadingReco(true);
+      try {
+        const reco = await fetchRecommendations(selectedUserId, 1);
+        const top = Array.isArray(reco.items) && reco.items.length > 0 ? reco.items[0] : null;
+        if (!top) {
+          throw new Error('empty top-1');
+        }
+        const book = await fetchDemoBook(top.item_id);
+        if (!cancelled && book) {
+          setRecommendedBook(book);
+        }
+      } catch {
+        if (!cancelled) {
+          setRecommendedBook(fallbackBook);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingReco(false);
+        }
+      }
+    }
+    loadTop1Recommendation();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedUserId]);
+
+  const author = firstOf(recommendedBook.authors, 'Unknown Author');
+  const genre = firstOf(recommendedBook.tags, 'N/A');
+  const series = firstOf(recommendedBook.series, 'Standalone');
+  const price = `$${20 + (Number(recommendedBook.item_id || 0) % 16)}.00`;
+
+  const pageCount = useMemo(() => {
+    const text = String(recommendedBook.description || '');
+    return Math.max(120, Math.min(650, Math.floor(text.length / 4) || 220));
+  }, [recommendedBook.description]);
 
   return (
     <div style={styles.body}>
@@ -272,34 +382,55 @@ export default function HomePage() {
         <header style={styles.cardHeader}>
           <div style={styles.nav}><Link to="/catalog">Catalog</Link><span>About</span></div>
           <div style={styles.brand}>Folio.</div>
-          <div style={{ ...styles.nav, justifyContent: 'flex-end' }}><span>Account</span><span>Cart (0)</span></div>
+          <div style={{ ...styles.nav, justifyContent: 'flex-end' }}>
+            <UserSwitcher
+              users={users}
+              selectedUserId={selectedUserId}
+              onChange={(userId) => {
+                setSelectedUserId(userId);
+                setStoredUserId(userId);
+              }}
+            />
+            <span>Cart ({cartCount})</span>
+          </div>
         </header>
 
         <div style={styles.cardBody}>
           <div style={styles.contentCol}>
-            <div style={styles.circleBadge}>New<br />Arrivals</div>
-            <h1 style={styles.h1}>Stories worth<br />holding in<br />your hands</h1>
-            <p style={styles.description}>Curated editions, rare finds, and modern classics. Every book in our collection is chosen for its craft.</p>
+            <div style={styles.circleBadge}>Top 1<br />for today</div>
+            <h1 style={styles.h1}>This is your<br />recommendation<br />for today</h1>
+            <p style={styles.description}>
+              {loadingReco ? 'Preparing your personalized pick...' : `Today we recommend "${recommendedBook.title}" by ${author}.`}
+            </p>
+            <div style={{ display: 'flex', gap: '18px', alignItems: 'center', marginBottom: '24px' }}>
+              <span style={{ fontSize: '18px', fontWeight: 500 }}>{price}</span>
+              <button
+                onClick={() => setCartCount((x) => x + 1)}
+                style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', background: 'none', border: 'none', borderBottom: '1px solid #1A1A1A', cursor: 'pointer' }}
+              >
+                Add to cart
+              </button>
+            </div>
             <Link
               to="/catalog"
               style={{ ...styles.ctaBtn, opacity: ctaHovered ? 0.6 : 1 }}
               onMouseEnter={() => setCtaHovered(true)}
               onMouseLeave={() => setCtaHovered(false)}
             >
-              Browse the collection
+              See top 10 recommendations
             </Link>
           </div>
 
           <div style={styles.visualCol} onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
-            <Book3D hovered={isHovered} />
+            <Book3D hovered={isHovered} title={recommendedBook.title} author={author} />
           </div>
         </div>
 
         <footer style={styles.cardFooter}>
-          <SpecItem label="Genre" value="Literary Fiction" />
-          <SpecItem label="Format" value="Hardcover" />
-          <SpecItem label="Pages" value="348" />
-          <SpecItem label="Language" value="English" last />
+          <SpecItem label="Genre" value={genre} />
+          <SpecItem label="Series" value={series} />
+          <SpecItem label="Pages" value={String(pageCount)} />
+          <SpecItem label="Author" value={author} last />
         </footer>
       </div>
     </div>

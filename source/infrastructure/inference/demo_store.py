@@ -109,6 +109,22 @@ class DemoStore:
             return None
         return self._map_book(row)
 
+    def list_user_seen_items(self, user_id: str, limit: int = 500) -> list[int]:
+        if self._pg is None:
+            return []
+        safe_limit = min(max(1, int(limit)), 5000)
+        rows = self._pg.fetchall(
+            """
+            SELECT item_id
+            FROM demo_user_seen
+            WHERE user_id = %s
+            ORDER BY event_ts DESC
+            LIMIT %s
+            """,
+            (str(user_id), safe_limit),
+        )
+        return [int(row["item_id"]) for row in rows]
+
     @staticmethod
     def _map_book(row: dict[str, Any]) -> DemoBook:
         def _as_list(value: Any) -> list[str]:

@@ -117,6 +117,26 @@ def create_app() -> FastAPI:
         )
         return RecommendationResponse(**result)
 
+    @app.post("/v1/demo/recommendations", response_model=RecommendationResponse)
+    def demo_recommendations(payload: RecommendationRequest) -> RecommendationResponse:
+        svc = _service_or_503(state)
+        store = _demo_store_or_503(state)
+        demo_seen = set(store.list_user_seen_items(user_id=payload.user_id, limit=1000))
+        payload_seen = set(payload.seen_items)
+        seen_items = demo_seen | payload_seen
+        result = svc.recommend(
+            InferenceRequest(
+                user_id=payload.user_id,
+                top_k=payload.top_k,
+                candidate_pool_size=payload.candidate_pool_size,
+                candidate_per_source_limit=payload.candidate_per_source_limit,
+                pre_top_m=payload.pre_top_m,
+                seen_items=seen_items,
+                use_history=False,
+            )
+        )
+        return RecommendationResponse(**result)
+
     @app.get("/v1/items/{item_id}/similar", response_model=SimilarItemsResponse)
     def similar_items(item_id: str, limit: int = 10) -> SimilarItemsResponse:
         svc = _service_or_503(state)

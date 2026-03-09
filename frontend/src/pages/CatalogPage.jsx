@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import UserSwitcher from '../components/UserSwitcher';
+import {
+  fetchDemoBooksByIds,
+  fetchDemoUsers,
+  fetchRecommendations,
+  getStoredUserId,
+  setStoredUserId,
+} from '../api/demoApi';
 
 const styles = {
   body: { backgroundColor: '#EAE8E0', display: 'flex', justifyContent: 'center', minHeight: '100vh', padding: '20px' },
@@ -145,8 +153,41 @@ export default function CatalogPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const [users, setUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [topRecs, setTopRecs] = useState([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+
   const limit = 24;
   const filters = ['All', 'Fiction', 'Poetry', 'Essays', 'History', 'Science'];
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadUsers() {
+      try {
+        const list = await fetchDemoUsers(300);
+        if (!cancelled) {
+          setUsers(list);
+          const stored = getStoredUserId();
+          const available = new Set(list.map((x) => x.user_id));
+          const initial = stored && available.has(stored) ? stored : (list[0]?.user_id || '');
+          setSelectedUserId(initial);
+          if (initial) {
+            setStoredUserId(initial);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setUsers([]);
+          setSelectedUserId('');
+        }
+      }
+    }
+    loadUsers();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -178,7 +219,7 @@ export default function CatalogPage() {
           setBooks(items);
           setTotal(Number(payload.total || 0));
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setError('Catalog API unavailable, fallback mode enabled');
           const filtered = fallbackBooks.filter((b) => {
@@ -203,6 +244,41 @@ export default function CatalogPage() {
     };
   }, [activeFilter, search, page]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadTop10() {
+      if (!selectedUserId) {
+        setTopRecs([]);
+        return;
+      }
+      setLoadingRecs(true);
+      try {
+        const reco = await fetchRecommendations(selectedUserId, 10);
+        const items = Array.isArray(reco.items) ? reco.items : [];
+        const map = await fetchDemoBooksByIds(items.map((x) => x.item_id));
+        const enriched = items.map((x, idx) => {
+          const raw = map[String(x.item_id)] || { item_id: x.item_id, title: `Book ${x.item_id}`, authors: [], tags: [] };
+          return normalizeBook(raw, idx);
+        });
+        if (!cancelled) {
+          setTopRecs(enriched);
+        }
+      } catch {
+        if (!cancelled) {
+          setTopRecs([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingRecs(false);
+        }
+      }
+    }
+    loadTop10();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedUserId]);
+
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / limit)), [total]);
 
   const onAddToCart = (book) => {
@@ -222,8 +298,15 @@ export default function CatalogPage() {
             <Link to="/" style={{ textDecoration: 'none' }}>Home</Link>
           </nav>
           <div style={{ fontFamily: "'Cinzel', serif", fontSize: '24px' }}>Folio.</div>
-          <nav style={{ display: 'flex', gap: '24px', justifyContent: 'flex-end', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            <span>Account</span>
+          <nav style={{ display: 'flex', gap: '24px', justifyContent: 'flex-end', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', alignItems: 'center' }}>
+            <UserSwitcher
+              users={users}
+              selectedUserId={selectedUserId}
+              onChange={(userId) => {
+                setSelectedUserId(userId);
+                setStoredUserId(userId);
+              }}
+            />
             <span>Cart ({cartCount})</span>
           </nav>
         </header>
@@ -253,6 +336,24 @@ export default function CatalogPage() {
             style={{ minWidth: '220px', border: '1px solid #1A1A1A', background: 'transparent', padding: '8px 10px', fontSize: '12px' }}
           />
         </div>
+
+        <section style={{ padding: '20px 24px 8px 24px', borderBottom: '1px solid #1A1A1A' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: '22px', letterSpacing: '0.02em' }}>Top 10 Recommendations</h2>
+            <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>User: {selectedUserId || 'N/A'}</span>
+          </div>
+          {loadingRecs ? (
+            <div style={{ fontSize: '12px', color: '#666' }}>Loading recommendations...</div>
+          ) : topRecs.length === 0 ? (
+            <div style={{ fontSize: '12px', color: '#666' }}>No recommendations for selected user.</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(220px, 1fr))', gap: '32px 32px', rowGap: '48px' }}>
+              {topRecs.map((book) => (
+                <BookCard key={`top-${book.item_id}`} book={book} onAddToCart={onAddToCart} />
+              ))}
+            </div>
+          )}
+        </section>
 
         {error && (
           <div style={{ padding: '10px 24px', borderBottom: '1px solid #1A1A1A', fontSize: '12px', color: '#7f1d1d' }}>
