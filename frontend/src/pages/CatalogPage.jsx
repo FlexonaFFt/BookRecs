@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import UserSwitcher from '../components/UserSwitcher';
 import { extractPartLabel, formatDisplayTitle, splitTitleForCover } from '../utils/bookFormat';
+import { addCartItem, getCartCount, onCartUpdate } from '../utils/cartStore';
 import {
   fetchDemoBooksByIds,
   fetchDemoUsers,
+  postInteraction,
   fetchRecommendations,
   getStoredUserId,
   setStoredUserId,
@@ -186,6 +188,16 @@ export default function CatalogPage() {
   }, []);
 
   useEffect(() => {
+    setCartCount(getCartCount(selectedUserId));
+    const off = onCartUpdate((updatedUserId) => {
+      if (!selectedUserId || !updatedUserId || updatedUserId === String(selectedUserId)) {
+        setCartCount(getCartCount(selectedUserId));
+      }
+    });
+    return off;
+  }, [selectedUserId]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function fetchCatalog() {
@@ -277,9 +289,23 @@ export default function CatalogPage() {
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / limit)), [total]);
 
-  const onAddToCart = (book) => {
-    setCartCount((prev) => prev + 1);
+  const onAddToCart = async (book) => {
+    addCartItem(selectedUserId, {
+      item_id: book.item_id,
+      title: book.title,
+      partLabel: book.partLabel,
+      price: book.price,
+    });
     setNotification(`"${book.title}" added to cart`);
+    try {
+      await postInteraction({
+        userId: selectedUserId,
+        itemId: book.item_id,
+        eventType: 'add_to_cart',
+      });
+    } catch {
+      // keep demo flow even if interaction logging failed
+    }
     setTimeout(() => setNotification(null), 2500);
   };
 
@@ -303,7 +329,7 @@ export default function CatalogPage() {
                 setStoredUserId(userId);
               }}
             />
-            <span>Cart ({cartCount})</span>
+            <Link to="/cart" style={{ textDecoration: 'none' }}>Cart ({cartCount})</Link>
           </nav>
         </header>
 

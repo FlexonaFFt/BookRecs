@@ -132,7 +132,7 @@ def create_app() -> FastAPI:
                 candidate_per_source_limit=payload.candidate_per_source_limit,
                 pre_top_m=payload.pre_top_m,
                 seen_items=seen_items,
-                use_history=False,
+                use_history=True,
             )
         )
         return RecommendationResponse(**result)

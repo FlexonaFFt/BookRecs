@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import UserSwitcher from '../components/UserSwitcher';
 import { extractPartLabel, formatDisplayTitle, splitTitleForCover } from '../utils/bookFormat';
+import { addCartItem, getCartCount, onCartUpdate } from '../utils/cartStore';
 import {
   fetchDemoBook,
   fetchDemoUsers,
+  postInteraction,
   fetchRecommendations,
   getStoredUserId,
   setStoredUserId,
@@ -375,6 +377,16 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    setCartCount(getCartCount(selectedUserId));
+    const off = onCartUpdate((updatedUserId) => {
+      if (!selectedUserId || !updatedUserId || updatedUserId === String(selectedUserId)) {
+        setCartCount(getCartCount(selectedUserId));
+      }
+    });
+    return off;
+  }, [selectedUserId]);
+
+  useEffect(() => {
     let cancelled = false;
     async function loadTop1Recommendation() {
       if (!selectedUserId) {
@@ -433,7 +445,7 @@ export default function HomePage() {
                 setStoredUserId(userId);
               }}
             />
-            <span>Cart ({cartCount})</span>
+            <Link to="/cart" style={{ textDecoration: 'none' }}>Cart ({cartCount})</Link>
           </div>
         </header>
 
@@ -447,7 +459,23 @@ export default function HomePage() {
             <div style={{ display: 'flex', gap: '18px', alignItems: 'center', marginBottom: '24px' }}>
               <span style={{ fontSize: '18px', fontWeight: 500 }}>{price}</span>
               <button
-                onClick={() => setCartCount((x) => x + 1)}
+                onClick={async () => {
+                  addCartItem(selectedUserId, {
+                    item_id: recommendedBook.item_id,
+                    title: displayTitle,
+                    partLabel,
+                    price,
+                  });
+                  try {
+                    await postInteraction({
+                      userId: selectedUserId,
+                      itemId: recommendedBook.item_id,
+                      eventType: 'add_to_cart',
+                    });
+                  } catch {
+                    // keep demo smooth even if logging fails
+                  }
+                }}
                 style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', background: 'none', border: 'none', borderBottom: '1px solid #1A1A1A', cursor: 'pointer' }}
               >
                 Add to cart

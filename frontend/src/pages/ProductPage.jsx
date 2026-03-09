@@ -5,12 +5,14 @@ import {
   fetchDemoBook,
   fetchDemoBooksByIds,
   fetchDemoUsers,
+  postInteraction,
   fetchRecommendations,
   fetchSimilarItems,
   getStoredUserId,
   setStoredUserId,
 } from '../api/demoApi';
 import { extractPartLabel, formatDisplayTitle, splitTitleForCover } from '../utils/bookFormat';
+import { addCartItem, getCartCount, onCartUpdate } from '../utils/cartStore';
 
 const fallbackBook = {
   item_id: 1,
@@ -246,6 +248,7 @@ export default function ProductPage() {
   const [users, setUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [cartCount, setCartCount] = useState(0);
+  const [eventStatus, setEventStatus] = useState('');
   const [previewHovered, setPreviewHovered] = useState(false);
 
   const [similarBooks, setSimilarBooks] = useState([]);
@@ -277,6 +280,16 @@ export default function ProductPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    setCartCount(getCartCount(selectedUserId));
+    const off = onCartUpdate((updatedUserId) => {
+      if (!selectedUserId || !updatedUserId || updatedUserId === String(selectedUserId)) {
+        setCartCount(getCartCount(selectedUserId));
+      }
+    });
+    return off;
+  }, [selectedUserId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -378,8 +391,37 @@ export default function ProductPage() {
     return text.length > 220 ? `${text.slice(0, 220).trim()}...` : text;
   }, [book.description]);
   const previewPalette = previewPaletteKeys[Math.abs(Number(book.item_id || 0)) % previewPaletteKeys.length];
-  const onAddToCart = () => {
-    setCartCount((x) => x + 1);
+  const onAddToCart = async (bookArg = book) => {
+    addCartItem(selectedUserId, {
+      item_id: bookArg.item_id,
+      title: bookArg.title,
+      partLabel: bookArg.partLabel,
+      price: bookArg.price || priceFromId(bookArg.item_id),
+    });
+    try {
+      await postInteraction({
+        userId: selectedUserId,
+        itemId: bookArg.item_id,
+        eventType: 'add_to_cart',
+      });
+      setEventStatus('Added to cart');
+    } catch {
+      setEventStatus('Added to cart (offline)');
+    }
+    setTimeout(() => setEventStatus(''), 1800);
+  };
+  const onSimulatePurchase = async () => {
+    try {
+      await postInteraction({
+        userId: selectedUserId,
+        itemId: book.item_id,
+        eventType: 'purchase',
+      });
+      setEventStatus('Purchase simulated');
+    } catch {
+      setEventStatus('Purchase simulated (offline)');
+    }
+    setTimeout(() => setEventStatus(''), 1800);
   };
 
   return (
@@ -400,7 +442,7 @@ export default function ProductPage() {
                 setStoredUserId(userId);
               }}
             />
-            <span>Cart ({cartCount})</span>
+            <Link to="/cart" style={{ textDecoration: 'none' }}>Cart ({cartCount})</Link>
           </div>
         </header>
 
@@ -423,6 +465,17 @@ export default function ProductPage() {
               >
                 Add to cart
               </button>
+              <button
+                onClick={onSimulatePurchase}
+                style={{ marginLeft: '10px', background: 'transparent', color: '#1A1A1A', border: '1px solid #1A1A1A', padding: '11px 18px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: '11px' }}
+              >
+                Simulate purchase
+              </button>
+              {eventStatus && (
+                <div style={{ marginTop: '10px', fontSize: '11px', textTransform: 'uppercase', color: '#334155' }}>
+                  {eventStatus}
+                </div>
+              )}
             </div>
             <div
               style={{ minHeight: '360px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}

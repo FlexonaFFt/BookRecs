@@ -69,3 +69,18 @@ export async function fetchSimilarItems(itemId, limit = 8) {
   }
   return res.json();
 }
+
+export async function postInteraction({ userId, itemId, eventType }) {
+  if (!userId || itemId === null || itemId === undefined) {
+    return;
+  }
+  await fetch('/v1/interactions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      user_id: String(userId),
+      item_id: itemId,
+      event_type: String(eventType || 'implicit'),
+    }),
+  });
+}
