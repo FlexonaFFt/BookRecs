@@ -245,6 +245,50 @@ const styles = {
   },
 };
 
+const bookPalettes = {
+  green: {
+    cover: 'linear-gradient(160deg, #3B5249 0%, #2A3D33 100%)',
+    spine: 'linear-gradient(90deg, #1E2B24 0%, #2A3D33 100%)',
+    back: '#1E2B24',
+  },
+  burgundy: {
+    cover: 'linear-gradient(160deg, #5D2E2E 0%, #3A1C1C 100%)',
+    spine: 'linear-gradient(90deg, #3A1C1C 0%, #5D2E2E 100%)',
+    back: '#2B1212',
+  },
+  navy: {
+    cover: 'linear-gradient(160deg, #2E3B5D 0%, #1C243A 100%)',
+    spine: 'linear-gradient(90deg, #1C243A 0%, #2E3B5D 100%)',
+    back: '#182033',
+  },
+  terracotta: {
+    cover: 'linear-gradient(160deg, #8C4B3E 0%, #5D322A 100%)',
+    spine: 'linear-gradient(90deg, #5D322A 0%, #8C4B3E 100%)',
+    back: '#4D2A23',
+  },
+  charcoal: {
+    cover: 'linear-gradient(160deg, #3D3D3D 0%, #262626 100%)',
+    spine: 'linear-gradient(90deg, #262626 0%, #3D3D3D 100%)',
+    back: '#1F1F1F',
+  },
+  olive: {
+    cover: 'linear-gradient(160deg, #555D2E 0%, #363A1C 100%)',
+    spine: 'linear-gradient(90deg, #363A1C 0%, #555D2E 100%)',
+    back: '#2E3118',
+  },
+  purple: {
+    cover: 'linear-gradient(160deg, #4A3B52 0%, #2F2236 100%)',
+    spine: 'linear-gradient(90deg, #2F2236 0%, #4A3B52 100%)',
+    back: '#281C2E',
+  },
+  blue: {
+    cover: 'linear-gradient(160deg, #3B4A52 0%, #222F36 100%)',
+    spine: 'linear-gradient(90deg, #222F36 0%, #3B4A52 100%)',
+    back: '#1D2830',
+  },
+};
+const paletteKeys = Object.keys(bookPalettes);
+
 function firstOf(list, fallback = '') {
   return Array.isArray(list) && list.length > 0 ? String(list[0]) : fallback;
 }
@@ -262,9 +306,13 @@ function SpecItem({ label, value, last }) {
   );
 }
 
-function Book3D({ hovered, title, partLabel }) {
+function Book3D({ hovered, title, partLabel, palette }) {
   const parts = splitTitle(title);
   const displayTitle = formatDisplayTitle(title);
+  const colors = bookPalettes[palette] || bookPalettes.green;
+  const coverStyle = { ...styles.bookCover, background: colors.cover };
+  const spineStyle = { ...styles.bookSpine, background: colors.spine };
+  const backStyle = { ...styles.bookBack, background: colors.back };
   return (
     <div
       style={{
@@ -273,14 +321,14 @@ function Book3D({ hovered, title, partLabel }) {
       }}
     >
       <div style={styles.book}>
-        <div style={styles.bookCover}>
+        <div style={coverStyle}>
           <div style={styles.bookCoverOrnament}></div>
           <div style={styles.bookCoverTitle}>{parts[0]}<br />{parts[1]}</div>
           <div style={styles.bookCoverRule}></div>
           <div style={styles.bookCoverAuthor}>{partLabel}</div>
         </div>
-        <div style={styles.bookSpine}><div style={styles.bookSpineText}>{displayTitle}</div></div>
-        <div style={styles.bookBack}></div>
+        <div style={spineStyle}><div style={styles.bookSpineText}>{displayTitle}</div></div>
+        <div style={backStyle}></div>
         <div style={styles.bookPages}></div>
         <div style={styles.bookTop}></div>
         <div style={styles.bookBottom}></div>
@@ -360,10 +408,10 @@ export default function HomePage() {
   }, [selectedUserId]);
 
   const partLabel = extractPartLabel(recommendedBook.title);
-  const genre = firstOf(recommendedBook.tags, 'N/A');
   const series = firstOf(recommendedBook.series, 'Standalone');
   const price = `$${20 + (Number(recommendedBook.item_id || 0) % 16)}.00`;
   const displayTitle = formatDisplayTitle(recommendedBook.title);
+  const palette = paletteKeys[Math.abs(Number(recommendedBook.item_id || 0)) % paletteKeys.length];
 
   const pageCount = useMemo(() => {
     const text = String(recommendedBook.description || '');
@@ -416,12 +464,12 @@ export default function HomePage() {
           </div>
 
           <div style={styles.visualCol} onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
-            <Book3D hovered={isHovered} title={recommendedBook.title} partLabel={partLabel} />
+            <Book3D hovered={isHovered} title={recommendedBook.title} partLabel={partLabel} palette={palette} />
           </div>
         </div>
 
         <footer style={styles.cardFooter}>
-          <SpecItem label="Genre" value={genre} />
+          <SpecItem label="Book ID" value={String(recommendedBook.item_id || 'N/A')} />
           <SpecItem label="Series" value={series} />
           <SpecItem label="Pages" value={String(pageCount)} />
           <SpecItem label="Part" value={partLabel} last />

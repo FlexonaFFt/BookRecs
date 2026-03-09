@@ -353,6 +353,15 @@ export default function CatalogPage() {
           </div>
         )}
 
+        <section style={{ padding: '18px 24px 0 24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: '22px', letterSpacing: '0.02em' }}>Main Catalog</h2>
+            <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#666' }}>
+              Browse all books
+            </span>
+          </div>
+        </section>
+
         <main style={styles.grid}>
           {loading && books.length === 0 && (
             <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '80px 0', fontSize: '13px', color: '#666', textTransform: 'uppercase' }}>
