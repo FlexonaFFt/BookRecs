@@ -68,6 +68,7 @@ function BookCard({ book, onAddToCart }) {
 
   return (
     <article onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      <Link to={`/book/${book.item_id}`} style={{ textDecoration: 'none' }}>
       <div style={styles.bookWrapper}>
         <div
           style={{
@@ -121,9 +122,12 @@ function BookCard({ book, onAddToCart }) {
           </div>
         </div>
       </div>
+      </Link>
 
       <div style={{ textAlign: 'center' }}>
-        <h3 style={{ fontFamily: "'Cinzel', serif", marginBottom: '4px' }}>{book.title}</h3>
+        <h3 style={{ fontFamily: "'Cinzel', serif", marginBottom: '4px' }}>
+          <Link to={`/book/${book.item_id}`} style={{ textDecoration: 'none' }}>{book.title}</Link>
+        </h3>
         <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#6b7280', marginBottom: '12px' }}>{book.partLabel}</p>
         <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #ddd', paddingTop: '10px' }}>
           <span style={{ fontWeight: 500, fontSize: '14px' }}>{book.price}</span>

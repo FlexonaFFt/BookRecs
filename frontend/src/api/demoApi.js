@@ -61,3 +61,11 @@ export async function fetchDemoBooksByIds(itemIds) {
   );
   return Object.fromEntries(results);
 }
+
+export async function fetchSimilarItems(itemId, limit = 8) {
+  const res = await fetch(`/v1/items/${encodeURIComponent(itemId)}/similar?limit=${encodeURIComponent(limit)}`);
+  if (!res.ok) {
+    throw new Error(`similar http ${res.status}`);
+  }
+  return res.json();
+}

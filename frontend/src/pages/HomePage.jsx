@@ -464,7 +464,9 @@ export default function HomePage() {
           </div>
 
           <div style={styles.visualCol} onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
-            <Book3D hovered={isHovered} title={recommendedBook.title} partLabel={partLabel} palette={palette} />
+            <Link to={`/book/${recommendedBook.item_id}`} style={{ textDecoration: 'none' }}>
+              <Book3D hovered={isHovered} title={recommendedBook.title} partLabel={partLabel} palette={palette} />
+            </Link>
           </div>
         </div>
 
