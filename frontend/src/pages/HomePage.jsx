@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import UserSwitcher from '../components/UserSwitcher';
+import { extractPartLabel, formatDisplayTitle, splitTitleForCover } from '../utils/bookFormat';
 import {
   fetchDemoBook,
   fetchDemoUsers,
@@ -249,16 +250,7 @@ function firstOf(list, fallback = '') {
 }
 
 function splitTitle(title) {
-  const text = String(title || '').trim();
-  if (!text) {
-    return ['Untitled', 'Book'];
-  }
-  const parts = text.split(/\s+/);
-  if (parts.length < 2) {
-    return [parts[0], ''];
-  }
-  const mid = Math.ceil(parts.length / 2);
-  return [parts.slice(0, mid).join(' '), parts.slice(mid).join(' ')];
+  return splitTitleForCover(title);
 }
 
 function SpecItem({ label, value, last }) {
@@ -270,8 +262,9 @@ function SpecItem({ label, value, last }) {
   );
 }
 
-function Book3D({ hovered, title, author }) {
+function Book3D({ hovered, title, partLabel }) {
   const parts = splitTitle(title);
+  const displayTitle = formatDisplayTitle(title);
   return (
     <div
       style={{
@@ -284,9 +277,9 @@ function Book3D({ hovered, title, author }) {
           <div style={styles.bookCoverOrnament}></div>
           <div style={styles.bookCoverTitle}>{parts[0]}<br />{parts[1]}</div>
           <div style={styles.bookCoverRule}></div>
-          <div style={styles.bookCoverAuthor}>{author || 'Unknown Author'}</div>
+          <div style={styles.bookCoverAuthor}>{partLabel}</div>
         </div>
-        <div style={styles.bookSpine}><div style={styles.bookSpineText}>{title || 'Untitled Book'}</div></div>
+        <div style={styles.bookSpine}><div style={styles.bookSpineText}>{displayTitle}</div></div>
         <div style={styles.bookBack}></div>
         <div style={styles.bookPages}></div>
         <div style={styles.bookTop}></div>
@@ -366,10 +359,11 @@ export default function HomePage() {
     };
   }, [selectedUserId]);
 
-  const author = firstOf(recommendedBook.authors, 'Unknown Author');
+  const partLabel = extractPartLabel(recommendedBook.title);
   const genre = firstOf(recommendedBook.tags, 'N/A');
   const series = firstOf(recommendedBook.series, 'Standalone');
   const price = `$${20 + (Number(recommendedBook.item_id || 0) % 16)}.00`;
+  const displayTitle = formatDisplayTitle(recommendedBook.title);
 
   const pageCount = useMemo(() => {
     const text = String(recommendedBook.description || '');
@@ -400,7 +394,7 @@ export default function HomePage() {
             <div style={styles.circleBadge}>Top 1<br />for today</div>
             <h1 style={styles.h1}>This is your<br />recommendation<br />for today</h1>
             <p style={styles.description}>
-              {loadingReco ? 'Preparing your personalized pick...' : `Today we recommend "${recommendedBook.title}" by ${author}.`}
+              {loadingReco ? 'Preparing your personalized pick...' : `Today we recommend "${displayTitle}".`}
             </p>
             <div style={{ display: 'flex', gap: '18px', alignItems: 'center', marginBottom: '24px' }}>
               <span style={{ fontSize: '18px', fontWeight: 500 }}>{price}</span>
@@ -422,7 +416,7 @@ export default function HomePage() {
           </div>
 
           <div style={styles.visualCol} onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
-            <Book3D hovered={isHovered} title={recommendedBook.title} author={author} />
+            <Book3D hovered={isHovered} title={recommendedBook.title} partLabel={partLabel} />
           </div>
         </div>
 
@@ -430,7 +424,7 @@ export default function HomePage() {
           <SpecItem label="Genre" value={genre} />
           <SpecItem label="Series" value={series} />
           <SpecItem label="Pages" value={String(pageCount)} />
-          <SpecItem label="Author" value={author} last />
+          <SpecItem label="Part" value={partLabel} last />
         </footer>
       </div>
     </div>

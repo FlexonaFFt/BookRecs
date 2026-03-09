@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import UserSwitcher from '../components/UserSwitcher';
+import { extractPartLabel, formatDisplayTitle, splitTitleForCover } from '../utils/bookFormat';
 import {
   fetchDemoBooksByIds,
   fetchDemoUsers,
@@ -42,28 +43,19 @@ function priceFromId(itemId) {
 }
 
 function titleLines(title) {
-  const text = String(title || '').trim();
-  if (!text) {
-    return ['Untitled', 'Book'];
-  }
-  const parts = text.split(/\s+/);
-  if (parts.length === 1) {
-    return [parts[0], ''];
-  }
-  const mid = Math.ceil(parts.length / 2);
-  return [parts.slice(0, mid).join(' '), parts.slice(mid).join(' ')];
+  return splitTitleForCover(title);
 }
 
 function normalizeBook(raw, idx = 0) {
   const id = Number(raw.item_id ?? raw.id ?? idx + 1);
-  const authors = Array.isArray(raw.authors) ? raw.authors : [];
   const tags = Array.isArray(raw.tags) ? raw.tags : [];
+  const rawTitle = raw.title || `Book ${id}`;
   return {
     id,
     item_id: id,
-    title: String(raw.title || `Book ${id}`),
-    titleLines: titleLines(raw.title),
-    author: authors.length > 0 ? String(authors[0]) : 'Unknown Author',
+    title: formatDisplayTitle(rawTitle),
+    titleLines: titleLines(rawTitle),
+    partLabel: extractPartLabel(rawTitle),
     price: priceFromId(id),
     color: colorKeys[id % colorKeys.length],
     genre: tags.length > 0 ? String(tags[0]) : 'All',
@@ -116,7 +108,7 @@ function BookCard({ book, onAddToCart }) {
                 {book.titleLines[0]}<br />{book.titleLines[1]}
               </div>
               <div style={{ width: '40px', height: '1px', background: '#D4C89A', margin: '12px 0', opacity: 0.6 }}></div>
-              <div style={{ color: '#D4C89A', fontSize: '8px', letterSpacing: '0.15em', textTransform: 'uppercase', opacity: 0.8 }}>{book.author}</div>
+              <div style={{ color: '#D4C89A', fontSize: '8px', letterSpacing: '0.15em', textTransform: 'uppercase', opacity: 0.8 }}>{book.partLabel}</div>
             </div>
 
             <div style={{ position: 'absolute', width: '50px', height: '280px', transform: 'rotateY(-90deg) translateZ(25px)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: spine }}>
@@ -132,7 +124,7 @@ function BookCard({ book, onAddToCart }) {
 
       <div style={{ textAlign: 'center' }}>
         <h3 style={{ fontFamily: "'Cinzel', serif", marginBottom: '4px' }}>{book.title}</h3>
-        <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#6b7280', marginBottom: '12px' }}>{book.author}</p>
+        <p style={{ fontSize: '10px', textTransform: 'uppercase', color: '#6b7280', marginBottom: '12px' }}>{book.partLabel}</p>
         <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #ddd', paddingTop: '10px' }}>
           <span style={{ fontWeight: 500, fontSize: '14px' }}>{book.price}</span>
           <button onClick={() => onAddToCart(book)} style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', background: 'none', border: 'none', borderBottom: '1px solid #1A1A1A', cursor: 'pointer' }}>Add to cart</button>
@@ -253,7 +245,7 @@ export default function CatalogPage() {
       }
       setLoadingRecs(true);
       try {
-        const reco = await fetchRecommendations(selectedUserId, 10);
+        const reco = await fetchRecommendations(selectedUserId, 8);
         const items = Array.isArray(reco.items) ? reco.items : [];
         const map = await fetchDemoBooksByIds(items.map((x) => x.item_id));
         const enriched = items.map((x, idx) => {
@@ -339,7 +331,7 @@ export default function CatalogPage() {
 
         <section style={{ padding: '20px 24px 8px 24px', borderBottom: '1px solid #1A1A1A' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: '22px', letterSpacing: '0.02em' }}>Top 10 Recommendations</h2>
+            <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: '22px', letterSpacing: '0.02em' }}>Top Recommendations</h2>
             <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>User: {selectedUserId || 'N/A'}</span>
           </div>
           {loadingRecs ? (
@@ -347,7 +339,7 @@ export default function CatalogPage() {
           ) : topRecs.length === 0 ? (
             <div style={{ fontSize: '12px', color: '#666' }}>No recommendations for selected user.</div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(220px, 1fr))', gap: '32px 32px', rowGap: '48px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(220px, 1fr))', gap: '32px 32px', rowGap: '64px' }}>
               {topRecs.map((book) => (
                 <BookCard key={`top-${book.item_id}`} book={book} onAddToCart={onAddToCart} />
               ))}
