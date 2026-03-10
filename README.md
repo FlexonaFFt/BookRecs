@@ -34,6 +34,12 @@ make infra-up
 make pipeline-up
 ```
 
+### 3.1 Эмуляция batch за 5 дней (offline replay / пилот)
+```bash
+make batch-emulate DAYS=5 END_DATE=2026-03-10
+```
+Если `END_DATE` не задан, берется текущая дата; для каждого дня запускается отдельный batch run с `run_name=batch_YYYYMMDD`.
+
 ### 4. Запуск API инференса
 ```bash
 make api-up
@@ -50,6 +56,7 @@ make ps
 make logs SERVICE=api
 make logs SERVICE=pipeline
 make demo-seed
+make batch-emulate DAYS=5 END_DATE=2026-03-10
 make test
 make down
 make down-volumes
@@ -67,9 +74,18 @@ make down-volumes
 ```bash
 python -m source.interfaces.pipeline_entrypoint
 python -m source.interfaces.api_entrypoint
+python -m source.interfaces.batch_backfill_entrypoint
 ```
 
 </details>
+
+## Airflow Batch DAG
+В проект добавлен DAG `bookrecs_daily_batch` (файл `deploy/airflow/dags/bookrecs_batch_dag.py`) с `DockerOperator` и `catchup=True`.
+
+Пример backfill в Airflow за 5 дней:
+```bash
+airflow dags backfill bookrecs_daily_batch -s 2026-03-06 -e 2026-03-10
+```
 
 ## Product Pipeline
 ![Recommendation pipeline](docs/images/pipeline.png)
