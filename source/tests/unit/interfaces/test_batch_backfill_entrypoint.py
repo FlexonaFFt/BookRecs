@@ -41,19 +41,34 @@ def test_build_dates() -> None:
     assert result == ["2026-03-08", "2026-03-09", "2026-03-10"]
 
 
+def test_parse_promote_enabled() -> None:
+    assert mod._parse_promote_enabled(None) is True
+    assert mod._parse_promote_enabled("") is True
+    assert mod._parse_promote_enabled("true") is True
+    assert mod._parse_promote_enabled("1") is True
+    assert mod._parse_promote_enabled("false") is False
+
+
 def test_main_runs_over_expected_dates(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BOOKRECS_BATCH_BACKFILL_DAYS", "3")
     monkeypatch.setenv("BOOKRECS_BATCH_END_DATE", "2026-03-10")
     monkeypatch.setenv("BOOKRECS_BATCH_RUN_NAME", "must_be_removed")
+    monkeypatch.setenv("BOOKRECS_BATCH_BACKFILL_PROMOTE", "true")
 
     calls: list[str] = []
+    promotions: list[str] = []
 
     def _fake_run_batch_once() -> None:
         calls.append(mod.os.environ["BOOKRECS_BATCH_EXECUTION_DATE"])
 
+    def _fake_promote() -> None:
+        promotions.append(mod.os.environ["BOOKRECS_PROMOTE_RUN_NAME"])
+
     monkeypatch.setattr(mod, "run_batch_once", _fake_run_batch_once)
+    monkeypatch.setattr(mod, "promote_model", _fake_promote)
 
     mod.main()
 
     assert calls == ["2026-03-08", "2026-03-09", "2026-03-10"]
+    assert promotions == ["batch_20260308", "batch_20260309", "batch_20260310"]
     assert "BOOKRECS_BATCH_RUN_NAME" not in mod.os.environ

@@ -1,8 +1,9 @@
-.PHONY: help init-env infra-up pipeline-up api-up demo-seed batch-emulate test up down down-volumes logs ps restart-pipeline restart-api
+.PHONY: help init-env infra-up pipeline-up api-up demo-seed batch-emulate promote-run test up down down-volumes logs ps restart-pipeline restart-api
 
 SERVICE ?= pipeline
 DAYS ?= 5
 END_DATE ?=
+RUN_NAME ?=
 
 help:
 	@echo "Доступные команды:"
@@ -11,7 +12,8 @@ help:
 	@echo "  make pipeline-up      # собрать образ и запустить pipeline"
 	@echo "  make api-up           # собрать образ и запустить inference API"
 	@echo "  make demo-seed        # загрузить demo-таблицы в postgres из preprocessed parquet"
-	@echo "  make batch-emulate    # эмуляция батч-запусков за N дней (DAYS=5 END_DATE=YYYY-MM-DD)"
+	@echo "  make batch-emulate    # эмуляция батч-запусков за N дней (DAYS=5 END_DATE=YYYY-MM-DD, с promote)"
+	@echo "  make promote-run      # вручную промоутнуть run в active pointer (RUN_NAME=batch_YYYYMMDD)"
 	@echo "  make test             # запустить unit-тесты"
 	@echo "  make up               # infra-up + pipeline-up"
 	@echo "  make down             # остановить все сервисы"
@@ -44,7 +46,13 @@ batch-emulate: init-env
 	docker compose run --build --rm \
 		-e BOOKRECS_BATCH_BACKFILL_DAYS=$(DAYS) \
 		-e BOOKRECS_BATCH_END_DATE=$(END_DATE) \
+		-e BOOKRECS_BATCH_BACKFILL_PROMOTE=true \
 		pipeline python -m source.interfaces.batch_backfill_entrypoint
+
+promote-run: init-env
+	docker compose run --build --rm \
+		-e BOOKRECS_PROMOTE_RUN_NAME=$(RUN_NAME) \
+		pipeline python -m source.interfaces.promote_model_entrypoint
 
 test:
 	python3 -m pytest

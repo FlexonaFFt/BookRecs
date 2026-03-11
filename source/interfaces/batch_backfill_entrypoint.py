@@ -4,6 +4,7 @@ import os
 from datetime import date, timedelta
 
 from source.interfaces.batch_entrypoint import main as run_batch_once
+from source.interfaces.promote_model_entrypoint import main as promote_model
 
 
 def _parse_days(raw: str | None) -> int:
@@ -31,9 +32,17 @@ def _build_dates(end_date: date, days: int) -> list[str]:
     return [(start + timedelta(days=offset)).isoformat() for offset in range(days)]
 
 
+def _parse_promote_enabled(raw: str | None) -> bool:
+    value = (raw or "").strip().lower()
+    if not value:
+        return True
+    return value in {"1", "true", "yes", "on"}
+
+
 def main() -> None:
     days = _parse_days(os.getenv("BOOKRECS_BATCH_BACKFILL_DAYS"))
     end_date = _parse_end_date(os.getenv("BOOKRECS_BATCH_END_DATE"))
+    promote_enabled = _parse_promote_enabled(os.getenv("BOOKRECS_BATCH_BACKFILL_PROMOTE"))
     execution_dates = _build_dates(end_date=end_date, days=days)
 
     # Для backfill нужен run_name, зависящий от execution date.
@@ -49,6 +58,11 @@ def main() -> None:
         os.environ["BOOKRECS_BATCH_EXECUTION_DATE"] = execution_date
         print(f"[batch-backfill] run execution_date={execution_date}", flush=True)
         run_batch_once()
+        if promote_enabled:
+            run_name = f"batch_{execution_date.replace('-', '')}"
+            os.environ["BOOKRECS_PROMOTE_RUN_NAME"] = run_name
+            print(f"[batch-backfill] promote run_name={run_name}", flush=True)
+            promote_model()
 
     print("[batch-backfill] done", flush=True)
 

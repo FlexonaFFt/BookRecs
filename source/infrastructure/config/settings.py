@@ -177,6 +177,8 @@ class PipelineSettings:
 @dataclass(frozen=True)
 class ApiRuntimeSettings:
     model_uri: str
+    active_model_pointer: str
+    auto_reload_sec: int
     model_cache_dir: str
     s3_region: str
     s3_endpoint: str
@@ -194,6 +196,12 @@ class ApiRuntimeSettings:
     def from_mapping(cls, values: Mapping[str, str]) -> ApiRuntimeSettings:
         return cls(
             model_uri=env_str(values, "BOOKRECS_API_MODEL_URI", ""),
+            active_model_pointer=env_str(
+                values,
+                "BOOKRECS_ACTIVE_MODEL_POINTER",
+                "artifacts/runs/active_model.json",
+            ),
+            auto_reload_sec=env_positive_int(values, "BOOKRECS_API_MODEL_AUTO_RELOAD_SEC", 60),
             model_cache_dir=env_str(values, "BOOKRECS_API_MODEL_CACHE_DIR", "artifacts/cache/models"),
             s3_region=env_str(values, "BOOKRECS_S3_REGION", "us-east-1"),
             s3_endpoint=env_str(values, "BOOKRECS_S3_ENDPOINT", ""),

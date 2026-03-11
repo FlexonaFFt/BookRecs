@@ -38,7 +38,12 @@ make pipeline-up
 ```bash
 make batch-emulate DAYS=5 END_DATE=2026-03-10
 ```
-Если `END_DATE` не задан, берется текущая дата; для каждого дня запускается отдельный batch run с `run_name=batch_YYYYMMDD`.
+Если `END_DATE` не задан, берется текущая дата; для каждого дня запускается отдельный batch run с `run_name=batch_YYYYMMDD`, после чего выполняется promote активной модели.
+
+### 3.2 Ручной promote модели
+```bash
+make promote-run RUN_NAME=batch_20260310
+```
 
 ### 4. Запуск API инференса
 ```bash
@@ -48,6 +53,7 @@ make api-up
 ### 5. Проверка API
 ```bash
 curl http://localhost:8000/healthz
+curl -X POST http://localhost:8000/v1/admin/reload-model
 ```
 
 ### Полезные команды
@@ -57,6 +63,7 @@ make logs SERVICE=api
 make logs SERVICE=pipeline
 make demo-seed
 make batch-emulate DAYS=5 END_DATE=2026-03-10
+make promote-run RUN_NAME=batch_20260310
 make test
 make down
 make down-volumes
@@ -81,11 +88,20 @@ python -m source.interfaces.batch_backfill_entrypoint
 
 ## Airflow Batch DAG
 В проект добавлен DAG `bookrecs_daily_batch` (файл `deploy/airflow/dags/bookrecs_batch_dag.py`) с `DockerOperator` и `catchup=True`.
+Он включает два шага:
+1. `run_batch_pipeline`
+2. `promote_model`
 
 Пример backfill в Airflow за 5 дней:
 ```bash
 airflow dags backfill bookrecs_daily_batch -s 2026-03-06 -e 2026-03-10
 ```
+
+## Active Model Flow
+- Активная модель хранится в pointer-файле `BOOKRECS_ACTIVE_MODEL_POINTER` (по умолчанию `artifacts/runs/active_model.json`).
+- API при старте и в рантайме читает pointer и подхватывает новую модель.
+- Интервал автопроверки: `BOOKRECS_API_MODEL_AUTO_RELOAD_SEC` (по умолчанию 60 сек).
+- Принудительное обновление без рестарта: `POST /v1/admin/reload-model`.
 
 ## Product Pipeline
 ![Recommendation pipeline](docs/images/pipeline.png)
