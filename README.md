@@ -87,7 +87,7 @@ python -m source.interfaces.batch_backfill_entrypoint
 </details>
 
 ## Airflow Batch DAG
-В проект добавлен DAG `bookrecs_daily_batch` (файл `deploy/airflow/dags/bookrecs_batch_dag.py`) с `DockerOperator` и `catchup=True`.
+В проект добавлен DAG `bookrecs_daily_batch` (файл `source/interfaces/airflow/dags/bookrecs_batch_dag.py`) с `DockerOperator` и `catchup=True`.
 Он включает два шага:
 1. `run_batch_pipeline`
 2. `promote_model`
