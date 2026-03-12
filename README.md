@@ -1,5 +1,7 @@
 # BookRecs
 
+![BookRecs demo catalog](docs/images/demo-catalog.png)
+
 ## Описание проекта
 BookRecs — это ML-система рекомендаций книг (Goodreads YA) с фокусом на гибридный pipeline и устойчивость к cold-start по айтемам. Проект объединяет подготовку данных, обучение моделей, офлайн-оценку и онлайн-инференс через FastAPI.
 
@@ -9,8 +11,28 @@ BookRecs — это ML-система рекомендаций книг (Goodrea
 - [ML System Design Doc](docs/ML_System_Design.md)
 - [Research Results](docs/Research_Results.md)
 
+## Product Pipeline
+![Recommendation pipeline](docs/images/pipeline.png)
+
+Pipeline состоит из пяти шагов:
+1. `Data & Split` — загрузка и предобработка interactions/metadata, time split, разметка warm/cold.
+2. `Candidate Generation` — объединение кандидатов из `CF`, `Content`, `Popular`.
+3. `Pre-ranking` — легкий Stage-2 отбор top-M кандидатов.
+4. `Final Ranking` — Stage-3 финальное ранжирование и postprocessing.
+5. `Evaluation & Publish` — метрики (`NDCG@K`, `Recall@K`, `Coverage@K`, cold-срезы) и сохранение артефактов.
+
 <details>
-<summary><h2>Как запустить проект</h2></summary>
+<summary><h2>Интерфейс демо</h2></summary>
+
+### Главная страница
+![BookRecs demo home](docs/images/demo-home.png)
+
+### Каталог рекомендаций
+![BookRecs demo product](docs/images/demo-product.png)
+
+</details>
+
+## Как запустить проект
 
 ### 1. Подготовка окружения
 ```bash
@@ -84,10 +106,10 @@ python -m source.interfaces.api_entrypoint
 python -m source.interfaces.batch_backfill_entrypoint
 ```
 
-</details>
+<details>
+<summary><h2>Airflow Batch DAG</h2></summary>
 
-## Airflow Batch DAG
-В проект добавлен DAG `bookrecs_daily_batch` (файл `source/interfaces/airflow/dags/bookrecs_batch_dag.py`) с `DockerOperator` и `catchup=True`.
+В проект добавлен DAG `bookrecs_daily_batch` (файл `deploy/airflow/dags/bookrecs_batch_dag.py`) с `DockerOperator` и `catchup=True`.
 Он включает два шага:
 1. `run_batch_pipeline`
 2. `promote_model`
@@ -97,21 +119,13 @@ python -m source.interfaces.batch_backfill_entrypoint
 airflow dags backfill bookrecs_daily_batch -s 2026-03-06 -e 2026-03-10
 ```
 
+</details>
+
 ## Active Model Flow
 - Активная модель хранится в pointer-файле `BOOKRECS_ACTIVE_MODEL_POINTER` (по умолчанию `artifacts/runs/active_model.json`).
 - API при старте и в рантайме читает pointer и подхватывает новую модель.
 - Интервал автопроверки: `BOOKRECS_API_MODEL_AUTO_RELOAD_SEC` (по умолчанию 60 сек).
 - Принудительное обновление без рестарта: `POST /v1/admin/reload-model`.
-
-## Product Pipeline
-![Recommendation pipeline](docs/images/pipeline.png)
-
-Pipeline состоит из пяти шагов:
-1. `Data & Split` — загрузка и предобработка interactions/metadata, time split, разметка warm/cold.
-2. `Candidate Generation` — объединение кандидатов из `CF`, `Content`, `Popular`.
-3. `Pre-ranking` — легкий Stage-2 отбор top-M кандидатов.
-4. `Final Ranking` — Stage-3 финальное ранжирование и postprocessing.
-5. `Evaluation & Publish` — метрики (`NDCG@K`, `Recall@K`, `Coverage@K`, cold-срезы) и сохранение артефактов.
 
 <details>
 <summary><h2>Architecture</h2></summary>
