@@ -25,7 +25,6 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 COPY source /app/source
 COPY data /app/data
-COPY configs /app/configs
 COPY .env.example /app/.env.example
 
 CMD ["python", "-m", "source.interfaces.pipeline_entrypoint"]

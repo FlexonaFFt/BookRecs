@@ -6,6 +6,7 @@
 BookRecs — это ML-система рекомендаций книг (Goodreads YA) с фокусом на гибридный pipeline и устойчивость к cold-start по айтемам. Проект объединяет подготовку данных, обучение моделей, офлайн-оценку и онлайн-инференс через FastAPI.
 
 Система построена в стиле Clean Architecture: доменная модель и use-case логика отделены от инфраструктуры (PostgreSQL, S3/MinIO, docker-сервисы). На текущем этапе реализованы batch training pipeline и inference API, которые работают с сохраненными артефактами `stage1/stage2/stage3`.
+Конфигурация приложения централизована в `source/infrastructure/config/settings.py` и читается через единый config layer на базе env-переменных.
 
 ## Ссылки на документацию проекта
 - [ML System Design Doc](docs/ML_System_Design.md)
@@ -109,7 +110,7 @@ python -m source.interfaces.batch_backfill_entrypoint
 <details>
 <summary><h2>Airflow Batch DAG</h2></summary>
 
-В проект добавлен DAG `bookrecs_daily_batch` (файл `deploy/airflow/dags/bookrecs_batch_dag.py`) с `DockerOperator` и `catchup=True`.
+В проект добавлен DAG `bookrecs_daily_batch` (файл `source/interfaces/airflow/dags/bookrecs_batch_dag.py`) с `DockerOperator` и `catchup=True`.
 Он включает два шага:
 1. `run_batch_pipeline`
 2. `promote_model`
@@ -121,11 +122,15 @@ airflow dags backfill bookrecs_daily_batch -s 2026-03-06 -e 2026-03-10
 
 </details>
 
-## Active Model Flow
+<details>
+<summary><h2>Active Model Flow</h2></summary>
+
 - Активная модель хранится в pointer-файле `BOOKRECS_ACTIVE_MODEL_POINTER` (по умолчанию `artifacts/runs/active_model.json`).
 - API при старте и в рантайме читает pointer и подхватывает новую модель.
 - Интервал автопроверки: `BOOKRECS_API_MODEL_AUTO_RELOAD_SEC` (по умолчанию 60 сек).
 - Принудительное обновление без рестарта: `POST /v1/admin/reload-model`.
+
+</details>
 
 <details>
 <summary><h2>Architecture</h2></summary>
