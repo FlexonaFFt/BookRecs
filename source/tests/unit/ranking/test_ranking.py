@@ -15,7 +15,9 @@ from source.application.use_cases.ranking.prerank_candidates import (
     PreRankCandidatesUseCase,
 )
 from source.application.use_cases.ranking.reco_flow import RecoFlowCommand, RecoFlowUseCase
+from source.application.use_cases.ranking.source_limits import source_limits_for_stage1
 from source.domain.entities import Candidate, FinalItem, ScoredCandidate
+from source.infrastructure.ranking.candidates import ColdCandidateSource
 
 
 @dataclass
@@ -147,6 +149,8 @@ def test_generate_candidates_merges_scores_and_sources_and_filters_seen() -> Non
     assert by_id[1].score == pytest.approx(0.8)
     assert by_id[1].source == "cf|pop"
     assert by_id[3].source == "pop"
+    assert by_id[1].features["source_count"] == pytest.approx(2.0)
+    assert by_id[1].features["total_score"] == pytest.approx(0.8)
 
 
 def test_generate_candidates_uses_fallback_when_pool_is_short() -> None:
@@ -185,6 +189,38 @@ def test_generate_candidates_respects_source_limits() -> None:
 
     assert cf.calls[0]["limit"] == 1
     assert pop.calls[0]["limit"] == 2
+
+
+def test_source_limits_for_stage1_favor_content_and_cold_for_short_history() -> None:
+    short = source_limits_for_stage1(history_len=1, per_source_limit=100)
+    medium = source_limits_for_stage1(history_len=4, per_source_limit=100)
+    long = source_limits_for_stage1(history_len=10, per_source_limit=100)
+
+    assert short == {"cf": 20, "content": 180, "cold": 160, "pop": 100}
+    assert medium == {"cf": 65, "content": 140, "cold": 114, "pop": 100}
+    assert long == {"cf": 100, "content": 110, "cold": 80, "pop": 90}
+
+
+def test_cold_candidate_source_uses_metadata_overlap_and_novelty() -> None:
+    source = ColdCandidateSource(
+        item_metadata={
+            1: {"authors": ["A"], "series": ["S"], "tags": ["fantasy"]},
+            2: {"authors": ["A"], "series": [], "tags": ["fantasy"]},
+            3: {"authors": [], "series": ["S"], "tags": ["magic"]},
+        },
+        author_index={"A": [1, 2]},
+        series_index={"S": [1, 3]},
+        tag_index={"fantasy": [1, 2], "magic": [3]},
+        popularity_scores={2: 0.1, 3: 0.0},
+    )
+
+    out = source.generate(user_id="u1", seen_items={1}, limit=5)
+
+    assert [x.item_id for x in out] == [2, 3]
+    by_id = {x.item_id: x for x in out}
+    assert by_id[2].features["metadata_overlap"] > 0.0
+    assert by_id[2].features["rank_cold"] == pytest.approx(1.0)
+    assert by_id[2].features["score_cold"] > by_id[3].features["score_cold"]
 
 
 def test_generate_candidates_validates_input() -> None:
@@ -342,7 +378,9 @@ def test_reco_flow_executes_all_stages_and_passes_params() -> None:
     assert stage2.last_cmd.top_m == 33
     assert stage3.last_cmd.top_k == 5
     assert stage1.last_cmd.source_limits["cf"] == 50
-    assert stage1.last_cmd.source_limits["content"] == int(50 * 1.25)
+    assert stage1.last_cmd.source_limits["content"] == int(50 * 1.1)
+    assert stage1.last_cmd.source_limits["cold"] == int(50 * 0.8)
+    assert stage1.last_cmd.source_limits["pop"] == int(50 * 0.9)
 
 
 def test_reco_flow_uses_content_heavy_limits_for_short_history() -> None:
@@ -365,6 +403,7 @@ def test_reco_flow_uses_content_heavy_limits_for_short_history() -> None:
     )
 
     limits = stage1.last_cmd.source_limits
-    assert limits["cf"] == 25
-    assert limits["content"] == 220
-    assert limits["pop"] == 120
+    assert limits["cf"] == 20
+    assert limits["content"] == 180
+    assert limits["cold"] == 160
+    assert limits["pop"] == 100

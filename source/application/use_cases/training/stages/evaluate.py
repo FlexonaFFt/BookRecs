@@ -10,6 +10,7 @@ from source.application.use_cases.training.common.data_ops import build_seen_map
 from source.application.use_cases.training.common.metrics import ndcg_at_k, recall_at_k
 from source.infrastructure.processing.postprocessing import DefaultPostprocessor
 from source.infrastructure.ranking.candidates import (
+    ColdCandidateSource,
     CfCandidateSource,
     ContentCandidateSource,
     PopularCandidateSource,
@@ -34,6 +35,13 @@ def evaluate_pipeline(
             CfCandidateSource(stage1["cf_neighbors"]),
             ContentCandidateSource(
                 stage1["content_similar"],
+                popularity_scores=stage1["pop_scores"],
+            ),
+            ColdCandidateSource(
+                item_metadata=stage1["item_metadata"],
+                author_index=stage1["author_index"],
+                series_index=stage1["series_index"],
+                tag_index=stage1["tag_index"],
                 popularity_scores=stage1["pop_scores"],
             ),
             PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),

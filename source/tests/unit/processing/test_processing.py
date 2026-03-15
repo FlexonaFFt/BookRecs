@@ -26,8 +26,20 @@ def test_default_postprocessor_returns_empty_when_top_k_non_positive() -> None:
 def test_feature_builder_builds_expected_flags_and_normalized_scores() -> None:
     builder = FeatureBuilder()
     candidates = [
-        Candidate(user_id="u1", item_id=1, source="cf|pop", score=0.2),
-        Candidate(user_id="u1", item_id=2, source="content", score=1.2),
+        Candidate(
+            user_id="u1",
+            item_id=1,
+            source="cf|pop",
+            score=0.2,
+            features={"score_cf": 0.2, "rank_cf": 1.0, "score_pop": 0.2, "rank_pop": 2.0, "source_count": 2.0},
+        ),
+        Candidate(
+            user_id="u1",
+            item_id=2,
+            source="content",
+            score=1.2,
+            features={"score_content": 1.2, "rank_content": 1.0, "source_count": 1.0},
+        ),
     ]
     rows = builder.build(candidates=candidates, user_id="u1", history_len=10, cold_item_ids={2})
 
@@ -39,6 +51,7 @@ def test_feature_builder_builds_expected_flags_and_normalized_scores() -> None:
     assert by_id[1].features["history_len_norm"] == 0.2
     assert by_id[1].features["score_norm"] == 0.0
     assert by_id[2].features["score_norm"] == 1.0
+    assert by_id[1].features["source_count_norm"] == 0.5
 
 
 def test_linear_preranker_returns_top_m_sorted_by_pre_score() -> None:
@@ -48,14 +61,19 @@ def test_linear_preranker_returns_top_m_sorted_by_pre_score() -> None:
             w_cf=0.0,
             w_content=0.0,
             w_pop=0.0,
-            w_cold=0.0,
+            w_cold_source=0.0,
+            w_cold_flag=0.0,
             w_history=0.0,
+            w_source_count=0.0,
+            w_popularity=0.0,
+            w_metadata_overlap=0.0,
+            w_rank=0.0,
         )
     )
     candidates = [
-        Candidate(user_id="u1", item_id=1, source="cf", score=0.2),
-        Candidate(user_id="u1", item_id=2, source="cf", score=0.9),
-        Candidate(user_id="u1", item_id=3, source="cf", score=0.4),
+        Candidate(user_id="u1", item_id=1, source="cf", score=0.2, features={"score_cf": 0.2, "rank_cf": 3.0}),
+        Candidate(user_id="u1", item_id=2, source="cf", score=0.9, features={"score_cf": 0.9, "rank_cf": 1.0}),
+        Candidate(user_id="u1", item_id=3, source="cf", score=0.4, features={"score_cf": 0.4, "rank_cf": 2.0}),
     ]
     out = ranker.rank(candidates=candidates, user_id="u1", history_len=5, cold_item_ids=set(), top_m=2)
     assert [x.item_id for x in out] == [2, 3]

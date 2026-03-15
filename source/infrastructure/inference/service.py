@@ -16,6 +16,7 @@ from source.infrastructure.inference.loader import ModelBundle
 from source.infrastructure.inference.logger import InferenceRequestLogger
 from source.infrastructure.processing.postprocessing import DefaultPostprocessor
 from source.infrastructure.ranking.candidates import (
+    ColdCandidateSource,
     CfCandidateSource,
     ContentCandidateSource,
     PopularCandidateSource,
@@ -50,6 +51,10 @@ class InferenceService:
         self._pop_items: list[Any] = stage1["pop_items"]
         self._cf_neighbors: dict[Any, list[tuple[Any, float]]] = stage1["cf_neighbors"]
         self._content_similar: dict[Any, list[tuple[Any, float]]] = stage1["content_similar"]
+        self._item_metadata: dict[Any, dict[str, list[str]]] = stage1.get("item_metadata", {})
+        self._author_index: dict[str, list[Any]] = stage1.get("author_index", {})
+        self._series_index: dict[str, list[Any]] = stage1.get("series_index", {})
+        self._tag_index: dict[str, list[Any]] = stage1.get("tag_index", {})
         self._item_id_type = self._detect_item_id_type()
 
         self._cold_item_ids = self._build_cold_item_ids()
@@ -58,6 +63,13 @@ class InferenceService:
                 sources=[
                     CfCandidateSource(self._cf_neighbors),
                     ContentCandidateSource(self._content_similar, popularity_scores=self._pop_scores),
+                    ColdCandidateSource(
+                        item_metadata=self._item_metadata,
+                        author_index=self._author_index,
+                        series_index=self._series_index,
+                        tag_index=self._tag_index,
+                        popularity_scores=self._pop_scores,
+                    ),
                     PopularCandidateSource(self._pop_items, self._pop_scores),
                 ],
                 fallback_source=PopularCandidateSource(self._pop_items, self._pop_scores),

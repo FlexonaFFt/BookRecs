@@ -61,10 +61,22 @@ class ContentCandidateSource(CandidateSourcePort):
 
         adjusted_rows.sort(key=lambda x: x[1], reverse=True)
         ranked = self._apply_cold_quota(adjusted_rows, limit=limit)
-        return [
-            Candidate(user_id=user_id, item_id=item_id, source=self.name, score=float(score))
-            for item_id, score in ranked
-        ]
+        out: list[Candidate] = []
+        for rank, (item_id, score) in enumerate(ranked, start=1):
+            out.append(
+                Candidate(
+                    user_id=user_id,
+                    item_id=item_id,
+                    source=self.name,
+                    score=float(score),
+                    features={
+                        "score_content": float(score),
+                        "rank_content": float(rank),
+                        "item_popularity": float(self._popularity(item_id)),
+                    },
+                )
+            )
+        return out
 
     def _apply_cold_quota(self, rows: list[tuple[Any, float, float]], limit: int) -> list[tuple[Any, float]]:
         if limit <= 0:

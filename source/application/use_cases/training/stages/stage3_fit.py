@@ -10,8 +10,10 @@ from source.application.use_cases.ranking.prerank_candidates import (
     PreRankCandidatesCommand,
     PreRankCandidatesUseCase,
 )
+from source.application.use_cases.ranking.source_limits import source_limits_for_stage1
 from source.application.use_cases.training.common.data_ops import build_seen_map, build_val_ground_truth, cold_items
 from source.infrastructure.ranking.candidates import (
+    ColdCandidateSource,
     CfCandidateSource,
     ContentCandidateSource,
     PopularCandidateSource,
@@ -39,6 +41,13 @@ def fit_stage3(
                 stage1["content_similar"],
                 popularity_scores=stage1["pop_scores"],
             ),
+            ColdCandidateSource(
+                item_metadata=stage1["item_metadata"],
+                author_index=stage1["author_index"],
+                series_index=stage1["series_index"],
+                tag_index=stage1["tag_index"],
+                popularity_scores=stage1["pop_scores"],
+            ),
             PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
         ],
         fallback_source=PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
@@ -62,7 +71,7 @@ def fit_stage3(
                 seen_items=seen,
                 pool_size=cmd.candidate_pool_size,
                 per_source_limit=cmd.candidate_per_source_limit,
-                source_limits=_source_limits_for_stage1(
+                source_limits=source_limits_for_stage1(
                     history_len=len(seen),
                     per_source_limit=cmd.candidate_per_source_limit,
                 ),
@@ -121,24 +130,3 @@ def fit_stage3(
         source_bias=source_bias,
     )
     return model
-
-
-def _source_limits_for_stage1(history_len: int, per_source_limit: int) -> dict[str, int]:
-    base = max(1, int(per_source_limit))
-    if history_len <= 1:
-        return {
-            "cf": max(20, int(base * 0.25)),
-            "content": int(base * 2.2),
-            "pop": int(base * 1.2),
-        }
-    if history_len <= 5:
-        return {
-            "cf": max(40, int(base * 0.7)),
-            "content": int(base * 1.8),
-            "pop": int(base * 1.1),
-        }
-    return {
-        "cf": base,
-        "content": int(base * 1.25),
-        "pop": base,
-    }

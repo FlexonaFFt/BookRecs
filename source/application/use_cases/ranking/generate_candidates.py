@@ -82,20 +82,46 @@ class GenerateCandidatesUseCase:
                 merged[cand.item_id] = {
                     "score": float(cand.score),
                     "sources": {cand.source},
+                    "features": dict(cand.features),
                 }
             else:
                 merged[cand.item_id]["score"] += float(cand.score)
                 merged[cand.item_id]["sources"].add(cand.source)
+                merged[cand.item_id]["features"] = GenerateCandidatesUseCase._merge_features(
+                    merged[cand.item_id]["features"],
+                    cand.features,
+                )
 
     @staticmethod
     def _to_ranked(user_id: Any, merged: dict[Any, dict[str, Any]], limit: int) -> list[Candidate]:
         rows = []
         for item_id, payload in merged.items():
             src = "|".join(sorted(payload["sources"]))
-            rows.append((item_id, float(payload["score"]), src))
+            features = dict(payload.get("features", {}))
+            features["source_count"] = float(len(payload["sources"]))
+            features["total_score"] = float(payload["score"])
+            rows.append((item_id, float(payload["score"]), src, features))
         rows.sort(key=lambda x: x[1], reverse=True)
 
         out: list[Candidate] = []
-        for item_id, score, src in rows[:limit]:
-            out.append(Candidate(user_id=user_id, item_id=item_id, source=src, score=score))
+        for item_id, score, src, features in rows[:limit]:
+            out.append(Candidate(user_id=user_id, item_id=item_id, source=src, score=score, features=features))
         return out
+
+    @staticmethod
+    def _merge_features(base: dict[str, float], extra: dict[str, float]) -> dict[str, float]:
+        merged = dict(base)
+        for key, value in extra.items():
+            numeric = float(value)
+            if key.startswith("score_"):
+                merged[key] = max(merged.get(key, 0.0), numeric)
+                continue
+            if key.startswith("rank_"):
+                current = merged.get(key)
+                merged[key] = numeric if current is None else min(float(current), numeric)
+                continue
+            if key in {"item_popularity"}:
+                merged[key] = max(merged.get(key, 0.0), numeric)
+                continue
+            merged[key] = merged.get(key, 0.0) + numeric
+        return merged

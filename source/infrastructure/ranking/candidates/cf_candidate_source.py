@@ -24,7 +24,18 @@ class CfCandidateSource(CandidateSourcePort):
                 score_map[neighbor_id] = score_map.get(neighbor_id, 0.0) + float(score)
 
         ranked = sorted(score_map.items(), key=lambda x: x[1], reverse=True)[:limit]
-        return [
-            Candidate(user_id=user_id, item_id=item_id, source=self.name, score=float(score))
-            for item_id, score in ranked
-        ]
+        out: list[Candidate] = []
+        for rank, (item_id, score) in enumerate(ranked, start=1):
+            out.append(
+                Candidate(
+                    user_id=user_id,
+                    item_id=item_id,
+                    source=self.name,
+                    score=float(score),
+                    features={
+                        "score_cf": float(score),
+                        "rank_cf": float(rank),
+                    },
+                )
+            )
+        return out

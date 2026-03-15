@@ -11,8 +11,10 @@ from source.application.use_cases.ranking.prerank_candidates import (
     PreRankCandidatesCommand,
     PreRankCandidatesUseCase,
 )
+from source.application.use_cases.ranking.source_limits import source_limits_for_stage1
 from source.application.use_cases.training.common.data_ops import build_seen_map, build_val_ground_truth, cold_items
 from source.infrastructure.ranking.candidates import (
+    ColdCandidateSource,
     CfCandidateSource,
     ContentCandidateSource,
     PopularCandidateSource,
@@ -32,17 +34,43 @@ def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: A
             stage1["content_similar"],
             popularity_scores=stage1["pop_scores"],
         ),
+        ColdCandidateSource(
+            item_metadata=stage1["item_metadata"],
+            author_index=stage1["author_index"],
+            series_index=stage1["series_index"],
+            tag_index=stage1["tag_index"],
+            popularity_scores=stage1["pop_scores"],
+        ),
         PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
     ]
     stage1_uc = GenerateCandidatesUseCase(sources=candidate_sources, fallback_source=candidate_sources[-1])
 
     grid = [
-        LinearPreRankerConfig(w_base=1.0, w_cf=0.2, w_content=0.2, w_pop=0.1, w_cold=0.1, w_history=0.02),
-        LinearPreRankerConfig(w_base=1.0, w_cf=0.3, w_content=0.2, w_pop=0.1, w_cold=0.1, w_history=0.02),
-        LinearPreRankerConfig(w_base=1.0, w_cf=0.25, w_content=0.25, w_pop=0.1, w_cold=0.15, w_history=0.02),
-        LinearPreRankerConfig(w_base=1.0, w_cf=0.35, w_content=0.2, w_pop=0.1, w_cold=0.1, w_history=0.01),
-        LinearPreRankerConfig(w_base=1.0, w_cf=0.15, w_content=0.35, w_pop=0.08, w_cold=0.25, w_history=0.02),
-        LinearPreRankerConfig(w_base=1.0, w_cf=0.1, w_content=0.4, w_pop=0.08, w_cold=0.35, w_history=0.02),
+        LinearPreRankerConfig(
+            w_base=1.0, w_cf=0.2, w_content=0.2, w_pop=0.08, w_cold_source=0.18, w_cold_flag=0.1
+        ),
+        LinearPreRankerConfig(
+            w_base=1.0, w_cf=0.26, w_content=0.18, w_pop=0.08, w_cold_source=0.2, w_cold_flag=0.08
+        ),
+        LinearPreRankerConfig(
+            w_base=1.0, w_cf=0.18, w_content=0.24, w_pop=0.06, w_cold_source=0.24, w_cold_flag=0.14
+        ),
+        LinearPreRankerConfig(
+            w_base=1.0, w_cf=0.14, w_content=0.2, w_pop=0.06, w_cold_source=0.32, w_cold_flag=0.18
+        ),
+        LinearPreRankerConfig(
+            w_base=1.0, w_cf=0.2, w_content=0.15, w_pop=0.06, w_cold_source=0.28, w_cold_flag=0.12, w_rank=0.24
+        ),
+        LinearPreRankerConfig(
+            w_base=1.0,
+            w_cf=0.16,
+            w_content=0.18,
+            w_pop=0.05,
+            w_cold_source=0.26,
+            w_cold_flag=0.12,
+            w_source_count=0.18,
+            w_metadata_overlap=0.22,
+        ),
     ]
 
     best_cfg = grid[0]
@@ -121,7 +149,7 @@ def evaluate_prerank_metrics(
                 seen_items=seen,
                 pool_size=cmd.candidate_pool_size,
                 per_source_limit=cmd.candidate_per_source_limit,
-                source_limits=_source_limits_for_stage1(
+                source_limits=source_limits_for_stage1(
                     history_len=len(seen),
                     per_source_limit=cmd.candidate_per_source_limit,
                 ),
@@ -159,25 +187,4 @@ def evaluate_prerank_metrics(
         "cold_recall": cold_recall,
         "cold_candidate_recall": cold_candidate_recall,
         "coverage_ratio": coverage_ratio,
-    }
-
-
-def _source_limits_for_stage1(history_len: int, per_source_limit: int) -> dict[str, int]:
-    base = max(1, int(per_source_limit))
-    if history_len <= 1:
-        return {
-            "cf": max(20, int(base * 0.25)),
-            "content": int(base * 2.2),
-            "pop": int(base * 1.2),
-        }
-    if history_len <= 5:
-        return {
-            "cf": max(40, int(base * 0.7)),
-            "content": int(base * 1.8),
-            "pop": int(base * 1.1),
-        }
-    return {
-        "cf": base,
-        "content": int(base * 1.25),
-        "pop": base,
     }

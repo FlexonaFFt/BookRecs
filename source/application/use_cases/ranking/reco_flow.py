@@ -12,6 +12,7 @@ from source.application.use_cases.ranking.prerank_candidates import (
     PreRankCandidatesCommand,
     PreRankCandidatesUseCase,
 )
+from source.application.use_cases.ranking.source_limits import source_limits_for_stage1
 from source.domain.entities import Candidate, FinalItem, ScoredCandidate
 
 
@@ -49,7 +50,7 @@ class RecoFlowUseCase:
         self._stage3 = stage3
 
     def execute(self, cmd: RecoFlowCommand) -> RecoFlowResult:
-        source_limits = _source_limits_for_stage1(
+        source_limits = source_limits_for_stage1(
             history_len=cmd.history_len,
             per_source_limit=cmd.candidate_per_source_limit,
         )
@@ -87,24 +88,3 @@ class RecoFlowUseCase:
             preranked=preranked,
             final_items=final_items,
         )
-
-
-def _source_limits_for_stage1(history_len: int, per_source_limit: int) -> dict[str, int]:
-    base = max(1, int(per_source_limit))
-    if history_len <= 1:
-        return {
-            "cf": max(20, int(base * 0.25)),
-            "content": int(base * 2.2),
-            "pop": int(base * 1.2),
-        }
-    if history_len <= 5:
-        return {
-            "cf": max(40, int(base * 0.7)),
-            "content": int(base * 1.8),
-            "pop": int(base * 1.1),
-        }
-    return {
-        "cf": base,
-        "content": int(base * 1.25),
-        "pop": base,
-    }

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -11,3 +11,4 @@ class Candidate:
     item_id: Any
     source: str
     score: float
+    features: dict[str, float] = field(default_factory=dict)
