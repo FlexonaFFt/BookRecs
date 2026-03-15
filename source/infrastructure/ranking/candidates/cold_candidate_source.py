@@ -18,8 +18,8 @@ class ColdCandidateSource(CandidateSourcePort):
         series_index: dict[str, list[Any]],
         tag_index: dict[str, list[Any]],
         popularity_scores: dict[Any, float] | None = None,
-        max_items_per_token: int = 200,
-        novelty_boost: float = 0.8,
+        max_items_per_token: int = 400,
+        novelty_boost: float = 1.2,
     ) -> None:
         self._item_metadata = item_metadata
         self._author_index = author_index
@@ -51,9 +51,9 @@ class ColdCandidateSource(CandidateSourcePort):
         score_map: dict[Any, float] = defaultdict(float)
         overlap_map: dict[Any, float] = defaultdict(float)
 
-        self._collect(score_map, overlap_map, author_tokens, self._author_index, seen_items, base_weight=3.0)
-        self._collect(score_map, overlap_map, series_tokens, self._series_index, seen_items, base_weight=2.5)
-        self._collect(score_map, overlap_map, tag_tokens, self._tag_index, seen_items, base_weight=0.9)
+        self._collect(score_map, overlap_map, author_tokens, self._author_index, seen_items, base_weight=4.0)
+        self._collect(score_map, overlap_map, series_tokens, self._series_index, seen_items, base_weight=3.5)
+        self._collect(score_map, overlap_map, tag_tokens, self._tag_index, seen_items, base_weight=1.2)
 
         ranked_rows: list[tuple[Any, float, float, float]] = []
         for item_id, raw_score in score_map.items():

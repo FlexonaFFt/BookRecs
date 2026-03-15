@@ -15,7 +15,10 @@ from source.application.use_cases.ranking.prerank_candidates import (
     PreRankCandidatesUseCase,
 )
 from source.application.use_cases.ranking.reco_flow import RecoFlowCommand, RecoFlowUseCase
-from source.application.use_cases.ranking.source_limits import source_limits_for_stage1
+from source.application.use_cases.ranking.source_limits import (
+    source_limits_for_stage1,
+    source_min_quota_for_stage1,
+)
 from source.domain.entities import Candidate, FinalItem, ScoredCandidate
 from source.infrastructure.ranking.candidates import ColdCandidateSource
 
@@ -237,14 +240,43 @@ def test_generate_candidates_merges_source_specific_features() -> None:
     assert features["total_score"] == pytest.approx(1.4)
 
 
+def test_generate_candidates_enforces_min_quota_for_cold_source() -> None:
+    pop = StubCandidateSource(name="pop", items=[(1, 1.0), (2, 0.95), (3, 0.9)])
+    cold = StubCandidateSource(name="cold", items=[(10, 0.2), (11, 0.19)])
+    uc = GenerateCandidatesUseCase(sources=[pop, cold], fallback_source=pop)
+
+    result = uc.execute(
+        GenerateCandidatesCommand(
+            user_id="u1",
+            seen_items=set(),
+            pool_size=3,
+            per_source_limit=5,
+            source_min_quota={"cold": 1},
+        )
+    )
+
+    assert len(result) == 3
+    assert any("cold" in item.source.split("|") for item in result)
+
+
 def test_source_limits_for_stage1_favor_content_and_cold_for_short_history() -> None:
     short = source_limits_for_stage1(history_len=1, per_source_limit=100)
     medium = source_limits_for_stage1(history_len=4, per_source_limit=100)
     long = source_limits_for_stage1(history_len=10, per_source_limit=100)
 
-    assert short == {"cf": 20, "content": 180, "cold": 160, "pop": 100}
-    assert medium == {"cf": 65, "content": 140, "cold": 114, "pop": 100}
-    assert long == {"cf": 100, "content": 110, "cold": 80, "pop": 90}
+    assert short == {"cf": 20, "content": 240, "cold": 220, "pop": 70}
+    assert medium == {"cf": 55, "content": 180, "cold": 150, "pop": 80}
+    assert long == {"cf": 100, "content": 130, "cold": 100, "pop": 70}
+
+
+def test_source_min_quota_for_stage1_reserves_cold_and_content() -> None:
+    short = source_min_quota_for_stage1(history_len=1, pool_size=1000)
+    medium = source_min_quota_for_stage1(history_len=4, pool_size=1000)
+    long = source_min_quota_for_stage1(history_len=10, pool_size=1000)
+
+    assert short == {"content": 350, "cold": 200}
+    assert medium == {"content": 250, "cold": 150}
+    assert long == {"content": 180, "cold": 100}
 
 
 def test_cold_candidate_source_uses_metadata_overlap_and_novelty() -> None:
@@ -424,9 +456,10 @@ def test_reco_flow_executes_all_stages_and_passes_params() -> None:
     assert stage2.last_cmd.top_m == 33
     assert stage3.last_cmd.top_k == 5
     assert stage1.last_cmd.source_limits["cf"] == 50
-    assert stage1.last_cmd.source_limits["content"] == int(50 * 1.1)
-    assert stage1.last_cmd.source_limits["cold"] == int(50 * 0.8)
-    assert stage1.last_cmd.source_limits["pop"] == int(50 * 0.9)
+    assert stage1.last_cmd.source_limits["content"] == int(50 * 1.3)
+    assert stage1.last_cmd.source_limits["cold"] == int(50 * 1.0)
+    assert stage1.last_cmd.source_limits["pop"] == int(50 * 0.7)
+    assert stage1.last_cmd.source_min_quota == {"content": 22, "cold": 12}
 
 
 def test_reco_flow_uses_content_heavy_limits_for_short_history() -> None:
@@ -450,6 +483,7 @@ def test_reco_flow_uses_content_heavy_limits_for_short_history() -> None:
 
     limits = stage1.last_cmd.source_limits
     assert limits["cf"] == 20
-    assert limits["content"] == 180
-    assert limits["cold"] == 160
-    assert limits["pop"] == 100
+    assert limits["content"] == 240
+    assert limits["cold"] == 220
+    assert limits["pop"] == 70
+    assert stage1.last_cmd.source_min_quota == {"content": 3, "cold": 2}

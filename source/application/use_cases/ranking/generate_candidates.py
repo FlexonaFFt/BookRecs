@@ -15,6 +15,7 @@ class GenerateCandidatesCommand:
     pool_size: int = 1000
     per_source_limit: int = 300
     source_limits: dict[str, int] | None = None
+    source_min_quota: dict[str, int] | None = None
 # Реализует сценарий генерации кандидатов.
 class GenerateCandidatesUseCase:
     """Stage 1: generate and merge candidates from multiple sources."""
@@ -50,7 +51,12 @@ class GenerateCandidatesUseCase:
             )
             self._merge_candidates(merged, generated, cmd.seen_items)
 
-        ranked = self._to_ranked(cmd.user_id, merged, cmd.pool_size)
+        ranked = self._to_ranked(
+            cmd.user_id,
+            merged,
+            cmd.pool_size,
+            source_min_quota=cmd.source_min_quota,
+        )
         if len(ranked) >= cmd.pool_size:
             return ranked
 
@@ -67,7 +73,12 @@ class GenerateCandidatesUseCase:
             limit=fallback_limit,
         )
         self._merge_candidates(merged, refill, cmd.seen_items)
-        return self._to_ranked(cmd.user_id, merged, cmd.pool_size)
+        return self._to_ranked(
+            cmd.user_id,
+            merged,
+            cmd.pool_size,
+            source_min_quota=cmd.source_min_quota,
+        )
 
     @staticmethod
     def _merge_candidates(
@@ -93,7 +104,12 @@ class GenerateCandidatesUseCase:
                 )
 
     @staticmethod
-    def _to_ranked(user_id: Any, merged: dict[Any, dict[str, Any]], limit: int) -> list[Candidate]:
+    def _to_ranked(
+        user_id: Any,
+        merged: dict[Any, dict[str, Any]],
+        limit: int,
+        source_min_quota: dict[str, int] | None = None,
+    ) -> list[Candidate]:
         rows = []
         for item_id, payload in merged.items():
             src = "|".join(sorted(payload["sources"]))
@@ -103,10 +119,58 @@ class GenerateCandidatesUseCase:
             rows.append((item_id, float(payload["score"]), src, features))
         rows.sort(key=lambda x: x[1], reverse=True)
 
-        out: list[Candidate] = []
-        for item_id, score, src, features in rows[:limit]:
-            out.append(Candidate(user_id=user_id, item_id=item_id, source=src, score=score, features=features))
-        return out
+        selected_rows = GenerateCandidatesUseCase._apply_source_min_quota(
+            rows=rows,
+            limit=limit,
+            source_min_quota=source_min_quota or {},
+        )
+        return [
+            Candidate(user_id=user_id, item_id=item_id, source=src, score=score, features=features)
+            for item_id, score, src, features in selected_rows
+        ]
+
+    @staticmethod
+    def _apply_source_min_quota(
+        rows: list[tuple[Any, float, str, dict[str, float]]],
+        limit: int,
+        source_min_quota: dict[str, int],
+    ) -> list[tuple[Any, float, str, dict[str, float]]]:
+        if limit <= 0:
+            return []
+        if not source_min_quota:
+            return rows[:limit]
+
+        selected: list[tuple[Any, float, str, dict[str, float]]] = []
+        used: set[Any] = set()
+
+        for source_name, quota in source_min_quota.items():
+            need = max(0, int(quota))
+            if need <= 0:
+                continue
+            for row in rows:
+                item_id, _, src, _ = row
+                if item_id in used:
+                    continue
+                src_parts = set(src.split("|"))
+                if source_name not in src_parts:
+                    continue
+                selected.append(row)
+                used.add(item_id)
+                if len(selected) >= limit:
+                    return selected[:limit]
+                need -= 1
+                if need <= 0:
+                    break
+
+        for row in rows:
+            item_id = row[0]
+            if item_id in used:
+                continue
+            selected.append(row)
+            used.add(item_id)
+            if len(selected) >= limit:
+                break
+        return selected[:limit]
 
     @staticmethod
     def _merge_features(base: dict[str, float], extra: dict[str, float]) -> dict[str, float]:

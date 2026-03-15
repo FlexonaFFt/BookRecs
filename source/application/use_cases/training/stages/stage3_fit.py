@@ -10,7 +10,10 @@ from source.application.use_cases.ranking.prerank_candidates import (
     PreRankCandidatesCommand,
     PreRankCandidatesUseCase,
 )
-from source.application.use_cases.ranking.source_limits import source_limits_for_stage1
+from source.application.use_cases.ranking.source_limits import (
+    source_limits_for_stage1,
+    source_min_quota_for_stage1,
+)
 from source.application.use_cases.training.common.data_ops import build_seen_map, build_val_ground_truth, cold_items
 from source.infrastructure.ranking.candidates import (
     ColdCandidateSource,
@@ -74,6 +77,10 @@ def fit_stage3(
                 source_limits=source_limits_for_stage1(
                     history_len=len(seen),
                     per_source_limit=cmd.candidate_per_source_limit,
+                ),
+                source_min_quota=source_min_quota_for_stage1(
+                    history_len=len(seen),
+                    pool_size=cmd.candidate_pool_size,
                 ),
             )
         )
