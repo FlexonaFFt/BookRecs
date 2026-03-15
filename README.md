@@ -57,6 +57,29 @@ make infra-up
 make pipeline-up
 ```
 
+### 3.1 Обучение на уже предобработанном датасете
+Если у вас уже есть каталог с `books.parquet`, `local_train.parquet`, `local_val.parquet`, можно пропустить `prepare` и запустить только обучение.
+
+Пример:
+```bash
+BOOKRECS_TRAIN_DATASET_DIR=/absolute/path/to/goodreads_ya \
+BOOKRECS_TRAIN_RUN_NAME=catboost_policy_v1 \
+make train-prepared
+```
+
+Команда монтирует каталог датасета в контейнер как `/dataset` и запускает только training entrypoint.
+
+При необходимости можно дополнительно передать параметры обучения через env:
+```bash
+BOOKRECS_TRAIN_DATASET_DIR=/absolute/path/to/goodreads_ya \
+BOOKRECS_TRAIN_RUN_NAME=catboost_policy_v1 \
+BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE=1200 \
+BOOKRECS_TRAIN_PER_SOURCE_LIMIT=350 \
+BOOKRECS_TRAIN_PRE_TOP_M=300 \
+BOOKRECS_TRAIN_FINAL_TOP_K=10 \
+make train-prepared
+```
+
 ### 3.1 Эмуляция batch за 5 дней (offline replay / пилот)
 ```bash
 make batch-emulate DAYS=5 END_DATE=2026-03-10
@@ -103,6 +126,7 @@ make down-volumes
 ### Локальный запуск без docker compose
 ```bash
 python -m source.interfaces.pipeline_entrypoint
+python -m source.interfaces.train_entrypoint
 python -m source.interfaces.api_entrypoint
 python -m source.interfaces.batch_backfill_entrypoint
 ```
