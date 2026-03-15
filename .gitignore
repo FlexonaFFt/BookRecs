@@ -34,3 +34,9 @@ data/*.pq
 data/*.parquet
 *.pq
 *.parquet
+artifacts/tmp_preprocessed/
+artifacts/baselines/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/

@@ -22,7 +22,19 @@ class PopularCandidateSource(CandidateSourcePort):
             if item_id in seen_items:
                 continue
             score = float(self._item_score.get(item_id, 1.0 / rank))
-            out.append(Candidate(user_id=user_id, item_id=item_id, source=self.name, score=score))
+            out.append(
+                Candidate(
+                    user_id=user_id,
+                    item_id=item_id,
+                    source=self.name,
+                    score=score,
+                    features={
+                        "score_pop": score,
+                        "rank_pop": float(rank),
+                        "item_popularity": score,
+                    },
+                )
+            )
             if len(out) >= limit:
                 break
         return out

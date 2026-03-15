@@ -10,7 +10,7 @@ except ModuleNotFoundError:
     dict_row = None
 # Предоставляет низкоуровневые утилиты для выполнения запросов PostgreSQL.
 class PostgresClient:
-    """Small wrapper around psycopg for simple query operations."""
+
 
     def __init__(self, dsn: str) -> None:
         self._dsn = dsn
@@ -35,3 +35,11 @@ class PostgresClient:
                 cur.execute(query, params)
                 row = cur.fetchone()
         return row
+
+    def fetchall(self, query: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        self._ensure_driver()
+        with psycopg.connect(self._dsn, row_factory=dict_row) as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                rows = cur.fetchall()
+        return list(rows)

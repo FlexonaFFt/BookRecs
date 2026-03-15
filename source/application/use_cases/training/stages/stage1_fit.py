@@ -10,10 +10,10 @@ from typing import Any
 def fit_stage1(data: dict[str, Any], cmd: Any, logger: Any) -> dict[str, Any]:
     train = data["local_train"]
     books = data["books"]
-    logger.start_step("stage1_fit", total=3)
+    logger.start_step("stage1_fit", total=4)
 
     pop_items, pop_scores = fit_popularity(train)
-    logger.progress("stage1_fit", done=1, total=3)
+    logger.progress("stage1_fit", done=1, total=4)
 
     cf_neighbors = fit_cf_neighbors(
         interactions=train,
@@ -22,26 +22,37 @@ def fit_stage1(data: dict[str, Any], cmd: Any, logger: Any) -> dict[str, Any]:
         max_items_per_user=getattr(cmd, "cf_max_items_per_user", 150),
         logger=logger,
     )
-    logger.progress("stage1_fit", done=2, total=3)
+    logger.progress("stage1_fit", done=2, total=4)
 
     content_similar = fit_content_neighbors(
         books=books,
         max_neighbors=cmd.content_max_neighbors,
         logger=logger,
     )
-    logger.progress("stage1_fit", done=3, total=3)
+    logger.progress("stage1_fit", done=3, total=4)
+
+    metadata_retrieval = fit_metadata_retrieval(
+        books=books,
+        logger=logger,
+    )
+    logger.progress("stage1_fit", done=4, total=4)
     logger.end_step(
         "stage1_fit",
         status="SUCCESS",
         pop_items=len(pop_items),
         cf_items=len(cf_neighbors),
         content_items=len(content_similar),
+        metadata_items=len(metadata_retrieval["item_metadata"]),
     )
     return {
         "pop_items": pop_items,
         "pop_scores": pop_scores,
         "cf_neighbors": cf_neighbors,
         "content_similar": content_similar,
+        "item_metadata": metadata_retrieval["item_metadata"],
+        "author_index": metadata_retrieval["author_index"],
+        "series_index": metadata_retrieval["series_index"],
+        "tag_index": metadata_retrieval["tag_index"],
     }
 
 
@@ -249,3 +260,46 @@ def fit_content_neighbors(books: Any, max_neighbors: int, logger: Any) -> dict[A
         if i % max(1, total // 20) == 0 or i == total:
             logger.event("STAGE1_CONTENT_SCORE_PROGRESS", done=i, total=total)
     return out
+
+
+def fit_metadata_retrieval(books: Any, logger: Any) -> dict[str, Any]:
+    data = books.copy()
+    for col in ["authors", "series", "tags"]:
+        if col not in data.columns:
+            data[col] = [[] for _ in range(len(data))]
+        data[col] = data[col].apply(lambda x: x if isinstance(x, list) else [])
+
+    by_item = data[["item_id", "authors", "series", "tags"]].drop_duplicates("item_id").reset_index(drop=True)
+    author_index: dict[str, list[Any]] = defaultdict(list)
+    series_index: dict[str, list[Any]] = defaultdict(list)
+    tag_index: dict[str, list[Any]] = defaultdict(list)
+    item_metadata: dict[Any, dict[str, list[str]]] = {}
+
+    total = len(by_item)
+    for i, row in enumerate(by_item.itertuples(index=False), start=1):
+        item_id = row.item_id
+        authors = [str(x) for x in list(dict.fromkeys(row.authors))[:8]]
+        series = [str(x) for x in list(dict.fromkeys(row.series))[:4]]
+        tags = [str(x) for x in list(dict.fromkeys(row.tags))[:20]]
+
+        item_metadata[item_id] = {
+            "authors": authors,
+            "series": series,
+            "tags": tags,
+        }
+        for value in authors:
+            author_index[value].append(item_id)
+        for value in series:
+            series_index[value].append(item_id)
+        for value in tags:
+            tag_index[value].append(item_id)
+
+        if i % max(1, total // 20) == 0 or i == total:
+            logger.event("STAGE1_METADATA_INDEX_PROGRESS", done=i, total=total)
+
+    return {
+        "item_metadata": item_metadata,
+        "author_index": dict(author_index),
+        "series_index": dict(series_index),
+        "tag_index": dict(tag_index),
+    }

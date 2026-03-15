@@ -12,11 +12,17 @@ from source.infrastructure.ranking.prerank.feature_builder import FeatureBuilder
 # Хранит веса линейной модели предранжирования.
 class LinearPreRankerConfig:
     w_base: float = 1.0
-    w_cf: float = 0.25
-    w_content: float = 0.2
-    w_pop: float = 0.1
-    w_cold: float = 0.15
+    w_total_score: float = 0.3
+    w_cf: float = 0.2
+    w_content: float = 0.18
+    w_pop: float = 0.08
+    w_cold_source: float = 0.28
+    w_cold_flag: float = 0.12
     w_history: float = 0.02
+    w_source_count: float = 0.12
+    w_popularity: float = 0.04
+    w_metadata_overlap: float = 0.16
+    w_rank: float = 0.18
 # Считает скор кандидатов линейной комбинацией ручных признаков.
 class LinearPreRanker(PreRankerPort):
     """Simple linear pre-ranker used as Stage-2 baseline."""
@@ -53,11 +59,23 @@ class LinearPreRanker(PreRankerPort):
             f = row.features
             pre_score = (
                 self._cfg.w_base * f["score_norm"]
+                + self._cfg.w_total_score * f["total_score_norm"]
                 + self._cfg.w_cf * f["score_cf"]
                 + self._cfg.w_content * f["score_content"]
                 + self._cfg.w_pop * f["score_pop"]
-                + self._cfg.w_cold * f["is_cold_item"]
+                + self._cfg.w_cold_source * f["score_cold"]
+                + self._cfg.w_rank
+                * (
+                    f["rank_inv_cf"]
+                    + f["rank_inv_content"]
+                    + f["rank_inv_pop"]
+                    + f["rank_inv_cold"]
+                )
+                + self._cfg.w_cold_flag * f["is_cold_item"]
                 + self._cfg.w_history * f["history_len_norm"]
+                + self._cfg.w_source_count * f["source_count_norm"]
+                + self._cfg.w_popularity * f["item_popularity"]
+                + self._cfg.w_metadata_overlap * f["metadata_overlap"]
             )
 
             scored.append(

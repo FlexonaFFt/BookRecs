@@ -12,6 +12,10 @@ from source.application.use_cases.ranking.prerank_candidates import (
     PreRankCandidatesCommand,
     PreRankCandidatesUseCase,
 )
+from source.application.use_cases.ranking.source_limits import (
+    source_limits_for_stage1,
+    source_min_quota_for_stage1,
+)
 from source.domain.entities import Candidate, FinalItem, ScoredCandidate
 
 
@@ -49,12 +53,21 @@ class RecoFlowUseCase:
         self._stage3 = stage3
 
     def execute(self, cmd: RecoFlowCommand) -> RecoFlowResult:
+        source_limits = source_limits_for_stage1(
+            history_len=cmd.history_len,
+            per_source_limit=cmd.candidate_per_source_limit,
+        )
         candidates = self._stage1.execute(
             GenerateCandidatesCommand(
                 user_id=cmd.user_id,
                 seen_items=cmd.seen_items,
                 pool_size=cmd.candidate_pool_size,
                 per_source_limit=cmd.candidate_per_source_limit,
+                source_limits=source_limits,
+                source_min_quota=source_min_quota_for_stage1(
+                    history_len=cmd.history_len,
+                    pool_size=cmd.candidate_pool_size,
+                ),
             )
         )
 
