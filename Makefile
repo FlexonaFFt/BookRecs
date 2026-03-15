@@ -1,4 +1,4 @@
-.PHONY: help init-env infra-up pipeline-up api-up demo-seed batch-emulate promote-run train-prepared test up down down-volumes logs ps restart-pipeline restart-api
+.PHONY: help init-env infra-up pipeline-up api-up demo-seed batch-emulate promote-run train-prepared lint lint-backend lint-frontend test up down down-volumes logs ps restart-pipeline restart-api
 
 SERVICE ?= pipeline
 DAYS ?= 5
@@ -15,6 +15,9 @@ help:
 	@echo "  make batch-emulate    # эмуляция батч-запусков за N дней (DAYS=5 END_DATE=YYYY-MM-DD, с promote)"
 	@echo "  make promote-run      # вручную промоутнуть run в active pointer (RUN_NAME=batch_YYYYMMDD)"
 	@echo "  make train-prepared   # обучить модель на уже подготовленном датасете (BOOKRECS_TRAIN_DATASET_DIR=...)"
+	@echo "  make lint             # запустить backend и frontend линтеры"
+	@echo "  make lint-backend     # запустить ruff для backend-кода"
+	@echo "  make lint-frontend    # запустить eslint для frontend-кода"
 	@echo "  make test             # запустить unit-тесты"
 	@echo "  make up               # infra-up + pipeline-up"
 	@echo "  make down             # остановить все сервисы"
@@ -60,6 +63,14 @@ train-prepared: init-env
 		-v $(BOOKRECS_TRAIN_DATASET_DIR):/dataset:ro \
 		-e BOOKRECS_TRAIN_DATASET_DIR=/dataset \
 		pipeline python -m source.interfaces.train_entrypoint
+
+lint: lint-backend lint-frontend
+
+lint-backend:
+	python3 -m ruff check source data
+
+lint-frontend:
+	cd frontend && npm run lint
 
 test:
 	python3 -m pytest
