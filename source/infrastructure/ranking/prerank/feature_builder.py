@@ -5,6 +5,28 @@ from typing import Any
 
 from source.domain.entities import Candidate
 
+PRE_RANK_FEATURE_COLUMNS = [
+    "score_norm",
+    "total_score_norm",
+    "score_cf",
+    "score_content",
+    "score_pop",
+    "score_cold",
+    "rank_inv_cf",
+    "rank_inv_content",
+    "rank_inv_pop",
+    "rank_inv_cold",
+    "is_from_cf",
+    "is_from_content",
+    "is_from_pop",
+    "is_from_cold",
+    "source_count_norm",
+    "item_popularity",
+    "metadata_overlap",
+    "is_cold_item",
+    "history_len_norm",
+]
+
 
 @dataclass(frozen=True)
 # Хранит признаки для одной пары пользователь-элемент.
@@ -51,6 +73,7 @@ class FeatureBuilder:
             extra = cand.features or {}
             feature_map = {
                 "score_norm": float(score_norm),
+                "total_score_norm": self._normalized_total_score(extra, mx),
                 "score_cf": self._normalized_score(extra, "score_cf", max_by_key),
                 "score_content": self._normalized_score(extra, "score_content", max_by_key),
                 "score_pop": self._normalized_score(extra, "score_pop", max_by_key),
@@ -69,6 +92,8 @@ class FeatureBuilder:
                 "is_cold_item": 1.0 if cand.item_id in cold_item_ids else 0.0,
                 "history_len_norm": hist_feature,
             }
+            for key in PRE_RANK_FEATURE_COLUMNS:
+                feature_map.setdefault(key, 0.0)
 
             rows.append(
                 FeatureRow(
@@ -104,3 +129,9 @@ class FeatureBuilder:
         if max_rank <= 1:
             return 1.0
         return 1.0 - ((rank - 1.0) / (max_rank - 1.0))
+
+    @staticmethod
+    def _normalized_total_score(features: dict[str, float], max_total_score: float) -> float:
+        value = float(features.get("total_score", 0.0))
+        denom = max(float(max_total_score), 1e-9)
+        return min(1.0, value / denom) if denom > 0 else 0.0

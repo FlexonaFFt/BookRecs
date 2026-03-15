@@ -191,6 +191,52 @@ def test_generate_candidates_respects_source_limits() -> None:
     assert pop.calls[0]["limit"] == 2
 
 
+def test_generate_candidates_merges_source_specific_features() -> None:
+    cf = StubCandidateSource(name="cf", items=[])
+    pop = StubCandidateSource(name="pop", items=[])
+    cf.items = [(1, 0.9)]
+    pop.items = [(1, 0.5)]
+
+    def _cf_generate(user_id: Any, seen_items: set[Any], limit: int) -> list[Candidate]:
+        return [
+            Candidate(
+                user_id=user_id,
+                item_id=1,
+                source="cf",
+                score=0.9,
+                features={"score_cf": 0.9, "rank_cf": 1.0},
+            )
+        ]
+
+    def _pop_generate(user_id: Any, seen_items: set[Any], limit: int) -> list[Candidate]:
+        return [
+            Candidate(
+                user_id=user_id,
+                item_id=1,
+                source="pop",
+                score=0.5,
+                features={"score_pop": 0.5, "rank_pop": 3.0, "item_popularity": 0.5},
+            )
+        ]
+
+    cf.generate = _cf_generate  # type: ignore[method-assign]
+    pop.generate = _pop_generate  # type: ignore[method-assign]
+    uc = GenerateCandidatesUseCase(sources=[cf, pop], fallback_source=pop)
+
+    result = uc.execute(
+        GenerateCandidatesCommand(user_id="u1", seen_items=set(), pool_size=1, per_source_limit=5)
+    )
+
+    assert len(result) == 1
+    features = result[0].features
+    assert features["score_cf"] == pytest.approx(0.9)
+    assert features["score_pop"] == pytest.approx(0.5)
+    assert features["rank_cf"] == pytest.approx(1.0)
+    assert features["rank_pop"] == pytest.approx(3.0)
+    assert features["item_popularity"] == pytest.approx(0.5)
+    assert features["total_score"] == pytest.approx(1.4)
+
+
 def test_source_limits_for_stage1_favor_content_and_cold_for_short_history() -> None:
     short = source_limits_for_stage1(history_len=1, per_source_limit=100)
     medium = source_limits_for_stage1(history_len=4, per_source_limit=100)

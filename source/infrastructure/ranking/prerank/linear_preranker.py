@@ -12,6 +12,7 @@ from source.infrastructure.ranking.prerank.feature_builder import FeatureBuilder
 # Хранит веса линейной модели предранжирования.
 class LinearPreRankerConfig:
     w_base: float = 1.0
+    w_total_score: float = 0.3
     w_cf: float = 0.2
     w_content: float = 0.18
     w_pop: float = 0.08
@@ -58,6 +59,7 @@ class LinearPreRanker(PreRankerPort):
             f = row.features
             pre_score = (
                 self._cfg.w_base * f["score_norm"]
+                + self._cfg.w_total_score * f["total_score_norm"]
                 + self._cfg.w_cf * f["score_cf"]
                 + self._cfg.w_content * f["score_content"]
                 + self._cfg.w_pop * f["score_pop"]

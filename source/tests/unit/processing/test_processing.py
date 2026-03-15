@@ -2,8 +2,23 @@ from __future__ import annotations
 
 from source.domain.entities import Candidate, FinalItem
 from source.infrastructure.processing.postprocessing.default_postprocessor import DefaultPostprocessor
+from source.infrastructure.ranking.prerank.catboost_preranker import CatBoostPreRanker, CatBoostPreRankerConfig
 from source.infrastructure.ranking.prerank.feature_builder import FeatureBuilder
 from source.infrastructure.ranking.prerank.linear_preranker import LinearPreRanker, LinearPreRankerConfig
+
+
+class FakeProbModel:
+    def predict_proba(self, rows):
+        if hasattr(rows, "to_dict"):
+            payload = rows.to_dict(orient="records")
+        else:
+            payload = rows
+        out = []
+        for row in payload:
+            score = 0.1 + 0.6 * float(row.get("score_cold", 0.0)) + 0.3 * float(row.get("metadata_overlap", 0.0))
+            score = max(0.0, min(1.0, score))
+            out.append([1.0 - score, score])
+        return out
 
 
 def test_default_postprocessor_filters_seen_and_duplicates_and_limits_top_k() -> None:
@@ -51,6 +66,7 @@ def test_feature_builder_builds_expected_flags_and_normalized_scores() -> None:
     assert by_id[1].features["history_len_norm"] == 0.2
     assert by_id[1].features["score_norm"] == 0.0
     assert by_id[2].features["score_norm"] == 1.0
+    assert by_id[2].features["total_score_norm"] == 1.0
     assert by_id[1].features["source_count_norm"] == 0.5
 
 
@@ -58,6 +74,7 @@ def test_linear_preranker_returns_top_m_sorted_by_pre_score() -> None:
     ranker = LinearPreRanker(
         cfg=LinearPreRankerConfig(
             w_base=1.0,
+            w_total_score=0.0,
             w_cf=0.0,
             w_content=0.0,
             w_pop=0.0,
@@ -79,7 +96,80 @@ def test_linear_preranker_returns_top_m_sorted_by_pre_score() -> None:
     assert [x.item_id for x in out] == [2, 3]
 
 
+def test_linear_preranker_can_promote_cold_candidate_with_overlap_signal() -> None:
+    ranker = LinearPreRanker(
+        cfg=LinearPreRankerConfig(
+            w_base=0.0,
+            w_total_score=0.0,
+            w_cf=0.0,
+            w_content=0.0,
+            w_pop=0.0,
+            w_cold_source=0.5,
+            w_cold_flag=0.2,
+            w_history=0.0,
+            w_source_count=0.0,
+            w_popularity=0.0,
+            w_metadata_overlap=0.5,
+            w_rank=0.0,
+        )
+    )
+    candidates = [
+        Candidate(
+            user_id="u1",
+            item_id=10,
+            source="pop",
+            score=1.0,
+            features={"score_pop": 1.0, "rank_pop": 1.0, "total_score": 1.0, "source_count": 1.0},
+        ),
+        Candidate(
+            user_id="u1",
+            item_id=20,
+            source="cold",
+            score=0.5,
+            features={
+                "score_cold": 0.5,
+                "rank_cold": 1.0,
+                "metadata_overlap": 4.0,
+                "total_score": 0.5,
+                "source_count": 1.0,
+            },
+        ),
+    ]
+
+    out = ranker.rank(candidates=candidates, user_id="u1", history_len=5, cold_item_ids={20}, top_m=2)
+    assert [x.item_id for x in out] == [20, 10]
+
+
 def test_linear_preranker_returns_empty_for_non_positive_top_m() -> None:
     ranker = LinearPreRanker()
     out = ranker.rank(candidates=[], user_id="u1", history_len=0, cold_item_ids=set(), top_m=0)
     assert out == []
+
+
+def test_catboost_preranker_ranks_candidates_from_model_scores() -> None:
+    ranker = CatBoostPreRanker(model=FakeProbModel(), cfg=CatBoostPreRankerConfig())
+    candidates = [
+        Candidate(
+            user_id="u1",
+            item_id=10,
+            source="pop",
+            score=1.0,
+            features={"score_pop": 1.0, "rank_pop": 1.0, "total_score": 1.0, "source_count": 1.0},
+        ),
+        Candidate(
+            user_id="u1",
+            item_id=20,
+            source="cold",
+            score=0.5,
+            features={
+                "score_cold": 0.8,
+                "rank_cold": 1.0,
+                "metadata_overlap": 4.0,
+                "total_score": 0.5,
+                "source_count": 1.0,
+            },
+        ),
+    ]
+
+    out = ranker.rank(candidates=candidates, user_id="u1", history_len=5, cold_item_ids={20}, top_m=2)
+    assert [x.item_id for x in out] == [20, 10]
