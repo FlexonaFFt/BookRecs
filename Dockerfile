@@ -2,14 +2,17 @@ FROM python:3.11-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_CACHE_DIR=/tmp/uv-cache
 
 WORKDIR /build
 
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
-COPY requirements.txt /build/requirements.txt
+RUN pip install --no-cache-dir uv
+COPY pyproject.toml uv.lock /build/
+RUN uv export --frozen --no-dev --no-emit-project --format requirements.txt -o /build/requirements.txt
 RUN pip install --upgrade pip && pip install --no-cache-dir -r /build/requirements.txt
 
 

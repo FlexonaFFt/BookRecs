@@ -8,6 +8,7 @@ RUN_NAME ?=
 help:
 	@echo "Доступные команды:"
 	@echo "  make init-env         # создать .env из .env.example (если .env отсутствует)"
+	@echo "  uv sync               # установить Python-зависимости и dev-tools через uv"
 	@echo "  make infra-up         # поднять postgres + minio + minio-init"
 	@echo "  make pipeline-up      # собрать образ и запустить pipeline"
 	@echo "  make api-up           # собрать образ и запустить inference API"
@@ -67,13 +68,13 @@ train-prepared: init-env
 lint: lint-backend lint-frontend
 
 lint-backend:
-	python3 -m ruff check source data
+	uv run ruff check source data
 
 lint-frontend:
 	cd frontend && npm run lint
 
 test:
-	python3 -m pytest
+	uv run pytest
 
 up: infra-up pipeline-up
 

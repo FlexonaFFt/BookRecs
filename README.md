@@ -37,6 +37,7 @@ Pipeline состоит из пяти шагов:
 
 ### 1. Подготовка окружения
 ```bash
+uv sync
 make init-env
 ```
 
@@ -125,10 +126,10 @@ make down-volumes
 
 ### Локальный запуск без docker compose
 ```bash
-python -m source.interfaces.pipeline_entrypoint
-python -m source.interfaces.train_entrypoint
-python -m source.interfaces.api_entrypoint
-python -m source.interfaces.batch_backfill_entrypoint
+uv run python -m source.interfaces.pipeline_entrypoint
+uv run python -m source.interfaces.train_entrypoint
+uv run python -m source.interfaces.api_entrypoint
+uv run python -m source.interfaces.batch_backfill_entrypoint
 ```
 
 <details>

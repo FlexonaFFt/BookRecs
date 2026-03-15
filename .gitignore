@@ -13,10 +13,13 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.uv-cache/
+.uv-python/
 .venv/
 venv/
 .pycache_local/
 .pycache_tmp
+.tools/
 
 # Secrets
 .env
