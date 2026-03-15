@@ -56,6 +56,9 @@ def evaluate_pipeline(
     recall_scores: list[float] = []
     cold_ndcg_scores: list[float] = []
     cold_recall_scores: list[float] = []
+    candidate_recall_scores: list[float] = []
+    prerank_recall_scores: list[float] = []
+    cold_prerank_recall_scores: list[float] = []
     cold_candidate_hits = 0.0
     cold_candidate_total = 0.0
     covered_items: set[Any] = set()
@@ -81,15 +84,19 @@ def evaluate_pipeline(
         )
         pred = [x.item_id for x in result.final_items]
         candidate_items = {x.item_id for x in result.candidates}
+        preranked_items = [x.item_id for x in result.preranked[: cmd.pre_top_m]]
         covered_items.update(pred[: cmd.final_top_k])
         ndcg_scores.append(ndcg_at_k(pred, gt_items, cmd.final_top_k))
         recall_scores.append(recall_at_k(pred, gt_items, cmd.final_top_k))
+        candidate_recall_scores.append(recall_at_k(list(candidate_items), gt_items, cmd.candidate_pool_size))
+        prerank_recall_scores.append(recall_at_k(preranked_items, gt_items, cmd.pre_top_m))
 
         gt_cold = [x for x in gt_items if x in cold]
         if gt_cold:
             gt_cold_set = set(gt_cold)
             cold_candidate_hits += float(len(candidate_items & gt_cold_set))
             cold_candidate_total += float(len(gt_cold_set))
+            cold_prerank_recall_scores.append(recall_at_k(preranked_items, gt_cold, cmd.pre_top_m))
             cold_ndcg_scores.append(ndcg_at_k(pred, gt_cold, cmd.final_top_k))
             cold_recall_scores.append(recall_at_k(pred, gt_cold, cmd.final_top_k))
 
@@ -101,8 +108,15 @@ def evaluate_pipeline(
         f"ndcg@{cmd.final_top_k}": float(sum(ndcg_scores) / max(1, len(ndcg_scores))),
         f"recall@{cmd.final_top_k}": float(sum(recall_scores) / max(1, len(recall_scores))),
         f"coverage@{cmd.final_top_k}": float(len(covered_items) / catalog_size),
+        f"candidate_recall@{cmd.candidate_pool_size}": float(
+            sum(candidate_recall_scores) / max(1, len(candidate_recall_scores))
+        ),
+        f"prerank_recall@{cmd.pre_top_m}": float(sum(prerank_recall_scores) / max(1, len(prerank_recall_scores))),
         f"cold_ndcg@{cmd.final_top_k}": float(sum(cold_ndcg_scores) / max(1, len(cold_ndcg_scores))),
         f"cold_recall@{cmd.final_top_k}": float(sum(cold_recall_scores) / max(1, len(cold_recall_scores))),
+        f"cold_prerank_recall@{cmd.pre_top_m}": float(
+            sum(cold_prerank_recall_scores) / max(1, len(cold_prerank_recall_scores))
+        ),
         f"cold_candidate_recall@{cmd.candidate_pool_size}": float(
             cold_candidate_hits / cold_candidate_total if cold_candidate_total > 0 else 0.0
         ),

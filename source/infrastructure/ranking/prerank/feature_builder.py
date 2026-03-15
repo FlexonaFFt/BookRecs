@@ -57,14 +57,12 @@ class FeatureBuilder:
         hist_feature = min(float(max(0, history_len)) / 50.0, 1.0)
         score_keys = ["score_cf", "score_content", "score_pop", "score_cold"]
         rank_keys = ["rank_cf", "rank_content", "rank_pop", "rank_cold"]
-        max_by_key = {
-            key: max(float(c.features.get(key, 0.0)) for c in candidates)
-            for key in score_keys
-        }
+        max_by_key = {key: max(float(c.features.get(key, 0.0)) for c in candidates) for key in score_keys}
         max_rank_by_key = {
             key: max(float(c.features.get(key, 0.0)) for c in candidates)
             for key in rank_keys
         }
+        max_total_score = max(float((c.features or {}).get("total_score", c.score)) for c in candidates)
 
         rows: list[FeatureRow] = []
         for cand in candidates:
@@ -73,7 +71,7 @@ class FeatureBuilder:
             extra = cand.features or {}
             feature_map = {
                 "score_norm": float(score_norm),
-                "total_score_norm": self._normalized_total_score(extra, mx),
+                "total_score_norm": self._normalized_total_score(extra, float(cand.score), max_total_score),
                 "score_cf": self._normalized_score(extra, "score_cf", max_by_key),
                 "score_content": self._normalized_score(extra, "score_content", max_by_key),
                 "score_pop": self._normalized_score(extra, "score_pop", max_by_key),
@@ -131,7 +129,7 @@ class FeatureBuilder:
         return 1.0 - ((rank - 1.0) / (max_rank - 1.0))
 
     @staticmethod
-    def _normalized_total_score(features: dict[str, float], max_total_score: float) -> float:
-        value = float(features.get("total_score", 0.0))
+    def _normalized_total_score(features: dict[str, float], base_score: float, max_total_score: float) -> float:
+        value = float(features.get("total_score", base_score))
         denom = max(float(max_total_score), 1e-9)
         return min(1.0, value / denom) if denom > 0 else 0.0

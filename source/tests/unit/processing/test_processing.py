@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from source.domain.entities import Candidate, FinalItem
 from source.infrastructure.processing.postprocessing.default_postprocessor import DefaultPostprocessor
+from source.infrastructure.ranking.finalrank.policy_final_reranker import PolicyFinalReranker, PolicyFinalRerankerConfig
 from source.infrastructure.ranking.prerank.catboost_preranker import CatBoostPreRanker, CatBoostPreRankerConfig
 from source.infrastructure.ranking.prerank.feature_builder import FeatureBuilder
 from source.infrastructure.ranking.prerank.linear_preranker import LinearPreRanker, LinearPreRankerConfig
@@ -173,3 +174,49 @@ def test_catboost_preranker_ranks_candidates_from_model_scores() -> None:
 
     out = ranker.rank(candidates=candidates, user_id="u1", history_len=5, cold_item_ids={20}, top_m=2)
     assert [x.item_id for x in out] == [20, 10]
+
+
+def test_policy_final_reranker_balances_source_and_keeps_cold_item() -> None:
+    ranker = PolicyFinalReranker(
+        cfg=PolicyFinalRerankerConfig(
+            source_bias={"pop": 0.0, "cold": 0.02},
+            source_repeat_penalty=0.2,
+            cold_item_boost=0.1,
+            metadata_overlap_boost=0.05,
+            popularity_penalty=0.05,
+            target_cold_items=1,
+        )
+    )
+    from source.domain.entities import ScoredCandidate
+
+    candidates = [
+        ScoredCandidate(
+            user_id="u1",
+            item_id=1,
+            source="pop",
+            base_score=1.0,
+            pre_score=0.95,
+            features={"item_popularity": 1.0},
+        ),
+        ScoredCandidate(
+            user_id="u1",
+            item_id=2,
+            source="pop",
+            base_score=0.9,
+            pre_score=0.9,
+            features={"item_popularity": 0.9},
+        ),
+        ScoredCandidate(
+            user_id="u1",
+            item_id=3,
+            source="cold",
+            base_score=0.7,
+            pre_score=0.78,
+            features={"is_cold_item": 1.0, "metadata_overlap": 0.8, "item_popularity": 0.1},
+        ),
+    ]
+
+    out = ranker.rank(candidates=candidates, user_id="u1", top_k=3)
+    top2 = [item.item_id for item in out][:2]
+    assert 3 in top2
+    assert 1 in top2
