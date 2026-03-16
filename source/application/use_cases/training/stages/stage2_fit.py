@@ -73,8 +73,26 @@ def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: A
     )
     logger.progress("stage2_fit", done=2, total=3)
 
+    prerank_model = str(getattr(cmd, "prerank_model", "auto")).lower()
+    if prerank_model == "linear":
+        model = LinearPreRanker()
+        logger.progress("stage2_fit", done=3, total=3)
+        logger.end_step(
+            "stage2_fit",
+            status="SUCCESS",
+            model_type="linear_forced",
+            train_rows=len(train_rows),
+            eval_rows=len(eval_rows),
+        )
+        return model
+
     try:
-        cfg = CatBoostPreRankerConfig(random_seed=cmd.seed)
+        cfg = CatBoostPreRankerConfig(
+            random_seed=cmd.seed,
+            iterations=int(getattr(cmd, "catboost_iterations", 250)),
+            depth=int(getattr(cmd, "catboost_depth", 6)),
+            learning_rate=float(getattr(cmd, "catboost_learning_rate", 0.08)),
+        )
         model = CatBoostPreRanker.fit(train_rows=train_rows, eval_rows=eval_rows, cfg=cfg)
         logger.progress("stage2_fit", done=3, total=3)
         logger.end_step(

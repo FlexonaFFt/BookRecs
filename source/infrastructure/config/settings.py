@@ -14,6 +14,8 @@ class Settings:
     s3_endpoint: str
     train_dataset_dir: str
     train_output_root: str
+    train_profile: str
+    train_auto_tune: bool
     train_eval_users_limit: int
     cold_max_interactions: int
     train_candidate_pool_size: int
@@ -21,7 +23,12 @@ class Settings:
     train_pre_top_m: int
     train_final_top_k: int
     train_cf_max_neighbors: int
+    train_cf_max_items_per_user: int
     train_content_max_neighbors: int
+    train_prerank_model: str
+    train_catboost_iterations: int
+    train_catboost_depth: int
+    train_catboost_learning_rate: float
     train_seed: int
 
     @classmethod
@@ -34,6 +41,21 @@ class Settings:
             raw = values.get(name, default)
             return str(raw).strip()
 
+        profile = _resolve_train_profile(_get)
+        if profile not in {"auto", "default", "lite"}:
+            raise ValueError("BOOKRECS_TRAIN_PROFILE must be one of: auto, default, lite")
+
+        auto_tune = env_bool(values, "BOOKRECS_TRAIN_AUTO_TUNE", False)
+        profile_defaults = _profile_defaults(profile)
+        prerank_model = _resolve_train_value(
+            values,
+            "BOOKRECS_TRAIN_PRERANK_MODEL",
+            str(profile_defaults["prerank_model"]),
+            auto_tune=auto_tune,
+        ).lower()
+        if prerank_model not in {"auto", "catboost", "linear"}:
+            raise ValueError("BOOKRECS_TRAIN_PRERANK_MODEL must be one of: auto, catboost, linear")
+
         return cls(
             pg_dsn=_get("BOOKRECS_PG_DSN", ""),
             s3_bucket=_get("BOOKRECS_S3_BUCKET", ""),
@@ -41,14 +63,71 @@ class Settings:
             s3_endpoint=_get("BOOKRECS_S3_ENDPOINT", ""),
             train_dataset_dir=_get("BOOKRECS_TRAIN_DATASET_DIR", "artifacts/tmp_preprocessed/goodreads_ya"),
             train_output_root=_get("BOOKRECS_TRAIN_OUTPUT_ROOT", "artifacts/runs"),
-            train_eval_users_limit=_parse_positive_int("BOOKRECS_TRAIN_EVAL_USERS_LIMIT", _get, 2000),
+            train_profile=profile,
+            train_auto_tune=auto_tune,
+            train_eval_users_limit=_read_positive_int(
+                values,
+                "BOOKRECS_TRAIN_EVAL_USERS_LIMIT",
+                int(profile_defaults["eval_users_limit"]),
+                auto_tune=auto_tune,
+            ),
             cold_max_interactions=_parse_non_negative_int("BOOKRECS_COLD_MAX_INTERACTIONS", _get, 5),
-            train_candidate_pool_size=_parse_positive_int("BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE", _get, 1000),
-            train_candidate_per_source_limit=_parse_positive_int("BOOKRECS_TRAIN_PER_SOURCE_LIMIT", _get, 300),
-            train_pre_top_m=_parse_positive_int("BOOKRECS_TRAIN_PRE_TOP_M", _get, 300),
+            train_candidate_pool_size=_read_positive_int(
+                values,
+                "BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE",
+                int(profile_defaults["candidate_pool_size"]),
+                auto_tune=auto_tune,
+            ),
+            train_candidate_per_source_limit=_read_positive_int(
+                values,
+                "BOOKRECS_TRAIN_PER_SOURCE_LIMIT",
+                int(profile_defaults["candidate_per_source_limit"]),
+                auto_tune=auto_tune,
+            ),
+            train_pre_top_m=_read_positive_int(
+                values,
+                "BOOKRECS_TRAIN_PRE_TOP_M",
+                int(profile_defaults["pre_top_m"]),
+                auto_tune=auto_tune,
+            ),
             train_final_top_k=_parse_positive_int("BOOKRECS_TRAIN_FINAL_TOP_K", _get, 10),
-            train_cf_max_neighbors=_parse_positive_int("BOOKRECS_TRAIN_CF_MAX_NEIGHBORS", _get, 120),
-            train_content_max_neighbors=_parse_positive_int("BOOKRECS_TRAIN_CONTENT_MAX_NEIGHBORS", _get, 120),
+            train_cf_max_neighbors=_read_positive_int(
+                values,
+                "BOOKRECS_TRAIN_CF_MAX_NEIGHBORS",
+                int(profile_defaults["cf_max_neighbors"]),
+                auto_tune=auto_tune,
+            ),
+            train_cf_max_items_per_user=_read_positive_int(
+                values,
+                "BOOKRECS_TRAIN_CF_MAX_ITEMS_PER_USER",
+                int(profile_defaults["cf_max_items_per_user"]),
+                auto_tune=auto_tune,
+            ),
+            train_content_max_neighbors=_read_positive_int(
+                values,
+                "BOOKRECS_TRAIN_CONTENT_MAX_NEIGHBORS",
+                int(profile_defaults["content_max_neighbors"]),
+                auto_tune=auto_tune,
+            ),
+            train_prerank_model=prerank_model,
+            train_catboost_iterations=_read_positive_int(
+                values,
+                "BOOKRECS_TRAIN_CATBOOST_ITERATIONS",
+                int(profile_defaults["catboost_iterations"]),
+                auto_tune=auto_tune,
+            ),
+            train_catboost_depth=_read_positive_int(
+                values,
+                "BOOKRECS_TRAIN_CATBOOST_DEPTH",
+                int(profile_defaults["catboost_depth"]),
+                auto_tune=auto_tune,
+            ),
+            train_catboost_learning_rate=_read_positive_float(
+                values,
+                "BOOKRECS_TRAIN_CATBOOST_LEARNING_RATE",
+                float(profile_defaults["catboost_learning_rate"]),
+                auto_tune=auto_tune,
+            ),
             train_seed=_parse_positive_int("BOOKRECS_TRAIN_SEED", _get, 42),
         )
 
@@ -60,6 +139,8 @@ class Settings:
             "BOOKRECS_S3_ENDPOINT": self.s3_endpoint,
             "BOOKRECS_TRAIN_DATASET_DIR": self.train_dataset_dir,
             "BOOKRECS_TRAIN_OUTPUT_ROOT": self.train_output_root,
+            "BOOKRECS_TRAIN_PROFILE": self.train_profile,
+            "BOOKRECS_TRAIN_AUTO_TUNE": "true" if self.train_auto_tune else "false",
             "BOOKRECS_TRAIN_EVAL_USERS_LIMIT": str(self.train_eval_users_limit),
             "BOOKRECS_COLD_MAX_INTERACTIONS": str(self.cold_max_interactions),
             "BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE": str(self.train_candidate_pool_size),
@@ -67,7 +148,12 @@ class Settings:
             "BOOKRECS_TRAIN_PRE_TOP_M": str(self.train_pre_top_m),
             "BOOKRECS_TRAIN_FINAL_TOP_K": str(self.train_final_top_k),
             "BOOKRECS_TRAIN_CF_MAX_NEIGHBORS": str(self.train_cf_max_neighbors),
+            "BOOKRECS_TRAIN_CF_MAX_ITEMS_PER_USER": str(self.train_cf_max_items_per_user),
             "BOOKRECS_TRAIN_CONTENT_MAX_NEIGHBORS": str(self.train_content_max_neighbors),
+            "BOOKRECS_TRAIN_PRERANK_MODEL": self.train_prerank_model,
+            "BOOKRECS_TRAIN_CATBOOST_ITERATIONS": str(self.train_catboost_iterations),
+            "BOOKRECS_TRAIN_CATBOOST_DEPTH": str(self.train_catboost_depth),
+            "BOOKRECS_TRAIN_CATBOOST_LEARNING_RATE": str(self.train_catboost_learning_rate),
             "BOOKRECS_TRAIN_SEED": str(self.train_seed),
         }
 
@@ -100,6 +186,8 @@ class PipelineSettings:
     dataset_dir: str
     output_root: str
     run_name: str | None
+    train_profile: str
+    train_auto_tune: bool
     eval_users_limit: int
     candidate_pool_size: int
     candidate_per_source_limit: int
@@ -109,6 +197,10 @@ class PipelineSettings:
     cf_max_neighbors: int
     cf_max_items_per_user: int
     content_max_neighbors: int
+    prerank_model: str
+    catboost_iterations: int
+    catboost_depth: int
+    catboost_learning_rate: float
     seed: int
 
     @classmethod
@@ -118,6 +210,7 @@ class PipelineSettings:
     @classmethod
     def from_mapping(cls, values: Mapping[str, str]) -> PipelineSettings:
         core = Settings.from_mapping(values)
+        auto_tune = core.train_auto_tune
         dataset_name = env_str(values, "BOOKRECS_DATASET_NAME", "goodreads_ya")
         raw_dir = env_str(values, "BOOKRECS_RAW_DIR", "data/raw_data")
         cf_mode = env_str(values, "BOOKRECS_TRAIN_CF_MODE", "auto").lower()
@@ -158,26 +251,73 @@ class PipelineSettings:
             dataset_dir=env_optional_str(values, "BOOKRECS_TRAIN_DATASET_DIR") or f"artifacts/tmp_preprocessed/{dataset_name}",
             output_root=env_str(values, "BOOKRECS_TRAIN_OUTPUT_ROOT", core.train_output_root),
             run_name=env_optional_str(values, "BOOKRECS_TRAIN_RUN_NAME"),
-            eval_users_limit=env_positive_int(values, "BOOKRECS_TRAIN_EVAL_USERS_LIMIT", core.train_eval_users_limit),
-            candidate_pool_size=env_positive_int(
+            train_profile=env_str(values, "BOOKRECS_TRAIN_PROFILE", core.train_profile),
+            train_auto_tune=env_bool(values, "BOOKRECS_TRAIN_AUTO_TUNE", core.train_auto_tune),
+            eval_users_limit=_read_positive_int(
                 values,
+                "BOOKRECS_TRAIN_EVAL_USERS_LIMIT",
+                core.train_eval_users_limit,
+                auto_tune=auto_tune,
+            ),
+            candidate_pool_size=env_positive_int(
+                {} if auto_tune else values,
                 "BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE",
                 core.train_candidate_pool_size,
             ),
             candidate_per_source_limit=env_positive_int(
-                values,
+                {} if auto_tune else values,
                 "BOOKRECS_TRAIN_PER_SOURCE_LIMIT",
                 core.train_candidate_per_source_limit,
             ),
-            pre_top_m=env_positive_int(values, "BOOKRECS_TRAIN_PRE_TOP_M", core.train_pre_top_m),
+            pre_top_m=_read_positive_int(
+                values,
+                "BOOKRECS_TRAIN_PRE_TOP_M",
+                core.train_pre_top_m,
+                auto_tune=auto_tune,
+            ),
             final_top_k=env_positive_int(values, "BOOKRECS_TRAIN_FINAL_TOP_K", core.train_final_top_k),
             cf_mode=cf_mode,
-            cf_max_neighbors=env_positive_int(values, "BOOKRECS_TRAIN_CF_MAX_NEIGHBORS", core.train_cf_max_neighbors),
-            cf_max_items_per_user=env_positive_int(values, "BOOKRECS_TRAIN_CF_MAX_ITEMS_PER_USER", 150),
-            content_max_neighbors=env_positive_int(
+            cf_max_neighbors=_read_positive_int(
+                values,
+                "BOOKRECS_TRAIN_CF_MAX_NEIGHBORS",
+                core.train_cf_max_neighbors,
+                auto_tune=auto_tune,
+            ),
+            cf_max_items_per_user=_read_positive_int(
+                values,
+                "BOOKRECS_TRAIN_CF_MAX_ITEMS_PER_USER",
+                core.train_cf_max_items_per_user,
+                auto_tune=auto_tune,
+            ),
+            content_max_neighbors=_read_positive_int(
                 values,
                 "BOOKRECS_TRAIN_CONTENT_MAX_NEIGHBORS",
                 core.train_content_max_neighbors,
+                auto_tune=auto_tune,
+            ),
+            prerank_model=_read_str(
+                values,
+                "BOOKRECS_TRAIN_PRERANK_MODEL",
+                core.train_prerank_model,
+                auto_tune=auto_tune,
+            ),
+            catboost_iterations=_read_positive_int(
+                values,
+                "BOOKRECS_TRAIN_CATBOOST_ITERATIONS",
+                core.train_catboost_iterations,
+                auto_tune=auto_tune,
+            ),
+            catboost_depth=_read_positive_int(
+                values,
+                "BOOKRECS_TRAIN_CATBOOST_DEPTH",
+                core.train_catboost_depth,
+                auto_tune=auto_tune,
+            ),
+            catboost_learning_rate=_read_positive_float(
+                values,
+                "BOOKRECS_TRAIN_CATBOOST_LEARNING_RATE",
+                core.train_catboost_learning_rate,
+                auto_tune=auto_tune,
             ),
             seed=env_positive_int(values, "BOOKRECS_TRAIN_SEED", core.train_seed),
         )
@@ -331,6 +471,13 @@ def _parse_non_negative_int(name: str, getter: Callable[[str, str], str], defaul
     return parsed
 
 
+def env_positive_float(values: Mapping[str, str], name: str, default: float) -> float:
+    value = env_float(values, name, default)
+    if value <= 0:
+        raise ValueError(f"{name} must be > 0, got {value}")
+    return value
+
+
 def env_float(values: Mapping[str, str], name: str, default: float) -> float:
     raw = values.get(name)
     if raw is None:
@@ -342,6 +489,156 @@ def env_float(values: Mapping[str, str], name: str, default: float) -> float:
         return float(value)
     except ValueError as exc:
         raise ValueError(f"Переменная {name} должна быть числом, получено: {raw}") from exc
+
+
+def _parse_positive_float(name: str, getter: Callable[[str, str], str], default: float) -> float:
+    value = getter(name, str(default))
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be > 0, got {value}") from exc
+    if parsed <= 0:
+        raise ValueError(f"{name} must be > 0, got {parsed}")
+    return parsed
+
+
+def _resolve_train_value(
+    values: Mapping[str, str],
+    name: str,
+    default: str,
+    *,
+    auto_tune: bool,
+) -> str:
+    if auto_tune:
+        return default
+    raw = values.get(name)
+    if raw is None:
+        return default
+    value = str(raw).strip()
+    return value or default
+
+
+def _read_positive_int(
+    values: Mapping[str, str],
+    name: str,
+    default: int,
+    *,
+    auto_tune: bool,
+) -> int:
+    return env_positive_int({} if auto_tune else values, name, default)
+
+
+def _read_positive_float(
+    values: Mapping[str, str],
+    name: str,
+    default: float,
+    *,
+    auto_tune: bool,
+) -> float:
+    return env_positive_float({} if auto_tune else values, name, default)
+
+
+def _read_str(
+    values: Mapping[str, str],
+    name: str,
+    default: str,
+    *,
+    auto_tune: bool,
+) -> str:
+    return env_str({} if auto_tune else values, name, default)
+
+
+def _profile_defaults(profile: str) -> dict[str, int | float | str]:
+    if profile == "auto":
+        detected_profile = _autodetect_resource_profile()
+        return _profile_defaults(detected_profile)
+    if profile == "lite":
+        return {
+            "eval_users_limit": 600,
+            "candidate_pool_size": 450,
+            "candidate_per_source_limit": 120,
+            "pre_top_m": 120,
+            "cf_max_neighbors": 60,
+            "cf_max_items_per_user": 40,
+            "content_max_neighbors": 60,
+            "prerank_model": "linear",
+            "catboost_iterations": 120,
+            "catboost_depth": 4,
+            "catboost_learning_rate": 0.1,
+        }
+    return {
+        "eval_users_limit": 2000,
+        "candidate_pool_size": 1000,
+        "candidate_per_source_limit": 300,
+        "pre_top_m": 300,
+        "cf_max_neighbors": 120,
+        "cf_max_items_per_user": 150,
+        "content_max_neighbors": 120,
+        "prerank_model": "auto",
+        "catboost_iterations": 250,
+        "catboost_depth": 6,
+        "catboost_learning_rate": 0.08,
+    }
+
+
+def _resolve_train_profile(getter: Callable[[str, str], str]) -> str:
+    raw = getter("BOOKRECS_TRAIN_PROFILE", "auto").lower()
+    if raw in {"default", "lite"}:
+        return raw
+    if raw != "auto":
+        raise ValueError("BOOKRECS_TRAIN_PROFILE must be one of: auto, default, lite")
+    return "auto"
+
+
+def _autodetect_resource_profile() -> str:
+    memory_limit_mb = _read_memory_limit_mb()
+    if memory_limit_mb is None:
+        memory_limit_mb = _read_meminfo_total_mb()
+    if memory_limit_mb is None:
+        return "lite"
+    if memory_limit_mb <= 8 * 1024:
+        return "lite"
+    return "default"
+
+
+def _read_memory_limit_mb() -> int | None:
+    candidates = [
+        "/sys/fs/cgroup/memory.max",
+        "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+    ]
+    for path in candidates:
+        if not os.path.exists(path):
+            continue
+        try:
+            raw = open(path, "r", encoding="utf-8").read().strip()
+        except OSError:
+            continue
+        if not raw or raw.lower() == "max":
+            continue
+        try:
+            value_bytes = int(raw)
+        except ValueError:
+            continue
+        if value_bytes <= 0 or value_bytes >= 1 << 60:
+            continue
+        return value_bytes // (1024 * 1024)
+    return None
+
+
+def _read_meminfo_total_mb() -> int | None:
+    path = "/proc/meminfo"
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                if not line.startswith("MemTotal:"):
+                    continue
+                value_kb = int(line.split()[1])
+                return max(0, value_kb // 1024)
+    except (OSError, ValueError, IndexError):
+        return None
+    return None
 
 
 def env_bool(values: Mapping[str, str], name: str, default: bool) -> bool:

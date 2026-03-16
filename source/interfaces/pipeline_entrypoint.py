@@ -78,6 +78,7 @@ def run_pipeline_from_env() -> None:
                 dataset_dir=settings.dataset_dir,
                 output_root=settings.output_root,
                 run_name=settings.run_name,
+                train_profile=settings.train_profile,
                 eval_users_limit=settings.eval_users_limit,
                 cold_max_interactions=settings.cold_max_interactions,
                 candidate_pool_size=settings.candidate_pool_size,
@@ -88,6 +89,10 @@ def run_pipeline_from_env() -> None:
                 cf_max_neighbors=settings.cf_max_neighbors,
                 cf_max_items_per_user=settings.cf_max_items_per_user,
                 content_max_neighbors=settings.content_max_neighbors,
+                prerank_model=settings.prerank_model,
+                catboost_iterations=settings.catboost_iterations,
+                catboost_depth=settings.catboost_depth,
+                catboost_learning_rate=settings.catboost_learning_rate,
                 seed=settings.seed,
             )
         )

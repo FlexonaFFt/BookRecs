@@ -81,6 +81,22 @@ BOOKRECS_TRAIN_PER_SOURCE_LIMIT=350 \
 BOOKRECS_TRAIN_PRE_TOP_M=300 \
 BOOKRECS_TRAIN_FINAL_TOP_K=10 \
 make train-prepared
+
+Для слабой машины или MacBook можно использовать облегченный режим:
+```bash
+BOOKRECS_TRAIN_DATASET_DIR=/absolute/path/to/goodreads_ya \
+make train-lite-prepared
+```
+
+`lite`-профиль уменьшает candidate pool, лимиты соседей и историю для `CF`, а Stage 2 переключает на `LinearPreRanker` вместо `CatBoost`.
+
+Для обычного запуска теперь можно использовать авто-подбор профиля:
+```bash
+BOOKRECS_TRAIN_DATASET_DIR=/absolute/path/to/goodreads_ya \
+make train-auto
+```
+
+`auto` по памяти контейнера выбирает `lite`, если лимит памяти не больше `8 GB`, иначе использует `default`. Ручные env-переопределения по-прежнему имеют приоритет.
 ```
 
 ### 3.1 Эмуляция batch за 5 дней (offline replay / пилот)

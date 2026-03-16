@@ -1,4 +1,4 @@
-.PHONY: help init-env infra-up pipeline-up api-up demo-seed batch-emulate promote-run train-prepared lint lint-backend lint-frontend test up down down-volumes logs ps restart-pipeline restart-api
+.PHONY: help init-env infra-up pipeline-up api-up demo-seed batch-emulate promote-run train-prepared train-lite-prepared train-auto lint lint-backend lint-frontend test up down down-volumes logs ps restart-pipeline restart-api
 
 SERVICE ?= pipeline
 DAYS ?= 5
@@ -16,6 +16,8 @@ help:
 	@echo "  make batch-emulate    # эмуляция батч-запусков за N дней (DAYS=5 END_DATE=YYYY-MM-DD, с promote)"
 	@echo "  make promote-run      # вручную промоутнуть run в active pointer (RUN_NAME=batch_YYYYMMDD)"
 	@echo "  make train-prepared   # обучить модель на уже подготовленном датасете (BOOKRECS_TRAIN_DATASET_DIR=...)"
+	@echo "  make train-lite-prepared # облегченный train для слабой машины / MacBook"
+	@echo "  make train-auto       # обучить модель с авто-подбором профиля по памяти контейнера"
 	@echo "  make lint             # запустить backend и frontend линтеры"
 	@echo "  make lint-backend     # запустить ruff для backend-кода"
 	@echo "  make lint-frontend    # запустить eslint для frontend-кода"
@@ -60,10 +62,41 @@ promote-run: init-env
 		pipeline python -m source.interfaces.promote_model_entrypoint
 
 train-prepared: init-env
-	docker compose run --build --rm \
-		-v $(BOOKRECS_TRAIN_DATASET_DIR):/dataset:ro \
-		-e BOOKRECS_TRAIN_DATASET_DIR=/dataset \
-		pipeline python -m source.interfaces.train_entrypoint
+	@set -a; . ./.env; set +a; \
+		if [ -z "$$BOOKRECS_TRAIN_DATASET_DIR" ]; then \
+			echo "BOOKRECS_TRAIN_DATASET_DIR is not set in .env"; \
+			exit 1; \
+		fi; \
+		docker compose run --build --rm \
+			-v "$$BOOKRECS_TRAIN_DATASET_DIR:/dataset:ro" \
+			-e BOOKRECS_TRAIN_DATASET_DIR=/dataset \
+			pipeline python -m source.interfaces.train_entrypoint
+
+train-lite-prepared: init-env
+	@set -a; . ./.env; set +a; \
+		if [ -z "$$BOOKRECS_TRAIN_DATASET_DIR" ]; then \
+			echo "BOOKRECS_TRAIN_DATASET_DIR is not set in .env"; \
+			exit 1; \
+		fi; \
+		docker compose run --build --rm \
+			-v "$$BOOKRECS_TRAIN_DATASET_DIR:/dataset:ro" \
+			-e BOOKRECS_TRAIN_DATASET_DIR=/dataset \
+			-e BOOKRECS_TRAIN_PROFILE=lite \
+			-e BOOKRECS_TRAIN_PRERANK_MODEL=linear \
+			pipeline python -m source.interfaces.train_entrypoint
+
+train-auto: init-env
+	@set -a; . ./.env; set +a; \
+		if [ -z "$$BOOKRECS_TRAIN_DATASET_DIR" ]; then \
+			echo "BOOKRECS_TRAIN_DATASET_DIR is not set in .env"; \
+			exit 1; \
+		fi; \
+		docker compose run --build --rm \
+			-v "$$BOOKRECS_TRAIN_DATASET_DIR:/dataset:ro" \
+			-e BOOKRECS_TRAIN_DATASET_DIR=/dataset \
+			-e BOOKRECS_TRAIN_PROFILE=auto \
+			-e BOOKRECS_TRAIN_AUTO_TUNE=true \
+			pipeline python -m source.interfaces.train_entrypoint
 
 lint: lint-backend lint-frontend
 
