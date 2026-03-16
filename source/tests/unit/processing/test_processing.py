@@ -220,3 +220,117 @@ def test_policy_final_reranker_balances_source_and_keeps_cold_item() -> None:
     top2 = [item.item_id for item in out][:2]
     assert 3 in top2
     assert 1 in top2
+
+
+def test_policy_final_reranker_injects_relevant_cold_item_into_tail() -> None:
+    ranker = PolicyFinalReranker(
+        cfg=PolicyFinalRerankerConfig(
+            source_bias={"pop": 0.0, "cold": 0.02},
+            source_repeat_penalty=0.0,
+            cold_item_boost=0.0,
+            metadata_overlap_boost=0.0,
+            popularity_penalty=0.02,
+            target_cold_items=1,
+            max_injected_cold_items=1,
+            cold_injection_min_metadata_overlap=2.0,
+            cold_injection_max_score_gap=0.1,
+        )
+    )
+
+    from source.domain.entities import ScoredCandidate
+
+    candidates = [
+        ScoredCandidate(
+            user_id="u1",
+            item_id=10,
+            source="pop",
+            base_score=1.0,
+            pre_score=0.96,
+            features={"item_popularity": 1.0},
+        ),
+        ScoredCandidate(
+            user_id="u1",
+            item_id=11,
+            source="pop",
+            base_score=0.94,
+            pre_score=0.93,
+            features={"item_popularity": 0.9},
+        ),
+        ScoredCandidate(
+            user_id="u1",
+            item_id=12,
+            source="content",
+            base_score=0.9,
+            pre_score=0.91,
+            features={"item_popularity": 0.5},
+        ),
+        ScoredCandidate(
+            user_id="u1",
+            item_id=20,
+            source="cold",
+            base_score=0.82,
+            pre_score=0.84,
+            features={
+                "is_cold_item": 1.0,
+                "metadata_overlap": 3.0,
+                "item_popularity": 0.05,
+                "score_cold": 0.8,
+            },
+        ),
+    ]
+
+    out = ranker.rank(candidates=candidates, user_id="u1", top_k=3)
+    assert [item.item_id for item in out] == [10, 11, 20]
+
+
+def test_policy_final_reranker_skips_weak_cold_injection() -> None:
+    ranker = PolicyFinalReranker(
+        cfg=PolicyFinalRerankerConfig(
+            source_bias={"pop": 0.0, "cold": 0.02},
+            source_repeat_penalty=0.0,
+            cold_item_boost=0.02,
+            metadata_overlap_boost=0.04,
+            popularity_penalty=0.02,
+            target_cold_items=1,
+            max_injected_cold_items=1,
+            cold_injection_min_metadata_overlap=2.0,
+            cold_injection_max_score_gap=0.05,
+        )
+    )
+
+    from source.domain.entities import ScoredCandidate
+
+    candidates = [
+        ScoredCandidate(
+            user_id="u1",
+            item_id=10,
+            source="pop",
+            base_score=1.0,
+            pre_score=0.96,
+            features={"item_popularity": 1.0},
+        ),
+        ScoredCandidate(
+            user_id="u1",
+            item_id=11,
+            source="content",
+            base_score=0.95,
+            pre_score=0.93,
+            features={"item_popularity": 0.8},
+        ),
+        ScoredCandidate(
+            user_id="u1",
+            item_id=20,
+            source="cold",
+            base_score=0.6,
+            pre_score=0.7,
+            features={
+                "is_cold_item": 1.0,
+                "metadata_overlap": 1.0,
+                "item_popularity": 0.05,
+                "score_cold": 0.8,
+            },
+        ),
+    ]
+
+    out = ranker.rank(candidates=candidates, user_id="u1", top_k=2)
+    assert [item.item_id for item in out] == [10, 11]

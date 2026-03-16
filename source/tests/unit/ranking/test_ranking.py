@@ -26,7 +26,7 @@ from source.infrastructure.ranking.candidates import ColdCandidateSource, Conten
 @dataclass
 class StubCandidateSource:
     name: str
-    items: list[tuple[Any, float]]
+    items: list[tuple[Any, float] | tuple[Any, float, dict[str, float]]]
 
     def __post_init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
@@ -34,8 +34,13 @@ class StubCandidateSource:
     def generate(self, user_id: Any, seen_items: set[Any], limit: int) -> list[Candidate]:
         self.calls.append({"user_id": user_id, "seen_items": set(seen_items), "limit": limit})
         out: list[Candidate] = []
-        for item_id, score in self.items[:limit]:
-            out.append(Candidate(user_id=user_id, item_id=item_id, source=self.name, score=score))
+        for raw in self.items[:limit]:
+            if len(raw) == 2:
+                item_id, score = raw
+                features: dict[str, float] = {}
+            else:
+                item_id, score, features = raw
+            out.append(Candidate(user_id=user_id, item_id=item_id, source=self.name, score=score, features=features))
         return out
 
 
@@ -259,6 +264,33 @@ def test_generate_candidates_enforces_min_quota_for_cold_source() -> None:
     assert any("cold" in item.source.split("|") for item in result)
 
 
+def test_generate_candidates_injects_relevant_cold_candidate_into_tail() -> None:
+    pop = StubCandidateSource(name="pop", items=[(1, 1.0), (2, 0.95), (3, 0.9)])
+    cold = StubCandidateSource(
+        name="cold",
+        items=[
+            (10, 0.82, {"metadata_overlap": 3.0, "score_cold": 0.8, "is_cold_item": 1.0}),
+            (11, 0.4, {"metadata_overlap": 0.5, "score_cold": 0.3, "is_cold_item": 1.0}),
+        ],
+    )
+    uc = GenerateCandidatesUseCase(sources=[pop, cold], fallback_source=pop)
+
+    result = uc.execute(
+        GenerateCandidatesCommand(
+            user_id="u1",
+            seen_items=set(),
+            pool_size=3,
+            per_source_limit=5,
+            source_min_quota={},
+            cold_tail_injection_count=1,
+            cold_tail_min_metadata_overlap=2.0,
+            cold_tail_max_score_gap=0.1,
+        )
+    )
+
+    assert [item.item_id for item in result] == [1, 2, 10]
+
+
 def test_source_limits_for_stage1_favor_content_and_cold_for_short_history() -> None:
     short = source_limits_for_stage1(history_len=1, per_source_limit=100)
     medium = source_limits_for_stage1(history_len=4, per_source_limit=100)
@@ -317,6 +349,27 @@ def test_cold_candidate_source_prioritizes_low_popularity_items_with_same_token(
     out = source.generate(user_id="u1", seen_items={1}, limit=2)
 
     assert [x.item_id for x in out][:2] == [3, 2]
+
+
+def test_cold_candidate_source_scores_explicit_cold_catalog() -> None:
+    source = ColdCandidateSource(
+        item_metadata={
+            1: {"authors": ["A"], "series": ["S"], "tags": ["fantasy"]},
+            10: {"authors": ["A"], "series": [], "tags": []},
+            11: {"authors": [], "series": ["S"], "tags": ["fantasy"]},
+            12: {"authors": ["B"], "series": [], "tags": []},
+        },
+        author_index={"A": [1, 10]},
+        series_index={"S": [1, 11]},
+        tag_index={"fantasy": [1, 11]},
+        popularity_scores={10: 0.05, 11: 0.01, 12: 0.0},
+        cold_item_ids={10, 11, 12},
+    )
+
+    out = source.generate(user_id="u1", seen_items={1}, limit=3)
+
+    assert [x.item_id for x in out][:2] == [11, 10]
+    assert all(item.item_id in {10, 11, 12} for item in out)
 
 
 def test_content_candidate_source_reserves_low_popularity_candidates() -> None:

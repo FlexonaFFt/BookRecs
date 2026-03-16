@@ -62,13 +62,18 @@ class InferenceService:
             stage1=GenerateCandidatesUseCase(
                 sources=[
                     CfCandidateSource(self._cf_neighbors),
-                    ContentCandidateSource(self._content_similar, popularity_scores=self._pop_scores),
+                    ContentCandidateSource(
+                        self._content_similar,
+                        popularity_scores=self._pop_scores,
+                        cold_item_ids=self._cold_item_ids,
+                    ),
                     ColdCandidateSource(
                         item_metadata=self._item_metadata,
                         author_index=self._author_index,
                         series_index=self._series_index,
                         tag_index=self._tag_index,
                         popularity_scores=self._pop_scores,
+                        cold_item_ids=self._cold_item_ids,
                     ),
                     PopularCandidateSource(self._pop_items, self._pop_scores),
                 ],

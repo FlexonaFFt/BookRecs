@@ -16,6 +16,9 @@ class GenerateCandidatesCommand:
     per_source_limit: int = 300
     source_limits: dict[str, int] | None = None
     source_min_quota: dict[str, int] | None = None
+    cold_tail_injection_count: int = 2
+    cold_tail_min_metadata_overlap: float = 1.5
+    cold_tail_max_score_gap: float = 0.12
 # Реализует сценарий генерации кандидатов.
 class GenerateCandidatesUseCase:
     """Stage 1: generate and merge candidates from multiple sources."""
@@ -56,6 +59,9 @@ class GenerateCandidatesUseCase:
             merged,
             cmd.pool_size,
             source_min_quota=cmd.source_min_quota,
+            cold_tail_injection_count=cmd.cold_tail_injection_count,
+            cold_tail_min_metadata_overlap=cmd.cold_tail_min_metadata_overlap,
+            cold_tail_max_score_gap=cmd.cold_tail_max_score_gap,
         )
         if len(ranked) >= cmd.pool_size:
             return ranked
@@ -78,6 +84,9 @@ class GenerateCandidatesUseCase:
             merged,
             cmd.pool_size,
             source_min_quota=cmd.source_min_quota,
+            cold_tail_injection_count=cmd.cold_tail_injection_count,
+            cold_tail_min_metadata_overlap=cmd.cold_tail_min_metadata_overlap,
+            cold_tail_max_score_gap=cmd.cold_tail_max_score_gap,
         )
 
     @staticmethod
@@ -109,6 +118,9 @@ class GenerateCandidatesUseCase:
         merged: dict[Any, dict[str, Any]],
         limit: int,
         source_min_quota: dict[str, int] | None = None,
+        cold_tail_injection_count: int = 0,
+        cold_tail_min_metadata_overlap: float = 0.0,
+        cold_tail_max_score_gap: float = 0.0,
     ) -> list[Candidate]:
         rows = []
         for item_id, payload in merged.items():
@@ -123,6 +135,14 @@ class GenerateCandidatesUseCase:
             rows=rows,
             limit=limit,
             source_min_quota=source_min_quota or {},
+        )
+        selected_rows = GenerateCandidatesUseCase._inject_cold_tail(
+            rows=rows,
+            selected_rows=selected_rows,
+            limit=limit,
+            cold_tail_injection_count=cold_tail_injection_count,
+            cold_tail_min_metadata_overlap=cold_tail_min_metadata_overlap,
+            cold_tail_max_score_gap=cold_tail_max_score_gap,
         )
         return [
             Candidate(user_id=user_id, item_id=item_id, source=src, score=score, features=features)
@@ -189,3 +209,71 @@ class GenerateCandidatesUseCase:
                 continue
             merged[key] = merged.get(key, 0.0) + numeric
         return merged
+
+    @staticmethod
+    def _inject_cold_tail(
+        rows: list[tuple[Any, float, str, dict[str, float]]],
+        selected_rows: list[tuple[Any, float, str, dict[str, float]]],
+        limit: int,
+        cold_tail_injection_count: int,
+        cold_tail_min_metadata_overlap: float,
+        cold_tail_max_score_gap: float,
+    ) -> list[tuple[Any, float, str, dict[str, float]]]:
+        if limit <= 0 or cold_tail_injection_count <= 0 or not selected_rows:
+            return selected_rows[:limit]
+
+        result = list(selected_rows[:limit])
+        selected_ids = {row[0] for row in result}
+        current_cold = sum(1 for row in result if GenerateCandidatesUseCase._is_cold_row(row))
+        need = max(0, int(cold_tail_injection_count) - current_cold)
+        if need <= 0:
+            return result
+
+        cold_pool = [
+            row for row in rows
+            if row[0] not in selected_ids and GenerateCandidatesUseCase._eligible_cold_row(row, cold_tail_min_metadata_overlap)
+        ]
+        if not cold_pool:
+            return result
+
+        cold_pool.sort(key=GenerateCandidatesUseCase._cold_priority, reverse=True)
+        for cold_row in cold_pool:
+            if need <= 0:
+                break
+            replace_idx = GenerateCandidatesUseCase._find_tail_replacement_index(result)
+            if replace_idx is None:
+                break
+            replace_row = result[replace_idx]
+            if (float(replace_row[1]) - float(cold_row[1])) > float(cold_tail_max_score_gap):
+                continue
+            result[replace_idx] = cold_row
+            need -= 1
+        return result[:limit]
+
+    @staticmethod
+    def _is_cold_row(row: tuple[Any, float, str, dict[str, float]]) -> bool:
+        src_parts = set(row[2].split("|"))
+        features = row[3] or {}
+        return "cold" in src_parts or float(features.get("is_cold_item", 0.0)) > 0.0
+
+    @staticmethod
+    def _eligible_cold_row(
+        row: tuple[Any, float, str, dict[str, float]],
+        min_metadata_overlap: float,
+    ) -> bool:
+        if not GenerateCandidatesUseCase._is_cold_row(row):
+            return False
+        features = row[3] or {}
+        return float(features.get("metadata_overlap", 0.0)) >= float(min_metadata_overlap)
+
+    @staticmethod
+    def _cold_priority(row: tuple[Any, float, str, dict[str, float]]) -> float:
+        _, score, _, features = row
+        return float(score) + 0.02 * float(features.get("metadata_overlap", 0.0)) + 0.01 * float(features.get("score_cold", 0.0))
+
+    @staticmethod
+    def _find_tail_replacement_index(rows: list[tuple[Any, float, str, dict[str, float]]]) -> int | None:
+        for idx in range(len(rows) - 1, -1, -1):
+            if not GenerateCandidatesUseCase._is_cold_row(rows[idx]):
+                return idx
+        return None

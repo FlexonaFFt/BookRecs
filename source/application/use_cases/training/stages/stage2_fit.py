@@ -41,6 +41,7 @@ def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: A
         ContentCandidateSource(
             stage1["content_similar"],
             popularity_scores=stage1["pop_scores"],
+            cold_item_ids=stage1.get("cold_item_ids"),
         ),
         ColdCandidateSource(
             item_metadata=stage1["item_metadata"],
@@ -48,6 +49,7 @@ def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: A
             series_index=stage1["series_index"],
             tag_index=stage1["tag_index"],
             popularity_scores=stage1["pop_scores"],
+            cold_item_ids=stage1.get("cold_item_ids"),
         ),
         PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
     ]

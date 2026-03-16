@@ -47,6 +47,7 @@ def fit_stage3(
             ContentCandidateSource(
                 stage1["content_similar"],
                 popularity_scores=stage1["pop_scores"],
+                cold_item_ids=stage1.get("cold_item_ids"),
             ),
             ColdCandidateSource(
                 item_metadata=stage1["item_metadata"],
@@ -54,6 +55,7 @@ def fit_stage3(
                 series_index=stage1["series_index"],
                 tag_index=stage1["tag_index"],
                 popularity_scores=stage1["pop_scores"],
+                cold_item_ids=stage1.get("cold_item_ids"),
             ),
             PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
         ],
@@ -127,7 +129,12 @@ def fit_stage3(
         score = 0.25 * (rate - global_rate) + 0.65 * (cold_rate - global_cold_rate)
         source_bias[source] = round(score, 6)
 
-    target_cold_items = 1 if total_cold_rows > 0 and cmd.final_top_k >= 5 else 0
+    if total_cold_rows > 0 and cmd.final_top_k >= 10:
+        target_cold_items = 2
+    elif total_cold_rows > 0 and cmd.final_top_k >= 5:
+        target_cold_items = 1
+    else:
+        target_cold_items = 0
     cfg = PolicyFinalRerankerConfig(
         source_bias=source_bias,
         source_repeat_penalty=0.04,
@@ -135,6 +142,9 @@ def fit_stage3(
         metadata_overlap_boost=0.05,
         popularity_penalty=0.025,
         target_cold_items=target_cold_items,
+        max_injected_cold_items=target_cold_items,
+        cold_injection_min_metadata_overlap=1.5,
+        cold_injection_max_score_gap=0.12,
     )
     model = PolicyFinalReranker(cfg=cfg)
     logger.progress("stage3_fit", done=1, total=1)
