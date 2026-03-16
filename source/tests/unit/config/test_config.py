@@ -43,11 +43,11 @@ def test_load_settings_reads_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.train_dataset_dir == "artifacts/tmp_preprocessed/goodreads_ya"
     assert settings.train_output_root == "artifacts/runs"
     assert settings.train_profile == "auto"
-    assert settings.train_eval_users_limit == 2000
+    assert settings.train_eval_users_limit == 600
     assert settings.cold_max_interactions == 5
-    assert settings.train_candidate_pool_size == 1000
+    assert settings.train_candidate_pool_size == 450
     assert settings.train_final_top_k == 10
-    assert settings.train_prerank_model == "auto"
+    assert settings.train_prerank_model == "linear"
 
 
 def test_load_settings_reads_custom_values(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -148,6 +148,7 @@ def test_env_settings_io_read_and_write() -> None:
         train_dataset_dir=settings.train_dataset_dir,
         train_output_root=settings.train_output_root,
         train_profile=settings.train_profile,
+        train_auto_tune=settings.train_auto_tune,
         train_eval_users_limit=777,
         cold_max_interactions=settings.cold_max_interactions,
         train_candidate_pool_size=settings.train_candidate_pool_size,

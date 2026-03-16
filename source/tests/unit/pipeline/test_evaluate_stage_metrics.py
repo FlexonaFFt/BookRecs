@@ -75,6 +75,7 @@ def test_evaluate_pipeline_reports_stage_metrics() -> None:
     }
     cmd = SimpleNamespace(
         eval_users_limit=10,
+        cold_max_interactions=5,
         candidate_pool_size=10,
         candidate_per_source_limit=5,
         pre_top_m=3,

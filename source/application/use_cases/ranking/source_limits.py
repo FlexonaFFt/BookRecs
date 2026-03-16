@@ -5,23 +5,23 @@ def source_limits_for_stage1(history_len: int, per_source_limit: int) -> dict[st
     base = max(1, int(per_source_limit))
     if history_len <= 1:
         return {
-            "cf": max(20, int(base * 0.2)),
-            "content": int(base * 2.4),
-            "cold": int(base * 2.2),
-            "pop": int(base * 0.7),
+            "cf": max(15, int(base * 0.15)),
+            "content": int(base * 2.8),
+            "cold": int(base * 2.6),
+            "pop": int(base * 0.6),
         }
     if history_len <= 5:
         return {
-            "cf": max(40, int(base * 0.55)),
-            "content": int(base * 1.8),
-            "cold": int(base * 1.5),
-            "pop": int(base * 0.8),
+            "cf": max(30, int(base * 0.45)),
+            "content": int(base * 2.1),
+            "cold": int(base * 1.9),
+            "pop": int(base * 0.7),
         }
     return {
-        "cf": base,
-        "content": int(base * 1.3),
-        "cold": base,
-        "pop": int(base * 0.7),
+        "cf": int(base * 0.85),
+        "content": int(base * 1.6),
+        "cold": int(base * 1.5),
+        "pop": int(base * 0.6),
     }
 
 
@@ -29,15 +29,15 @@ def source_min_quota_for_stage1(history_len: int, pool_size: int) -> dict[str, i
     pool = max(1, int(pool_size))
     if history_len <= 1:
         return {
-            "content": max(1, int(pool * 0.35)),
-            "cold": max(1, int(pool * 0.20)),
+            "content": max(1, int(pool * 0.42)),
+            "cold": max(1, int(pool * 0.28)),
         }
     if history_len <= 5:
         return {
-            "content": max(1, int(pool * 0.25)),
-            "cold": max(1, int(pool * 0.15)),
+            "content": max(1, int(pool * 0.32)),
+            "cold": max(1, int(pool * 0.22)),
         }
     return {
-        "content": max(1, int(pool * 0.18)),
-        "cold": max(1, int(pool * 0.10)),
+        "content": max(1, int(pool * 0.24)),
+        "cold": max(1, int(pool * 0.18)),
     }

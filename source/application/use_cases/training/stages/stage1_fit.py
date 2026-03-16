@@ -22,6 +22,8 @@ def fit_stage1(data: dict[str, Any], cmd: Any, logger: Any) -> dict[str, Any]:
         cf_mode=getattr(cmd, "cf_mode", "auto"),
         max_neighbors=cmd.cf_max_neighbors,
         max_items_per_user=getattr(cmd, "cf_max_items_per_user", 150),
+        batch_size=getattr(cmd, "cf_batch_size", 2000),
+        retained_neighbors_factor=getattr(cmd, "cf_retained_neighbors_factor", 4),
         logger=logger,
     )
     logger.progress("stage1_fit", done=2, total=4)
@@ -85,6 +87,8 @@ def fit_cf_neighbors(
     cf_mode: str,
     max_neighbors: int,
     max_items_per_user: int,
+    batch_size: int,
+    retained_neighbors_factor: int,
     logger: Any,
 ) -> dict[Any, list[tuple[Any, float]]]:
     user_items = (
@@ -93,7 +97,7 @@ def fit_cf_neighbors(
         .groupby("user_id", sort=False)["item_id"]
         .agg(list)
     )
-    pair_counts: Counter[tuple[Any, Any]] = Counter()
+    neighbor_counts: dict[Any, Counter[Any]] = defaultdict(Counter)
     item_counts: Counter[Any] = Counter()
     truncated_users = 0
     effective_mode = cf_mode if cf_mode in {"auto", "fixed"} else "auto"
@@ -104,6 +108,8 @@ def fit_cf_neighbors(
         memory_limit_mb=memory_limit_mb,
     )
     min_cap = 20
+    safe_batch_size = max(200, int(batch_size))
+    retained_neighbors = max(int(max_neighbors), int(max_neighbors) * max(1, int(retained_neighbors_factor)))
 
     users_total = len(user_items)
     logger.event(
@@ -111,6 +117,8 @@ def fit_cf_neighbors(
         mode=effective_mode,
         memory_limit_mb=memory_limit_mb,
         initial_cap=current_cap,
+        batch_size=safe_batch_size,
+        retained_neighbors=retained_neighbors,
     )
     for i, items in enumerate(user_items.tolist(), start=1):
         uniq = list(dict.fromkeys(items))
@@ -120,7 +128,11 @@ def fit_cf_neighbors(
             uniq = uniq[-current_cap:]
         item_counts.update(uniq)
         for a, b in itertools.combinations(sorted(uniq), 2):
-            pair_counts[(a, b)] += 1
+            neighbor_counts[a][b] += 1
+            neighbor_counts[b][a] += 1
+
+        if i % safe_batch_size == 0:
+            _prune_neighbor_counts(neighbor_counts, retained_neighbors)
 
         if effective_mode == "auto" and memory_limit_mb is not None and i % 2000 == 0:
             rss_mb = _read_process_rss_mb()
@@ -129,6 +141,8 @@ def fit_cf_neighbors(
                 next_cap = max(min_cap, int(current_cap * 0.8))
                 if next_cap < current_cap:
                     current_cap = next_cap
+                    retained_neighbors = max(max_neighbors, int(retained_neighbors * 0.85))
+                    _prune_neighbor_counts(neighbor_counts, retained_neighbors)
                     logger.event(
                         "STAGE1_CF_ADAPT",
                         done=i,
@@ -137,6 +151,7 @@ def fit_cf_neighbors(
                         memory_limit_mb=memory_limit_mb,
                         memory_ratio=round(ratio, 4),
                         new_cap=current_cap,
+                        retained_neighbors=retained_neighbors,
                     )
 
         if i % max(1, users_total // 20) == 0 or i == users_total:
@@ -151,22 +166,31 @@ def fit_cf_neighbors(
                 rss_mb=rss_mb,
                 memory_limit_mb=memory_limit_mb,
                 memory_ratio=(None if ratio is None else round(ratio, 4)),
+                retained_neighbors=retained_neighbors,
             )
 
-    neighbors: dict[Any, list[tuple[Any, float]]] = defaultdict(list)
-    for (a, b), co in pair_counts.items():
-        denom = math.sqrt(float(item_counts[a]) * float(item_counts[b]))
-        if denom <= 0:
-            continue
-        score = float(co / denom)
-        neighbors[a].append((b, score))
-        neighbors[b].append((a, score))
+    _prune_neighbor_counts(neighbor_counts, retained_neighbors)
 
     out: dict[Any, list[tuple[Any, float]]] = {}
-    for item_id, vals in neighbors.items():
+    for item_id, counts in neighbor_counts.items():
+        vals: list[tuple[Any, float]] = []
+        for other_id, co in counts.items():
+            denom = math.sqrt(float(item_counts[item_id]) * float(item_counts[other_id]))
+            if denom <= 0:
+                continue
+            vals.append((other_id, float(co / denom)))
         vals.sort(key=lambda x: x[1], reverse=True)
         out[item_id] = vals[:max_neighbors]
     return out
+
+
+def _prune_neighbor_counts(neighbor_counts: dict[Any, Counter[Any]], retained_neighbors: int) -> None:
+    if retained_neighbors <= 0:
+        return
+    for item_id, counts in list(neighbor_counts.items()):
+        if len(counts) <= retained_neighbors:
+            continue
+        neighbor_counts[item_id] = Counter(dict(counts.most_common(retained_neighbors)))
 
 
 def _resolve_initial_cap(mode: str, fixed_cap: int, memory_limit_mb: int | None) -> int:

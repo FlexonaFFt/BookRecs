@@ -12,11 +12,11 @@ class ContentCandidateSource(CandidateSourcePort):
         self,
         similar_items: dict[Any, list[tuple[Any, float]]],
         popularity_scores: dict[Any, float] | None = None,
-        second_hop_decay: float = 0.35,
-        second_hop_limit_factor: int = 3,
-        novelty_boost: float = 0.35,
-        cold_quota_ratio: float = 0.35,
-        cold_popularity_threshold: float = 0.02,
+        second_hop_decay: float = 0.5,
+        second_hop_limit_factor: int = 4,
+        novelty_boost: float = 0.9,
+        cold_quota_ratio: float = 0.55,
+        cold_popularity_threshold: float = 0.08,
     ) -> None:
         self._similar_items = similar_items
         self._popularity_scores = popularity_scores or {}
@@ -59,7 +59,7 @@ class ContentCandidateSource(CandidateSourcePort):
             adjusted_score = float(score) * (1.0 + self._novelty_boost * (1.0 - pop_score))
             adjusted_rows.append((item_id, adjusted_score, pop_score))
 
-        adjusted_rows.sort(key=lambda x: x[1], reverse=True)
+        adjusted_rows.sort(key=lambda x: (x[1], -x[2]), reverse=True)
         ranked = self._apply_cold_quota(adjusted_rows, limit=limit)
         out: list[Candidate] = []
         for rank, (item_id, score) in enumerate(ranked, start=1):

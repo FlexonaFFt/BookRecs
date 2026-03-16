@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from source.application.use_cases.training import TrainPipelineCommand, TrainPipelineUseCase
 from source.infrastructure.config import load_pipeline_settings
 
@@ -33,6 +36,28 @@ def run_train_from_env() -> None:
     print(f"[train] completed run_id={train_result.run_id}")
     print(f"[train] run_dir={train_result.run_dir}")
     print(f"[train] metrics_path={train_result.metrics_path}")
+    try:
+        metrics = json.loads(Path(train_result.metrics_path).read_text(encoding="utf-8"))
+    except Exception:
+        metrics = {}
+    if metrics:
+        keys = [
+            f"ndcg@{settings.final_top_k}",
+            f"recall@{settings.final_top_k}",
+            f"cold_ndcg@{settings.final_top_k}",
+            f"cold_recall@{settings.final_top_k}",
+            f"candidate_recall@{settings.candidate_pool_size}",
+            f"prerank_recall@{settings.pre_top_m}",
+            f"cold_candidate_recall@{settings.candidate_pool_size}",
+            f"cold_prerank_recall@{settings.pre_top_m}",
+        ]
+        summary = " ".join(
+            f"{key}={float(metrics[key]):.4f}"
+            for key in keys
+            if key in metrics
+        )
+        if summary:
+            print(f"[train] metrics {summary}")
 
 
 def main() -> None:

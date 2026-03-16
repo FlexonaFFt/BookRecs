@@ -18,8 +18,9 @@ class ColdCandidateSource(CandidateSourcePort):
         series_index: dict[str, list[Any]],
         tag_index: dict[str, list[Any]],
         popularity_scores: dict[Any, float] | None = None,
-        max_items_per_token: int = 400,
-        novelty_boost: float = 1.2,
+        max_items_per_token: int = 800,
+        novelty_boost: float = 2.0,
+        rare_item_boost: float = 1.4,
     ) -> None:
         self._item_metadata = item_metadata
         self._author_index = author_index
@@ -28,6 +29,7 @@ class ColdCandidateSource(CandidateSourcePort):
         self._popularity_scores = popularity_scores or {}
         self._max_items_per_token = max(1, int(max_items_per_token))
         self._novelty_boost = max(0.0, float(novelty_boost))
+        self._rare_item_boost = max(0.0, float(rare_item_boost))
 
     @property
     def name(self) -> str:
@@ -51,17 +53,19 @@ class ColdCandidateSource(CandidateSourcePort):
         score_map: dict[Any, float] = defaultdict(float)
         overlap_map: dict[Any, float] = defaultdict(float)
 
-        self._collect(score_map, overlap_map, author_tokens, self._author_index, seen_items, base_weight=4.0)
-        self._collect(score_map, overlap_map, series_tokens, self._series_index, seen_items, base_weight=3.5)
-        self._collect(score_map, overlap_map, tag_tokens, self._tag_index, seen_items, base_weight=1.2)
+        self._collect(score_map, overlap_map, author_tokens, self._author_index, seen_items, base_weight=4.4)
+        self._collect(score_map, overlap_map, series_tokens, self._series_index, seen_items, base_weight=4.0)
+        self._collect(score_map, overlap_map, tag_tokens, self._tag_index, seen_items, base_weight=1.5)
 
         ranked_rows: list[tuple[Any, float, float, float]] = []
         for item_id, raw_score in score_map.items():
             pop = self._popularity(item_id)
             novelty = 1.0 + self._novelty_boost * (1.0 - pop)
+            if pop <= 0.08:
+                novelty *= 1.0 + self._rare_item_boost * (0.08 - pop) / 0.08
             score = float(raw_score) * novelty
             ranked_rows.append((item_id, score, overlap_map.get(item_id, 0.0), pop))
-        ranked_rows.sort(key=lambda row: row[1], reverse=True)
+        ranked_rows.sort(key=lambda row: (row[1], row[2], -row[3]), reverse=True)
 
         out: list[Candidate] = []
         for rank, (item_id, score, overlap, pop) in enumerate(ranked_rows[:limit], start=1):
@@ -94,10 +98,12 @@ class ColdCandidateSource(CandidateSourcePort):
         for token, freq in tokens.items():
             if not token:
                 continue
-            for item_id in index.get(str(token), [])[: self._max_items_per_token]:
+            token_items = [item_id for item_id in index.get(str(token), []) if item_id not in seen_items]
+            token_items.sort(key=lambda item_id: self._popularity(item_id))
+            for item_id in token_items[: self._max_items_per_token]:
                 if item_id in seen_items:
                     continue
-                increment = base_weight * min(3.0, float(freq))
+                increment = base_weight * min(3.0, float(freq)) * (1.0 + 0.75 * (1.0 - self._popularity(item_id)))
                 score_map[item_id] += increment
                 overlap_map[item_id] += 1.0
 

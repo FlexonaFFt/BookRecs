@@ -1,4 +1,4 @@
-.PHONY: help init-env infra-up pipeline-up api-up demo-seed batch-emulate promote-run train-prepared train-lite-prepared train-auto lint lint-backend lint-frontend test up down down-volumes logs ps restart-pipeline restart-api
+.PHONY: help init-env infra-up pipeline-up api-up demo-seed batch-emulate promote-run train-prepared train-lite-prepared train-auto metrics-latest metrics-run lint lint-backend lint-frontend test up down down-volumes logs ps restart-pipeline restart-api
 
 SERVICE ?= pipeline
 DAYS ?= 5
@@ -18,6 +18,8 @@ help:
 	@echo "  make train-prepared   # обучить модель на уже подготовленном датасете (BOOKRECS_TRAIN_DATASET_DIR=...)"
 	@echo "  make train-lite-prepared # облегченный train для слабой машины / MacBook"
 	@echo "  make train-auto       # обучить модель с авто-подбором профиля по памяти контейнера"
+	@echo "  make metrics-latest   # вывести метрики последнего training run"
+	@echo "  make metrics-run RUN_NAME=<run_id> # вывести метрики конкретного run"
 	@echo "  make lint             # запустить backend и frontend линтеры"
 	@echo "  make lint-backend     # запустить ruff для backend-кода"
 	@echo "  make lint-frontend    # запустить eslint для frontend-кода"
@@ -97,6 +99,14 @@ train-auto: init-env
 			-e BOOKRECS_TRAIN_PROFILE=auto \
 			-e BOOKRECS_TRAIN_AUTO_TUNE=true \
 			pipeline python -m source.interfaces.train_entrypoint
+
+metrics-latest: init-env
+	docker compose run --build --rm pipeline python -m source.interfaces.report_metrics_entrypoint
+
+metrics-run: init-env
+	docker compose run --build --rm \
+		-e BOOKRECS_REPORT_RUN_ID=$(RUN_NAME) \
+		pipeline python -m source.interfaces.report_metrics_entrypoint
 
 lint: lint-backend lint-frontend
 
