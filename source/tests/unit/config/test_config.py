@@ -21,6 +21,7 @@ def test_load_settings_reads_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
         "BOOKRECS_TRAIN_DATASET_DIR",
         "BOOKRECS_TRAIN_OUTPUT_ROOT",
         "BOOKRECS_TRAIN_EVAL_USERS_LIMIT",
+        "BOOKRECS_COLD_MAX_INTERACTIONS",
         "BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE",
         "BOOKRECS_TRAIN_PER_SOURCE_LIMIT",
         "BOOKRECS_TRAIN_PRE_TOP_M",
@@ -36,6 +37,7 @@ def test_load_settings_reads_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.train_dataset_dir == "artifacts/tmp_preprocessed/goodreads_ya"
     assert settings.train_output_root == "artifacts/runs"
     assert settings.train_eval_users_limit == 2000
+    assert settings.cold_max_interactions == 5
     assert settings.train_candidate_pool_size == 1000
     assert settings.train_final_top_k == 10
 
@@ -46,6 +48,7 @@ def test_load_settings_reads_custom_values(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("BOOKRECS_S3_REGION", "eu-west-1")
     monkeypatch.setenv("BOOKRECS_S3_ENDPOINT", "http://minio:9000")
     monkeypatch.setenv("BOOKRECS_TRAIN_EVAL_USERS_LIMIT", "99")
+    monkeypatch.setenv("BOOKRECS_COLD_MAX_INTERACTIONS", "7")
     monkeypatch.setenv("BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE", "777")
     monkeypatch.setenv("BOOKRECS_TRAIN_PER_SOURCE_LIMIT", "111")
     monkeypatch.setenv("BOOKRECS_TRAIN_PRE_TOP_M", "222")
@@ -60,6 +63,7 @@ def test_load_settings_reads_custom_values(monkeypatch: pytest.MonkeyPatch) -> N
     assert settings.s3_region == "eu-west-1"
     assert settings.s3_endpoint == "http://minio:9000"
     assert settings.train_eval_users_limit == 99
+    assert settings.cold_max_interactions == 7
     assert settings.train_candidate_pool_size == 777
     assert settings.train_candidate_per_source_limit == 111
     assert settings.train_pre_top_m == 222
@@ -73,6 +77,7 @@ def test_load_settings_reads_custom_values(monkeypatch: pytest.MonkeyPatch) -> N
     "key,value",
     [
         ("BOOKRECS_TRAIN_EVAL_USERS_LIMIT", "0"),
+        ("BOOKRECS_COLD_MAX_INTERACTIONS", "-1"),
         ("BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE", "-1"),
         ("BOOKRECS_TRAIN_PER_SOURCE_LIMIT", "abc"),
     ],
@@ -96,6 +101,7 @@ def test_env_settings_io_read_and_write() -> None:
         "BOOKRECS_TRAIN_DATASET_DIR": "artifacts/tmp_preprocessed/goodreads_ya",
         "BOOKRECS_TRAIN_OUTPUT_ROOT": "artifacts/runs",
         "BOOKRECS_TRAIN_EVAL_USERS_LIMIT": "123",
+        "BOOKRECS_COLD_MAX_INTERACTIONS": "5",
         "BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE": "1000",
         "BOOKRECS_TRAIN_PER_SOURCE_LIMIT": "300",
         "BOOKRECS_TRAIN_PRE_TOP_M": "300",
@@ -116,6 +122,7 @@ def test_env_settings_io_read_and_write() -> None:
         train_dataset_dir=settings.train_dataset_dir,
         train_output_root=settings.train_output_root,
         train_eval_users_limit=777,
+        cold_max_interactions=settings.cold_max_interactions,
         train_candidate_pool_size=settings.train_candidate_pool_size,
         train_candidate_per_source_limit=settings.train_candidate_per_source_limit,
         train_pre_top_m=settings.train_pre_top_m,
@@ -126,6 +133,7 @@ def test_env_settings_io_read_and_write() -> None:
     )
     io.write(updated)
     assert env["BOOKRECS_TRAIN_EVAL_USERS_LIMIT"] == "777"
+    assert env["BOOKRECS_COLD_MAX_INTERACTIONS"] == "5"
 
 
 def test_api_runtime_settings_reads_defaults() -> None:
@@ -144,3 +152,8 @@ def test_api_server_settings_raises_for_invalid_port() -> None:
 def test_pipeline_settings_validates_cf_mode() -> None:
     with pytest.raises(ValueError):
         PipelineSettings.from_mapping({"BOOKRECS_TRAIN_CF_MODE": "bad"})
+
+
+def test_pipeline_settings_reads_cold_threshold() -> None:
+    settings = PipelineSettings.from_mapping({"BOOKRECS_COLD_MAX_INTERACTIONS": "9"})
+    assert settings.cold_max_interactions == 9

@@ -142,6 +142,7 @@ class PrepareDataUseCase:
                 "keep_recent_fraction": cmd.params.keep_recent_fraction,
                 "test_fraction": cmd.params.test_fraction,
                 "local_val_fraction": cmd.params.local_val_fraction,
+                "cold_max_interactions": cmd.params.cold_max_interactions,
                 "warm_users_only": cmd.params.warm_users_only,
                 "language_filter_enabled": cmd.params.language_filter_enabled,
                 "interactions_chunksize": cmd.params.interactions_chunksize,

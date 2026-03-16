@@ -167,6 +167,10 @@ class InferenceService:
         )
 
     def _build_cold_item_ids(self) -> set[Any]:
+        stage1_cold = self._bundle.stage1.get("cold_item_ids")
+        if stage1_cold is not None:
+            return set(stage1_cold)
+
         warm = set(self._pop_scores.keys())
         all_items: set[Any] = set()
         all_items.update(self._pop_items)

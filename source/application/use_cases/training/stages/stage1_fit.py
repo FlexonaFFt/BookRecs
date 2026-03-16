@@ -6,6 +6,8 @@ import os
 from collections import Counter, defaultdict
 from typing import Any
 
+from source.application.use_cases.training.common.data_ops import build_item_interaction_counts
+
 
 def fit_stage1(data: dict[str, Any], cmd: Any, logger: Any) -> dict[str, Any]:
     train = data["local_train"]
@@ -36,6 +38,13 @@ def fit_stage1(data: dict[str, Any], cmd: Any, logger: Any) -> dict[str, Any]:
         logger=logger,
     )
     logger.progress("stage1_fit", done=4, total=4)
+    item_interaction_counts = build_item_interaction_counts(train)
+    catalog_item_ids = set(books["item_id"].dropna().tolist())
+    cold_item_ids = {
+        item_id
+        for item_id in catalog_item_ids
+        if int(item_interaction_counts.get(item_id, 0)) <= int(getattr(cmd, "cold_max_interactions", 0))
+    }
     logger.end_step(
         "stage1_fit",
         status="SUCCESS",
@@ -43,12 +52,16 @@ def fit_stage1(data: dict[str, Any], cmd: Any, logger: Any) -> dict[str, Any]:
         cf_items=len(cf_neighbors),
         content_items=len(content_similar),
         metadata_items=len(metadata_retrieval["item_metadata"]),
+        cold_items=len(cold_item_ids),
     )
     return {
         "pop_items": pop_items,
         "pop_scores": pop_scores,
         "cf_neighbors": cf_neighbors,
         "content_similar": content_similar,
+        "item_interaction_counts": item_interaction_counts,
+        "cold_item_ids": cold_item_ids,
+        "cold_max_interactions": int(getattr(cmd, "cold_max_interactions", 0)),
         "item_metadata": metadata_retrieval["item_metadata"],
         "author_index": metadata_retrieval["author_index"],
         "series_index": metadata_retrieval["series_index"],

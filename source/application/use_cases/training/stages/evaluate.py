@@ -28,7 +28,11 @@ def evaluate_pipeline(
     logger.start_step("evaluate", total=1)
     val_users, gt_map = build_val_ground_truth(data["local_val"], limit=cmd.eval_users_limit)
     seen_by_user = build_seen_map(data["local_train"])
-    cold = cold_items(data["local_train"], data["local_val"])
+    cold = cold_items(
+        data["local_train"],
+        data["local_val"],
+        max_train_interactions=cmd.cold_max_interactions,
+    )
 
     stage1_uc = GenerateCandidatesUseCase(
         sources=[

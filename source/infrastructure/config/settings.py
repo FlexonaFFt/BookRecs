@@ -15,6 +15,7 @@ class Settings:
     train_dataset_dir: str
     train_output_root: str
     train_eval_users_limit: int
+    cold_max_interactions: int
     train_candidate_pool_size: int
     train_candidate_per_source_limit: int
     train_pre_top_m: int
@@ -41,6 +42,7 @@ class Settings:
             train_dataset_dir=_get("BOOKRECS_TRAIN_DATASET_DIR", "artifacts/tmp_preprocessed/goodreads_ya"),
             train_output_root=_get("BOOKRECS_TRAIN_OUTPUT_ROOT", "artifacts/runs"),
             train_eval_users_limit=_parse_positive_int("BOOKRECS_TRAIN_EVAL_USERS_LIMIT", _get, 2000),
+            cold_max_interactions=_parse_non_negative_int("BOOKRECS_COLD_MAX_INTERACTIONS", _get, 5),
             train_candidate_pool_size=_parse_positive_int("BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE", _get, 1000),
             train_candidate_per_source_limit=_parse_positive_int("BOOKRECS_TRAIN_PER_SOURCE_LIMIT", _get, 300),
             train_pre_top_m=_parse_positive_int("BOOKRECS_TRAIN_PRE_TOP_M", _get, 300),
@@ -59,6 +61,7 @@ class Settings:
             "BOOKRECS_TRAIN_DATASET_DIR": self.train_dataset_dir,
             "BOOKRECS_TRAIN_OUTPUT_ROOT": self.train_output_root,
             "BOOKRECS_TRAIN_EVAL_USERS_LIMIT": str(self.train_eval_users_limit),
+            "BOOKRECS_COLD_MAX_INTERACTIONS": str(self.cold_max_interactions),
             "BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE": str(self.train_candidate_pool_size),
             "BOOKRECS_TRAIN_PER_SOURCE_LIMIT": str(self.train_candidate_per_source_limit),
             "BOOKRECS_TRAIN_PRE_TOP_M": str(self.train_pre_top_m),
@@ -80,6 +83,7 @@ class PipelineSettings:
     keep_recent_fraction: float
     test_fraction: float
     local_val_fraction: float
+    cold_max_interactions: int
     warm_users_only: bool
     language_filter_enabled: bool
     interactions_chunksize: int
@@ -129,6 +133,11 @@ class PipelineSettings:
             keep_recent_fraction=env_float(values, "BOOKRECS_KEEP_RECENT_FRACTION", 0.6),
             test_fraction=env_float(values, "BOOKRECS_TEST_FRACTION", 0.25),
             local_val_fraction=env_float(values, "BOOKRECS_LOCAL_VAL_FRACTION", 0.2),
+            cold_max_interactions=env_non_negative_int(
+                values,
+                "BOOKRECS_COLD_MAX_INTERACTIONS",
+                core.cold_max_interactions,
+            ),
             warm_users_only=env_bool(values, "BOOKRECS_WARM_USERS_ONLY", True),
             language_filter_enabled=env_bool(values, "BOOKRECS_LANGUAGE_FILTER_ENABLED", True),
             interactions_chunksize=env_positive_int(values, "BOOKRECS_INTERACTIONS_CHUNKSIZE", 200_000),
@@ -302,6 +311,24 @@ def env_positive_int(values: Mapping[str, str], name: str, default: int) -> int:
     if value <= 0:
         raise ValueError(f"{name} must be > 0, got {value}")
     return value
+
+
+def env_non_negative_int(values: Mapping[str, str], name: str, default: int) -> int:
+    value = env_int(values, name, default)
+    if value < 0:
+        raise ValueError(f"{name} must be >= 0, got {value}")
+    return value
+
+
+def _parse_non_negative_int(name: str, getter: Callable[[str, str], str], default: int) -> int:
+    value = getter(name, str(default))
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be >= 0, got {value}") from exc
+    if parsed < 0:
+        raise ValueError(f"{name} must be >= 0, got {parsed}")
+    return parsed
 
 
 def env_float(values: Mapping[str, str], name: str, default: float) -> float:

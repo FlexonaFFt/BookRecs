@@ -65,6 +65,7 @@ make pipeline-up
 ```bash
 BOOKRECS_TRAIN_DATASET_DIR=/absolute/path/to/goodreads_ya \
 BOOKRECS_TRAIN_RUN_NAME=catboost_policy_v1 \
+BOOKRECS_COLD_MAX_INTERACTIONS=5 \
 make train-prepared
 ```
 
@@ -74,6 +75,7 @@ make train-prepared
 ```bash
 BOOKRECS_TRAIN_DATASET_DIR=/absolute/path/to/goodreads_ya \
 BOOKRECS_TRAIN_RUN_NAME=catboost_policy_v1 \
+BOOKRECS_COLD_MAX_INTERACTIONS=5 \
 BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE=1200 \
 BOOKRECS_TRAIN_PER_SOURCE_LIMIT=350 \
 BOOKRECS_TRAIN_PRE_TOP_M=300 \

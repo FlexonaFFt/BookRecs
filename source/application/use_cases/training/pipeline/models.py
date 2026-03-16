@@ -10,6 +10,7 @@ class TrainPipelineCommand:
     output_root: str = "artifacts/runs"
     run_name: str | None = None
     eval_users_limit: int = 2000
+    cold_max_interactions: int = 5
     candidate_pool_size: int = 1000
     candidate_per_source_limit: int = 300
     pre_top_m: int = 300

@@ -13,6 +13,7 @@ def run_train_from_env() -> None:
             output_root=settings.output_root,
             run_name=settings.run_name,
             eval_users_limit=settings.eval_users_limit,
+            cold_max_interactions=settings.cold_max_interactions,
             candidate_pool_size=settings.candidate_pool_size,
             candidate_per_source_limit=settings.candidate_per_source_limit,
             pre_top_m=settings.pre_top_m,

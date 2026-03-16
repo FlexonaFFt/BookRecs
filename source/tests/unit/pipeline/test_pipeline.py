@@ -5,6 +5,7 @@ import os
 import pytest
 
 from source.infrastructure.config import env_bool, env_float, env_int, env_optional_str, env_str
+from source.infrastructure.config import env_non_negative_int
 
 
 def test_env_str_returns_default_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -55,6 +56,15 @@ def test_env_float_raises_for_invalid_value(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setenv("X_FLOAT", "oops")
     with pytest.raises(ValueError):
         env_float(os.environ, "X_FLOAT", 0.1)
+
+
+def test_env_non_negative_int_accepts_zero_and_rejects_negative(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("X_NN_INT", "0")
+    assert env_non_negative_int(os.environ, "X_NN_INT", 5) == 0
+
+    monkeypatch.setenv("X_NN_INT", "-1")
+    with pytest.raises(ValueError):
+        env_non_negative_int(os.environ, "X_NN_INT", 5)
 
 
 @pytest.mark.parametrize("value", ["1", "true", "yes", "y", "on", "TRUE"])
