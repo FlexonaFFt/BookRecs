@@ -95,6 +95,141 @@ services:
     volumes:
       - ./frontend:/app/frontend
 
+  airflow-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${AIRFLOW_POSTGRES_USER:-airflow}
+      POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD:-airflow}
+      POSTGRES_DB: ${AIRFLOW_POSTGRES_DB:-airflow}
+    volumes:
+      - airflow_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${AIRFLOW_POSTGRES_USER:-airflow} -d ${AIRFLOW_POSTGRES_DB:-airflow}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  airflow-init:
+    build:
+      context: .
+      dockerfile: source/interfaces/airflow/Dockerfile
+    restart: "no"
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+    environment: &airflow-env
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      AIRFLOW__CORE__FERNET_KEY: "bookrecs-airflow-fernet-key-2026"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER:-airflow}:${AIRFLOW_POSTGRES_PASSWORD:-airflow}@airflow-postgres:5432/${AIRFLOW_POSTGRES_DB:-airflow}
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.session
+      BOOKRECS_BATCH_IMAGE: ${BOOKRECS_BATCH_IMAGE:-bookrecs-pipeline:latest}
+      BOOKRECS_DOCKER_NETWORK: ${BOOKRECS_DOCKER_NETWORK:-bookrecs_net}
+      BOOKRECS_HOST_PROJECT_DIR: ${PWD}
+      DOCKER_HOST: unix://var/run/docker.sock
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      BOOKRECS_PG_DSN: ${BOOKRECS_PG_DSN}
+      BOOKRECS_PG_MIGRATION_PATH: ${BOOKRECS_PG_MIGRATION_PATH}
+      BOOKRECS_STORE_BACKEND: ${BOOKRECS_STORE_BACKEND}
+      BOOKRECS_REGISTRY_BACKEND: ${BOOKRECS_REGISTRY_BACKEND}
+      BOOKRECS_S3_PREFIX: ${BOOKRECS_S3_PREFIX}
+      BOOKRECS_S3_BUCKET: ${BOOKRECS_S3_BUCKET}
+      BOOKRECS_S3_REGION: ${BOOKRECS_S3_REGION}
+      BOOKRECS_S3_ENDPOINT: ${BOOKRECS_S3_ENDPOINT}
+      BOOKRECS_ACTIVE_MODEL_POINTER: ${BOOKRECS_ACTIVE_MODEL_POINTER:-artifacts/runs/active_model.json}
+      BOOKRECS_PROMOTION_REQUIRE_SUCCESS: ${BOOKRECS_PROMOTION_REQUIRE_SUCCESS:-true}
+      BOOKRECS_PROMOTION_MIN_NDCG10: ${BOOKRECS_PROMOTION_MIN_NDCG10:-}
+      BOOKRECS_PROMOTION_MIN_RECALL10: ${BOOKRECS_PROMOTION_MIN_RECALL10:-}
+      BOOKRECS_PROMOTION_MIN_COLD_NDCG10: ${BOOKRECS_PROMOTION_MIN_COLD_NDCG10:-}
+      BOOKRECS_PROMOTION_MIN_COLD_RECALL10: ${BOOKRECS_PROMOTION_MIN_COLD_RECALL10:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USERNAME:-admin}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
+    command: >
+      bash -lc "
+      airflow db migrate &&
+      airflow users create
+      --username \"$${_AIRFLOW_WWW_USER_USERNAME}\"
+      --password \"$${_AIRFLOW_WWW_USER_PASSWORD}\"
+      --firstname Book
+      --lastname Recs
+      --role Admin
+      --email admin@example.com || true
+      "
+    volumes:
+      - ./source/interfaces/airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  airflow-webserver:
+    build:
+      context: .
+      dockerfile: source/interfaces/airflow/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    environment: *airflow-env
+    command: webserver
+    ports:
+      - "${AIRFLOW_WEBSERVER_PORT:-8080}:8080"
+    volumes:
+      - ./source/interfaces/airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  airflow-scheduler:
+    build:
+      context: .
+      dockerfile: source/interfaces/airflow/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    environment: *airflow-env
+    command: scheduler
+    volumes:
+      - ./source/interfaces/airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  airflow-triggerer:
+    build:
+      context: .
+      dockerfile: source/interfaces/airflow/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    environment: *airflow-env
+    command: triggerer
+    volumes:
+      - ./source/interfaces/airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+
 volumes:
   pg_data:
   minio_data:
+  airflow_pg_data:
+  airflow_logs:
+
+networks:
+  default:
+    name: ${BOOKRECS_DOCKER_NETWORK:-bookrecs_net}

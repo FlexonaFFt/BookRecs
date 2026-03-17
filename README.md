@@ -153,12 +153,36 @@ uv run python -m source.interfaces.batch_backfill_entrypoint
 <details>
 <summary><h2>Airflow Batch DAG</h2></summary>
 
-В проект добавлен DAG `bookrecs_daily_batch` (файл `source/interfaces/airflow/dags/bookrecs_batch_dag.py`) с `DockerOperator` и `catchup=True`.
-Он включает два шага:
-1. `run_batch_pipeline`
-2. `promote_model`
+В проект добавлены два Airflow DAG:
+- `bookrecs_daily_batch`:
+  1. `run_batch_pipeline`
+  2. `promote_model`
+- `bookrecs_backfill`:
+  1. `run_backfill`
 
-Пример backfill в Airflow за 5 дней:
+Локальный запуск Airflow UI:
+```bash
+docker compose up --build -d airflow-postgres airflow-init airflow-webserver airflow-scheduler airflow-triggerer
+```
+
+UI будет доступен на:
+```text
+http://localhost:8080
+```
+
+Логин/пароль по умолчанию:
+```text
+admin / admin
+```
+
+Проверка, что DAG'и подхватились:
+```bash
+docker compose exec airflow-webserver airflow dags list
+docker compose exec airflow-webserver airflow tasks list bookrecs_daily_batch
+docker compose exec airflow-webserver airflow tasks list bookrecs_backfill
+```
+
+Пример ручного backfill через CLI:
 ```bash
 airflow dags backfill bookrecs_daily_batch -s 2026-03-06 -e 2026-03-10
 ```
