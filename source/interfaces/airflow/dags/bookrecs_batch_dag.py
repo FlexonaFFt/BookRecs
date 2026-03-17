@@ -5,7 +5,7 @@ from datetime import datetime
 from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
 
-from _common import DEFAULT_ARGS, default_docker_args, docker_env, env_if_set
+from dag_common import DEFAULT_ARGS, default_docker_args, docker_env, env_if_set
 
 with DAG(
     dag_id="bookrecs_daily_batch",
