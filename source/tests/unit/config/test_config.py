@@ -39,6 +39,13 @@ def test_load_settings_reads_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in keys:
         monkeypatch.delenv(key, raising=False)
 
+    monkeypatch.setattr(
+        "source.infrastructure.config.settings._read_memory_limit_mb", lambda: None
+    )
+    monkeypatch.setattr(
+        "source.infrastructure.config.settings._read_meminfo_total_mb", lambda: None
+    )
+
     settings = load_settings()
     assert settings.train_dataset_dir == "artifacts/tmp_preprocessed/goodreads_ya"
     assert settings.train_output_root == "artifacts/runs"
