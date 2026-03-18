@@ -67,6 +67,7 @@ class GoodreadsPreprocessor(PreprocessorPort):
             train=train,
             val_fraction=params.local_val_fraction,
             warm_users_only=params.warm_users_only,
+            cold_max_interactions=params.cold_max_interactions,
         )
         local_train = self._add_interaction_weight(local_train)
         print(
@@ -97,6 +98,11 @@ class GoodreadsPreprocessor(PreprocessorPort):
         local_val_warm.to_parquet(local_val_warm_path, index=False)
         local_val_cold.to_parquet(local_val_cold_path, index=False)
 
+        train_item_counts = train.groupby("item_id").size().to_dict()
+        cold_test_items = {
+            item_id for item_id in set(test["item_id"].tolist()) if int(train_item_counts.get(item_id, 0)) <= params.cold_max_interactions
+        }
+
         summary = {
             "dataset_name": source.dataset_name,
             "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -116,7 +122,7 @@ class GoodreadsPreprocessor(PreprocessorPort):
                 "test_users": int(test["user_id"].nunique()),
                 "train_items": int(train["item_id"].nunique()),
                 "test_items": int(test["item_id"].nunique()),
-                "cold_test_items": int(len(set(test["item_id"].tolist()) - set(train["item_id"].tolist()))),
+                "cold_test_items": int(len(cold_test_items)),
             },
         }
         summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -341,7 +347,8 @@ class GoodreadsPreprocessor(PreprocessorPort):
 
     @staticmethod
     def _build_local_split(train: pd.DataFrame, val_fraction: float,
-        warm_users_only: bool) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, Any]:
+        warm_users_only: bool,
+        cold_max_interactions: int) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, Any]:
 
         if "date_added" not in train.columns:
             raise ValueError("Train must contain date_added for local split")
@@ -356,10 +363,12 @@ class GoodreadsPreprocessor(PreprocessorPort):
             users = set(local_train["user_id"].tolist())
             local_val = local_val[local_val["user_id"].isin(users)].copy()
 
-        train_items = set(local_train["item_id"].tolist())
         val_items = set(local_val["item_id"].tolist())
-        warm_items = val_items & train_items
-        cold_items = val_items - train_items
+        train_item_counts = local_train.groupby("item_id").size().to_dict()
+        cold_items = {
+            item_id for item_id in val_items if int(train_item_counts.get(item_id, 0)) <= int(cold_max_interactions)
+        }
+        warm_items = val_items - cold_items
 
         local_val_warm = local_val[local_val["item_id"].isin(warm_items)].copy().reset_index(drop=True)
         local_val_cold = local_val[local_val["item_id"].isin(cold_items)].copy().reset_index(drop=True)

@@ -52,17 +52,34 @@ def _validate_thresholds(manifest: dict[str, Any]) -> None:
     if not isinstance(metrics, dict):
         metrics = {}
     thresholds = {
-        "ndcg_at_k": _env_optional_float("BOOKRECS_PROMOTION_MIN_NDCG10"),
-        "recall_at_k": _env_optional_float("BOOKRECS_PROMOTION_MIN_RECALL10"),
-        "cold_ndcg_at_k": _env_optional_float("BOOKRECS_PROMOTION_MIN_COLD_NDCG10"),
-        "cold_recall_at_k": _env_optional_float("BOOKRECS_PROMOTION_MIN_COLD_RECALL10"),
+        "ndcg@10": {
+            "threshold": _env_optional_float("BOOKRECS_PROMOTION_MIN_NDCG10"),
+            "aliases": ("ndcg@10", "ndcg_at_k"),
+        },
+        "recall@10": {
+            "threshold": _env_optional_float("BOOKRECS_PROMOTION_MIN_RECALL10"),
+            "aliases": ("recall@10", "recall_at_k"),
+        },
+        "cold_ndcg@10": {
+            "threshold": _env_optional_float("BOOKRECS_PROMOTION_MIN_COLD_NDCG10"),
+            "aliases": ("cold_ndcg@10", "cold_ndcg_at_k"),
+        },
+        "cold_recall@10": {
+            "threshold": _env_optional_float("BOOKRECS_PROMOTION_MIN_COLD_RECALL10"),
+            "aliases": ("cold_recall@10", "cold_recall_at_k"),
+        },
     }
 
     failed: list[str] = []
-    for key, threshold in thresholds.items():
+    for key, spec in thresholds.items():
+        threshold = spec["threshold"]
         if threshold is None:
             continue
-        value = metrics.get(key)
+        value = None
+        for alias in spec["aliases"]:
+            if alias in metrics:
+                value = metrics.get(alias)
+                break
         if value is None:
             failed.append(f"{key}=MISSING < {threshold}")
             continue

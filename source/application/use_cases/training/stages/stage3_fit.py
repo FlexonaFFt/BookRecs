@@ -10,27 +10,36 @@ from source.application.use_cases.ranking.prerank_candidates import (
     PreRankCandidatesCommand,
     PreRankCandidatesUseCase,
 )
+from source.application.use_cases.ranking.source_limits import (
+    source_limits_for_stage1,
+    source_min_quota_for_stage1,
+)
 from source.application.use_cases.training.common.data_ops import build_seen_map, build_val_ground_truth, cold_items
 from source.infrastructure.ranking.candidates import (
+    ColdCandidateSource,
     CfCandidateSource,
     ContentCandidateSource,
     PopularCandidateSource,
 )
-from source.infrastructure.ranking.finalrank import LinearFinalReranker, LinearFinalRerankerConfig
+from source.infrastructure.ranking.finalrank import PolicyFinalReranker, PolicyFinalRerankerConfig
 
 
-# Обучает линейный финальный реранкер на валидационном срезе.
+# Обучает policy-based финальный реранкер на валидационном срезе.
 def fit_stage3(
     data: dict[str, Any],
     stage1: dict[str, Any],
     stage2_model: Any,
     cmd: Any,
     logger: Any,
-) -> LinearFinalReranker:
+) -> PolicyFinalReranker:
     logger.start_step("stage3_fit", total=1)
     val_users, gt_map = build_val_ground_truth(data["local_val"], limit=cmd.eval_users_limit)
     seen_by_user = build_seen_map(data["local_train"])
-    cold = cold_items(data["local_train"], data["local_val"])
+    cold = cold_items(
+        data["local_train"],
+        data["local_val"],
+        max_train_interactions=cmd.cold_max_interactions,
+    )
 
     stage1_uc = GenerateCandidatesUseCase(
         sources=[
@@ -38,6 +47,15 @@ def fit_stage3(
             ContentCandidateSource(
                 stage1["content_similar"],
                 popularity_scores=stage1["pop_scores"],
+                cold_item_ids=stage1.get("cold_item_ids"),
+            ),
+            ColdCandidateSource(
+                item_metadata=stage1["item_metadata"],
+                author_index=stage1["author_index"],
+                series_index=stage1["series_index"],
+                tag_index=stage1["tag_index"],
+                popularity_scores=stage1["pop_scores"],
+                cold_item_ids=stage1.get("cold_item_ids"),
             ),
             PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
         ],
@@ -62,9 +80,13 @@ def fit_stage3(
                 seen_items=seen,
                 pool_size=cmd.candidate_pool_size,
                 per_source_limit=cmd.candidate_per_source_limit,
-                source_limits=_source_limits_for_stage1(
+                source_limits=source_limits_for_stage1(
                     history_len=len(seen),
                     per_source_limit=cmd.candidate_per_source_limit,
+                ),
+                source_min_quota=source_min_quota_for_stage1(
+                    history_len=len(seen),
+                    pool_size=cmd.candidate_pool_size,
                 ),
             )
         )
@@ -107,11 +129,24 @@ def fit_stage3(
         score = 0.25 * (rate - global_rate) + 0.65 * (cold_rate - global_cold_rate)
         source_bias[source] = round(score, 6)
 
-    cfg = LinearFinalRerankerConfig(
+    if total_cold_rows > 0 and cmd.final_top_k >= 10:
+        target_cold_items = 2
+    elif total_cold_rows > 0 and cmd.final_top_k >= 5:
+        target_cold_items = 1
+    else:
+        target_cold_items = 0
+    cfg = PolicyFinalRerankerConfig(
         source_bias=source_bias,
-        source_repeat_penalty=0.03,
+        source_repeat_penalty=0.04,
+        cold_item_boost=0.08 if global_cold_rate > 0 else 0.0,
+        metadata_overlap_boost=0.05,
+        popularity_penalty=0.025,
+        target_cold_items=target_cold_items,
+        max_injected_cold_items=target_cold_items,
+        cold_injection_min_metadata_overlap=1.5,
+        cold_injection_max_score_gap=0.12,
     )
-    model = LinearFinalReranker(cfg=cfg)
+    model = PolicyFinalReranker(cfg=cfg)
     logger.progress("stage3_fit", done=1, total=1)
     logger.end_step(
         "stage3_fit",
@@ -119,26 +154,6 @@ def fit_stage3(
         global_rate=round(global_rate, 6),
         global_cold_rate=round(global_cold_rate, 6),
         source_bias=source_bias,
+        target_cold_items=target_cold_items,
     )
     return model
-
-
-def _source_limits_for_stage1(history_len: int, per_source_limit: int) -> dict[str, int]:
-    base = max(1, int(per_source_limit))
-    if history_len <= 1:
-        return {
-            "cf": max(20, int(base * 0.25)),
-            "content": int(base * 2.2),
-            "pop": int(base * 1.2),
-        }
-    if history_len <= 5:
-        return {
-            "cf": max(40, int(base * 0.7)),
-            "content": int(base * 1.8),
-            "pop": int(base * 1.1),
-        }
-    return {
-        "cf": base,
-        "content": int(base * 1.25),
-        "pop": base,
-    }

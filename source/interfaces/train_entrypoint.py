@@ -1,0 +1,68 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from source.application.use_cases.training import TrainPipelineCommand, TrainPipelineUseCase
+from source.infrastructure.config import load_pipeline_settings
+
+
+def run_train_from_env() -> None:
+    settings = load_pipeline_settings()
+    train_use_case = TrainPipelineUseCase()
+    train_result = train_use_case.execute(
+        TrainPipelineCommand(
+            dataset_dir=settings.dataset_dir,
+            output_root=settings.output_root,
+            run_name=settings.run_name,
+            train_profile=settings.train_profile,
+            eval_users_limit=settings.eval_users_limit,
+            cold_max_interactions=settings.cold_max_interactions,
+            candidate_pool_size=settings.candidate_pool_size,
+            candidate_per_source_limit=settings.candidate_per_source_limit,
+            pre_top_m=settings.pre_top_m,
+            final_top_k=settings.final_top_k,
+            cf_mode=settings.cf_mode,
+            cf_max_neighbors=settings.cf_max_neighbors,
+            cf_max_items_per_user=settings.cf_max_items_per_user,
+            content_max_neighbors=settings.content_max_neighbors,
+            prerank_model=settings.prerank_model,
+            catboost_iterations=settings.catboost_iterations,
+            catboost_depth=settings.catboost_depth,
+            catboost_learning_rate=settings.catboost_learning_rate,
+            seed=settings.seed,
+        )
+    )
+    print(f"[train] completed run_id={train_result.run_id}")
+    print(f"[train] run_dir={train_result.run_dir}")
+    print(f"[train] metrics_path={train_result.metrics_path}")
+    try:
+        metrics = json.loads(Path(train_result.metrics_path).read_text(encoding="utf-8"))
+    except Exception:
+        metrics = {}
+    if metrics:
+        keys = [
+            f"ndcg@{settings.final_top_k}",
+            f"recall@{settings.final_top_k}",
+            f"cold_ndcg@{settings.final_top_k}",
+            f"cold_recall@{settings.final_top_k}",
+            f"candidate_recall@{settings.candidate_pool_size}",
+            f"prerank_recall@{settings.pre_top_m}",
+            f"cold_candidate_recall@{settings.candidate_pool_size}",
+            f"cold_prerank_recall@{settings.pre_top_m}",
+        ]
+        summary = " ".join(
+            f"{key}={float(metrics[key]):.4f}"
+            for key in keys
+            if key in metrics
+        )
+        if summary:
+            print(f"[train] metrics {summary}")
+
+
+def main() -> None:
+    run_train_from_env()
+
+
+if __name__ == "__main__":
+    main()

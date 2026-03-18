@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export default function UserSwitcher({ users, selectedUserId, onChange }) {
   const [open, setOpen] = useState(false);

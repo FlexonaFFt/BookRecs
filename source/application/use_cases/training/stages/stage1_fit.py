@@ -6,42 +6,68 @@ import os
 from collections import Counter, defaultdict
 from typing import Any
 
+from source.application.use_cases.training.common.data_ops import build_item_interaction_counts
+
 
 def fit_stage1(data: dict[str, Any], cmd: Any, logger: Any) -> dict[str, Any]:
     train = data["local_train"]
     books = data["books"]
-    logger.start_step("stage1_fit", total=3)
+    logger.start_step("stage1_fit", total=4)
 
     pop_items, pop_scores = fit_popularity(train)
-    logger.progress("stage1_fit", done=1, total=3)
+    logger.progress("stage1_fit", done=1, total=4)
 
     cf_neighbors = fit_cf_neighbors(
         interactions=train,
         cf_mode=getattr(cmd, "cf_mode", "auto"),
         max_neighbors=cmd.cf_max_neighbors,
         max_items_per_user=getattr(cmd, "cf_max_items_per_user", 150),
+        batch_size=getattr(cmd, "cf_batch_size", 2000),
+        retained_neighbors_factor=getattr(cmd, "cf_retained_neighbors_factor", 4),
         logger=logger,
     )
-    logger.progress("stage1_fit", done=2, total=3)
+    logger.progress("stage1_fit", done=2, total=4)
 
     content_similar = fit_content_neighbors(
         books=books,
         max_neighbors=cmd.content_max_neighbors,
         logger=logger,
     )
-    logger.progress("stage1_fit", done=3, total=3)
+    logger.progress("stage1_fit", done=3, total=4)
+
+    metadata_retrieval = fit_metadata_retrieval(
+        books=books,
+        logger=logger,
+    )
+    logger.progress("stage1_fit", done=4, total=4)
+    item_interaction_counts = build_item_interaction_counts(train)
+    catalog_item_ids = set(books["item_id"].dropna().tolist())
+    cold_item_ids = {
+        item_id
+        for item_id in catalog_item_ids
+        if int(item_interaction_counts.get(item_id, 0)) <= int(getattr(cmd, "cold_max_interactions", 0))
+    }
     logger.end_step(
         "stage1_fit",
         status="SUCCESS",
         pop_items=len(pop_items),
         cf_items=len(cf_neighbors),
         content_items=len(content_similar),
+        metadata_items=len(metadata_retrieval["item_metadata"]),
+        cold_items=len(cold_item_ids),
     )
     return {
         "pop_items": pop_items,
         "pop_scores": pop_scores,
         "cf_neighbors": cf_neighbors,
         "content_similar": content_similar,
+        "item_interaction_counts": item_interaction_counts,
+        "cold_item_ids": cold_item_ids,
+        "cold_max_interactions": int(getattr(cmd, "cold_max_interactions", 0)),
+        "item_metadata": metadata_retrieval["item_metadata"],
+        "author_index": metadata_retrieval["author_index"],
+        "series_index": metadata_retrieval["series_index"],
+        "tag_index": metadata_retrieval["tag_index"],
     }
 
 
@@ -61,6 +87,8 @@ def fit_cf_neighbors(
     cf_mode: str,
     max_neighbors: int,
     max_items_per_user: int,
+    batch_size: int,
+    retained_neighbors_factor: int,
     logger: Any,
 ) -> dict[Any, list[tuple[Any, float]]]:
     user_items = (
@@ -69,7 +97,7 @@ def fit_cf_neighbors(
         .groupby("user_id", sort=False)["item_id"]
         .agg(list)
     )
-    pair_counts: Counter[tuple[Any, Any]] = Counter()
+    neighbor_counts: dict[Any, Counter[Any]] = defaultdict(Counter)
     item_counts: Counter[Any] = Counter()
     truncated_users = 0
     effective_mode = cf_mode if cf_mode in {"auto", "fixed"} else "auto"
@@ -80,6 +108,8 @@ def fit_cf_neighbors(
         memory_limit_mb=memory_limit_mb,
     )
     min_cap = 20
+    safe_batch_size = max(200, int(batch_size))
+    retained_neighbors = max(int(max_neighbors), int(max_neighbors) * max(1, int(retained_neighbors_factor)))
 
     users_total = len(user_items)
     logger.event(
@@ -87,6 +117,8 @@ def fit_cf_neighbors(
         mode=effective_mode,
         memory_limit_mb=memory_limit_mb,
         initial_cap=current_cap,
+        batch_size=safe_batch_size,
+        retained_neighbors=retained_neighbors,
     )
     for i, items in enumerate(user_items.tolist(), start=1):
         uniq = list(dict.fromkeys(items))
@@ -96,7 +128,11 @@ def fit_cf_neighbors(
             uniq = uniq[-current_cap:]
         item_counts.update(uniq)
         for a, b in itertools.combinations(sorted(uniq), 2):
-            pair_counts[(a, b)] += 1
+            neighbor_counts[a][b] += 1
+            neighbor_counts[b][a] += 1
+
+        if i % safe_batch_size == 0:
+            _prune_neighbor_counts(neighbor_counts, retained_neighbors)
 
         if effective_mode == "auto" and memory_limit_mb is not None and i % 2000 == 0:
             rss_mb = _read_process_rss_mb()
@@ -105,6 +141,8 @@ def fit_cf_neighbors(
                 next_cap = max(min_cap, int(current_cap * 0.8))
                 if next_cap < current_cap:
                     current_cap = next_cap
+                    retained_neighbors = max(max_neighbors, int(retained_neighbors * 0.85))
+                    _prune_neighbor_counts(neighbor_counts, retained_neighbors)
                     logger.event(
                         "STAGE1_CF_ADAPT",
                         done=i,
@@ -113,6 +151,7 @@ def fit_cf_neighbors(
                         memory_limit_mb=memory_limit_mb,
                         memory_ratio=round(ratio, 4),
                         new_cap=current_cap,
+                        retained_neighbors=retained_neighbors,
                     )
 
         if i % max(1, users_total // 20) == 0 or i == users_total:
@@ -127,22 +166,31 @@ def fit_cf_neighbors(
                 rss_mb=rss_mb,
                 memory_limit_mb=memory_limit_mb,
                 memory_ratio=(None if ratio is None else round(ratio, 4)),
+                retained_neighbors=retained_neighbors,
             )
 
-    neighbors: dict[Any, list[tuple[Any, float]]] = defaultdict(list)
-    for (a, b), co in pair_counts.items():
-        denom = math.sqrt(float(item_counts[a]) * float(item_counts[b]))
-        if denom <= 0:
-            continue
-        score = float(co / denom)
-        neighbors[a].append((b, score))
-        neighbors[b].append((a, score))
+    _prune_neighbor_counts(neighbor_counts, retained_neighbors)
 
     out: dict[Any, list[tuple[Any, float]]] = {}
-    for item_id, vals in neighbors.items():
+    for item_id, counts in neighbor_counts.items():
+        vals: list[tuple[Any, float]] = []
+        for other_id, co in counts.items():
+            denom = math.sqrt(float(item_counts[item_id]) * float(item_counts[other_id]))
+            if denom <= 0:
+                continue
+            vals.append((other_id, float(co / denom)))
         vals.sort(key=lambda x: x[1], reverse=True)
         out[item_id] = vals[:max_neighbors]
     return out
+
+
+def _prune_neighbor_counts(neighbor_counts: dict[Any, Counter[Any]], retained_neighbors: int) -> None:
+    if retained_neighbors <= 0:
+        return
+    for item_id, counts in list(neighbor_counts.items()):
+        if len(counts) <= retained_neighbors:
+            continue
+        neighbor_counts[item_id] = Counter(dict(counts.most_common(retained_neighbors)))
 
 
 def _resolve_initial_cap(mode: str, fixed_cap: int, memory_limit_mb: int | None) -> int:
@@ -249,3 +297,46 @@ def fit_content_neighbors(books: Any, max_neighbors: int, logger: Any) -> dict[A
         if i % max(1, total // 20) == 0 or i == total:
             logger.event("STAGE1_CONTENT_SCORE_PROGRESS", done=i, total=total)
     return out
+
+
+def fit_metadata_retrieval(books: Any, logger: Any) -> dict[str, Any]:
+    data = books.copy()
+    for col in ["authors", "series", "tags"]:
+        if col not in data.columns:
+            data[col] = [[] for _ in range(len(data))]
+        data[col] = data[col].apply(lambda x: x if isinstance(x, list) else [])
+
+    by_item = data[["item_id", "authors", "series", "tags"]].drop_duplicates("item_id").reset_index(drop=True)
+    author_index: dict[str, list[Any]] = defaultdict(list)
+    series_index: dict[str, list[Any]] = defaultdict(list)
+    tag_index: dict[str, list[Any]] = defaultdict(list)
+    item_metadata: dict[Any, dict[str, list[str]]] = {}
+
+    total = len(by_item)
+    for i, row in enumerate(by_item.itertuples(index=False), start=1):
+        item_id = row.item_id
+        authors = [str(x) for x in list(dict.fromkeys(row.authors))[:8]]
+        series = [str(x) for x in list(dict.fromkeys(row.series))[:4]]
+        tags = [str(x) for x in list(dict.fromkeys(row.tags))[:20]]
+
+        item_metadata[item_id] = {
+            "authors": authors,
+            "series": series,
+            "tags": tags,
+        }
+        for value in authors:
+            author_index[value].append(item_id)
+        for value in series:
+            series_index[value].append(item_id)
+        for value in tags:
+            tag_index[value].append(item_id)
+
+        if i % max(1, total // 20) == 0 or i == total:
+            logger.event("STAGE1_METADATA_INDEX_PROGRESS", done=i, total=total)
+
+    return {
+        "item_metadata": item_metadata,
+        "author_index": dict(author_index),
+        "series_index": dict(series_index),
+        "tag_index": dict(tag_index),
+    }

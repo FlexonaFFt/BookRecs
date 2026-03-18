@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import UserSwitcher from '../components/UserSwitcher';
 import { fetchDemoUsers, getStoredUserId, postInteraction, setStoredUserId } from '../api/demoApi';

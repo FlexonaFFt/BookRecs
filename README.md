@@ -37,6 +37,7 @@ Pipeline состоит из пяти шагов:
 
 ### 1. Подготовка окружения
 ```bash
+uv sync
 make init-env
 ```
 
@@ -55,6 +56,47 @@ make infra-up
 ### 3. Запуск batch pipeline (опционально)
 ```bash
 make pipeline-up
+```
+
+### 3.1 Обучение на уже предобработанном датасете
+Если у вас уже есть каталог с `books.parquet`, `local_train.parquet`, `local_val.parquet`, можно пропустить `prepare` и запустить только обучение.
+
+Пример:
+```bash
+BOOKRECS_TRAIN_DATASET_DIR=/absolute/path/to/goodreads_ya \
+BOOKRECS_TRAIN_RUN_NAME=catboost_policy_v1 \
+BOOKRECS_COLD_MAX_INTERACTIONS=5 \
+make train-prepared
+```
+
+Команда монтирует каталог датасета в контейнер как `/dataset` и запускает только training entrypoint.
+
+При необходимости можно дополнительно передать параметры обучения через env:
+```bash
+BOOKRECS_TRAIN_DATASET_DIR=/absolute/path/to/goodreads_ya \
+BOOKRECS_TRAIN_RUN_NAME=catboost_policy_v1 \
+BOOKRECS_COLD_MAX_INTERACTIONS=5 \
+BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE=1200 \
+BOOKRECS_TRAIN_PER_SOURCE_LIMIT=350 \
+BOOKRECS_TRAIN_PRE_TOP_M=300 \
+BOOKRECS_TRAIN_FINAL_TOP_K=10 \
+make train-prepared
+
+Для слабой машины или MacBook можно использовать облегченный режим:
+```bash
+BOOKRECS_TRAIN_DATASET_DIR=/absolute/path/to/goodreads_ya \
+make train-lite-prepared
+```
+
+`lite`-профиль уменьшает candidate pool, лимиты соседей и историю для `CF`, а Stage 2 переключает на `LinearPreRanker` вместо `CatBoost`.
+
+Для обычного запуска теперь можно использовать авто-подбор профиля:
+```bash
+BOOKRECS_TRAIN_DATASET_DIR=/absolute/path/to/goodreads_ya \
+make train-auto
+```
+
+`auto` по памяти контейнера выбирает `lite`, если лимит памяти не больше `8 GB`, иначе использует `default`. Ручные env-переопределения по-прежнему имеют приоритет.
 ```
 
 ### 3.1 Эмуляция batch за 5 дней (offline replay / пилот)
@@ -102,20 +144,45 @@ make down-volumes
 
 ### Локальный запуск без docker compose
 ```bash
-python -m source.interfaces.pipeline_entrypoint
-python -m source.interfaces.api_entrypoint
-python -m source.interfaces.batch_backfill_entrypoint
+uv run python -m source.interfaces.pipeline_entrypoint
+uv run python -m source.interfaces.train_entrypoint
+uv run python -m source.interfaces.api_entrypoint
+uv run python -m source.interfaces.batch_backfill_entrypoint
 ```
 
 <details>
 <summary><h2>Airflow Batch DAG</h2></summary>
 
-В проект добавлен DAG `bookrecs_daily_batch` (файл `source/interfaces/airflow/dags/bookrecs_batch_dag.py`) с `DockerOperator` и `catchup=True`.
-Он включает два шага:
-1. `run_batch_pipeline`
-2. `promote_model`
+В проект добавлены два Airflow DAG:
+- `bookrecs_daily_batch`:
+  1. `run_batch_pipeline`
+  2. `promote_model`
+- `bookrecs_backfill`:
+  1. `run_backfill`
 
-Пример backfill в Airflow за 5 дней:
+Локальный запуск Airflow UI:
+```bash
+docker compose up --build -d airflow-postgres airflow-init airflow-webserver airflow-scheduler airflow-triggerer
+```
+
+UI будет доступен на:
+```text
+http://localhost:8080
+```
+
+Логин/пароль по умолчанию:
+```text
+admin / admin
+```
+
+Проверка, что DAG'и подхватились:
+```bash
+docker compose exec airflow-webserver airflow dags list
+docker compose exec airflow-webserver airflow tasks list bookrecs_daily_batch
+docker compose exec airflow-webserver airflow tasks list bookrecs_backfill
+```
+
+Пример ручного backfill через CLI:
 ```bash
 airflow dags backfill bookrecs_daily_batch -s 2026-03-06 -e 2026-03-10
 ```
