@@ -4,11 +4,14 @@ from typing import Any
 
 from source.application.ports import CandidateSourcePort
 from source.domain.entities import Candidate
+
+
 # Генерирует кандидатов из глобального рейтинга популярности.
 class PopularCandidateSource(CandidateSourcePort):
 
-
-    def __init__(self, top_items: list[Any], item_score: dict[Any, float] | None = None) -> None:
+    def __init__(
+        self, top_items: list[Any], item_score: dict[Any, float] | None = None
+    ) -> None:
         self._top_items = top_items
         self._item_score = item_score or {}
 
@@ -16,7 +19,9 @@ class PopularCandidateSource(CandidateSourcePort):
     def name(self) -> str:
         return "pop"
 
-    def generate(self, user_id: Any, seen_items: set[Any], limit: int) -> list[Candidate]:
+    def generate(
+        self, user_id: Any, seen_items: set[Any], limit: int
+    ) -> list[Candidate]:
         out: list[Candidate] = []
         for rank, item_id in enumerate(self._top_items, start=1):
             if item_id in seen_items:

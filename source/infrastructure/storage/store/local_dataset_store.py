@@ -5,27 +5,46 @@ from pathlib import Path
 
 from source.application.ports import DatasetStorePort
 from source.domain.entities import DatasetArtifacts, DatasetVersion
+
+
 # Сохраняет артефакты датасета в локальную файловую систему.
 class LocalDatasetStore(DatasetStorePort):
-
 
     def __init__(self, root_dir: str = "artifacts/datasets") -> None:
         self._root_dir = Path(root_dir)
 
-    def save(self, dataset_version: DatasetVersion, artifacts: DatasetArtifacts) -> DatasetArtifacts:
+    def save(
+        self, dataset_version: DatasetVersion, artifacts: DatasetArtifacts
+    ) -> DatasetArtifacts:
         target_dir = self._target_dir(dataset_version)
         target_dir.mkdir(parents=True, exist_ok=True)
         print(f"[prepare] Публикация в локальное хранилище: {target_dir}", flush=True)
 
-        books_uri = self._copy_to_target(artifacts.books_uri, target_dir / "books.parquet")
-        train_uri = self._copy_to_target(artifacts.train_uri, target_dir / "train.parquet")
+        books_uri = self._copy_to_target(
+            artifacts.books_uri, target_dir / "books.parquet"
+        )
+        train_uri = self._copy_to_target(
+            artifacts.train_uri, target_dir / "train.parquet"
+        )
         test_uri = self._copy_to_target(artifacts.test_uri, target_dir / "test.parquet")
-        local_train_uri = self._copy_to_target(artifacts.local_train_uri, target_dir / "local_train.parquet")
-        local_val_uri = self._copy_to_target(artifacts.local_val_uri, target_dir / "local_val.parquet")
-        local_val_warm_uri = self._copy_to_target(artifacts.local_val_warm_uri, target_dir / "local_val_warm.parquet")
-        local_val_cold_uri = self._copy_to_target(artifacts.local_val_cold_uri, target_dir / "local_val_cold.parquet")
-        summary_uri = self._copy_to_target(artifacts.summary_uri, target_dir / "summary.json")
-        manifest_uri = self._copy_to_target(artifacts.manifest_uri, target_dir / "manifest.json")
+        local_train_uri = self._copy_to_target(
+            artifacts.local_train_uri, target_dir / "local_train.parquet"
+        )
+        local_val_uri = self._copy_to_target(
+            artifacts.local_val_uri, target_dir / "local_val.parquet"
+        )
+        local_val_warm_uri = self._copy_to_target(
+            artifacts.local_val_warm_uri, target_dir / "local_val_warm.parquet"
+        )
+        local_val_cold_uri = self._copy_to_target(
+            artifacts.local_val_cold_uri, target_dir / "local_val_cold.parquet"
+        )
+        summary_uri = self._copy_to_target(
+            artifacts.summary_uri, target_dir / "summary.json"
+        )
+        manifest_uri = self._copy_to_target(
+            artifacts.manifest_uri, target_dir / "manifest.json"
+        )
 
         return DatasetArtifacts(
             books_uri=books_uri,
@@ -44,7 +63,9 @@ class LocalDatasetStore(DatasetStorePort):
         return manifest.exists()
 
     def _target_dir(self, dataset_version: DatasetVersion) -> Path:
-        return self._root_dir / dataset_version.dataset_name / dataset_version.version_id
+        return (
+            self._root_dir / dataset_version.dataset_name / dataset_version.version_id
+        )
 
     @staticmethod
     def _copy_to_target(src: str, dst: Path) -> str:

@@ -51,17 +51,23 @@ def write_model_pointer(pointer_path: str, pointer: ModelPointer) -> None:
     if path is None:
         raise ValueError("pointer_path is required")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(pointer.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+    path.write_text(
+        json.dumps(pointer.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
-def resolve_model_uri(config_model_uri: str, pointer_path: str | None) -> tuple[str, ModelPointer | None]:
+def resolve_model_uri(
+    config_model_uri: str, pointer_path: str | None
+) -> tuple[str, ModelPointer | None]:
     pointer = read_model_pointer(pointer_path)
     if pointer is not None:
         return pointer.model_uri, pointer
     return config_model_uri.strip(), None
 
 
-def build_local_pointer(run_id: str, output_root: str, metrics: dict[str, Any] | None = None) -> ModelPointer:
+def build_local_pointer(
+    run_id: str, output_root: str, metrics: dict[str, Any] | None = None
+) -> ModelPointer:
     model_uri = str((Path(output_root) / run_id / "models").resolve())
     return ModelPointer(
         run_id=run_id,

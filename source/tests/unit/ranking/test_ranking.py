@@ -5,7 +5,15 @@ from typing import Any
 
 import pytest
 
-from source.application.use_cases.ranking.final_rank import FinalRankCommand, FinalRankUseCase
+from source.application.ports.ranking_ports import (
+    FinalRankerPort,
+    PostProcessorPort,
+    PreRankerPort,
+)
+from source.application.use_cases.ranking.final_rank import (
+    FinalRankCommand,
+    FinalRankUseCase,
+)
 from source.application.use_cases.ranking.generate_candidates import (
     GenerateCandidatesCommand,
     GenerateCandidatesUseCase,
@@ -14,13 +22,19 @@ from source.application.use_cases.ranking.prerank_candidates import (
     PreRankCandidatesCommand,
     PreRankCandidatesUseCase,
 )
-from source.application.use_cases.ranking.reco_flow import RecoFlowCommand, RecoFlowUseCase
+from source.application.use_cases.ranking.reco_flow import (
+    RecoFlowCommand,
+    RecoFlowUseCase,
+)
 from source.application.use_cases.ranking.source_limits import (
     source_limits_for_stage1,
     source_min_quota_for_stage1,
 )
 from source.domain.entities import Candidate, FinalItem, ScoredCandidate
-from source.infrastructure.ranking.candidates import ColdCandidateSource, ContentCandidateSource
+from source.infrastructure.ranking.candidates import (
+    ColdCandidateSource,
+    ContentCandidateSource,
+)
 
 
 @dataclass
@@ -31,8 +45,12 @@ class StubCandidateSource:
     def __post_init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
 
-    def generate(self, user_id: Any, seen_items: set[Any], limit: int) -> list[Candidate]:
-        self.calls.append({"user_id": user_id, "seen_items": set(seen_items), "limit": limit})
+    def generate(
+        self, user_id: Any, seen_items: set[Any], limit: int
+    ) -> list[Candidate]:
+        self.calls.append(
+            {"user_id": user_id, "seen_items": set(seen_items), "limit": limit}
+        )
         out: list[Candidate] = []
         for raw in self.items[:limit]:
             if len(raw) == 2:
@@ -40,12 +58,20 @@ class StubCandidateSource:
                 features: dict[str, float] = {}
             else:
                 item_id, score, features = raw
-            out.append(Candidate(user_id=user_id, item_id=item_id, source=self.name, score=score, features=features))
+            out.append(
+                Candidate(
+                    user_id=user_id,
+                    item_id=item_id,
+                    source=self.name,
+                    score=score,
+                    features=features,
+                )
+            )
         return out
 
 
 @dataclass
-class StubPreRanker:
+class StubPreRanker(PreRankerPort):
     result: list[ScoredCandidate]
 
     def __post_init__(self) -> None:
@@ -64,26 +90,34 @@ class StubPreRanker:
 
 
 @dataclass
-class StubFinalRanker:
+class StubFinalRanker(FinalRankerPort):
     result: list[FinalItem]
 
     def __post_init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
 
-    def rank(self, candidates: list[ScoredCandidate], user_id: Any, top_k: int) -> list[FinalItem]:
-        self.calls.append({"candidates": candidates, "user_id": user_id, "top_k": top_k})
+    def rank(
+        self, candidates: list[ScoredCandidate], user_id: Any, top_k: int
+    ) -> list[FinalItem]:
+        self.calls.append(
+            {"candidates": candidates, "user_id": user_id, "top_k": top_k}
+        )
         return self.result
 
 
 @dataclass
-class StubPostProcessor:
+class StubPostProcessor(PostProcessorPort):
     result: list[FinalItem]
 
     def __post_init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
 
-    def apply(self, items: list[FinalItem], seen_items: set[Any], top_k: int) -> list[FinalItem]:
-        self.calls.append({"items": items, "seen_items": set(seen_items), "top_k": top_k})
+    def apply(
+        self, items: list[FinalItem], seen_items: set[Any], top_k: int
+    ) -> list[FinalItem]:
+        self.calls.append(
+            {"items": items, "seen_items": set(seen_items), "top_k": top_k}
+        )
         return self.result
 
 
@@ -133,8 +167,22 @@ def _candidates() -> list[Candidate]:
 
 def _scored_candidates() -> list[ScoredCandidate]:
     return [
-        ScoredCandidate(user_id="u1", item_id=1, source="cf", base_score=0.5, pre_score=0.7, features={}),
-        ScoredCandidate(user_id="u1", item_id=2, source="pop", base_score=0.4, pre_score=0.6, features={}),
+        ScoredCandidate(
+            user_id="u1",
+            item_id=1,
+            source="cf",
+            base_score=0.5,
+            pre_score=0.7,
+            features={},
+        ),
+        ScoredCandidate(
+            user_id="u1",
+            item_id=2,
+            source="pop",
+            base_score=0.4,
+            pre_score=0.6,
+            features={},
+        ),
     ]
 
 
@@ -216,7 +264,9 @@ def test_generate_candidates_merges_source_specific_features() -> None:
             )
         ]
 
-    def _pop_generate(user_id: Any, seen_items: set[Any], limit: int) -> list[Candidate]:
+    def _pop_generate(
+        user_id: Any, seen_items: set[Any], limit: int
+    ) -> list[Candidate]:
         return [
             Candidate(
                 user_id=user_id,
@@ -232,7 +282,9 @@ def test_generate_candidates_merges_source_specific_features() -> None:
     uc = GenerateCandidatesUseCase(sources=[cf, pop], fallback_source=pop)
 
     result = uc.execute(
-        GenerateCandidatesCommand(user_id="u1", seen_items=set(), pool_size=1, per_source_limit=5)
+        GenerateCandidatesCommand(
+            user_id="u1", seen_items=set(), pool_size=1, per_source_limit=5
+        )
     )
 
     assert len(result) == 1
@@ -269,8 +321,16 @@ def test_generate_candidates_injects_relevant_cold_candidate_into_tail() -> None
     cold = StubCandidateSource(
         name="cold",
         items=[
-            (10, 0.82, {"metadata_overlap": 3.0, "score_cold": 0.8, "is_cold_item": 1.0}),
-            (11, 0.4, {"metadata_overlap": 0.5, "score_cold": 0.3, "is_cold_item": 1.0}),
+            (
+                10,
+                0.82,
+                {"metadata_overlap": 3.0, "score_cold": 0.8, "is_cold_item": 1.0},
+            ),
+            (
+                11,
+                0.4,
+                {"metadata_overlap": 0.5, "score_cold": 0.3, "is_cold_item": 1.0},
+            ),
         ],
     )
     uc = GenerateCandidatesUseCase(sources=[pop, cold], fallback_source=pop)
@@ -333,7 +393,9 @@ def test_cold_candidate_source_uses_metadata_overlap_and_novelty() -> None:
     assert by_id[3].features["score_cold"] > by_id[2].features["score_cold"]
 
 
-def test_cold_candidate_source_prioritizes_low_popularity_items_with_same_token() -> None:
+def test_cold_candidate_source_prioritizes_low_popularity_items_with_same_token() -> (
+    None
+):
     source = ColdCandidateSource(
         item_metadata={
             1: {"authors": ["A"], "series": [], "tags": []},
@@ -391,9 +453,17 @@ def test_generate_candidates_validates_input() -> None:
     uc = GenerateCandidatesUseCase(sources=[pop], fallback_source=pop)
 
     with pytest.raises(ValueError):
-        uc.execute(GenerateCandidatesCommand(user_id="u", seen_items=set(), pool_size=0, per_source_limit=1))
+        uc.execute(
+            GenerateCandidatesCommand(
+                user_id="u", seen_items=set(), pool_size=0, per_source_limit=1
+            )
+        )
     with pytest.raises(ValueError):
-        uc.execute(GenerateCandidatesCommand(user_id="u", seen_items=set(), pool_size=1, per_source_limit=0))
+        uc.execute(
+            GenerateCandidatesCommand(
+                user_id="u", seen_items=set(), pool_size=1, per_source_limit=0
+            )
+        )
 
 
 def test_generate_candidates_requires_at_least_one_source() -> None:
@@ -498,7 +568,9 @@ def test_final_rank_returns_empty_when_no_candidates() -> None:
     ranker = StubFinalRanker(result=[])
     post = StubPostProcessor(result=[])
     uc = FinalRankUseCase(final_ranker=ranker, postprocessor=post)
-    out = uc.execute(FinalRankCommand(user_id="u1", candidates=[], seen_items=set(), top_k=10))
+    out = uc.execute(
+        FinalRankCommand(user_id="u1", candidates=[], seen_items=set(), top_k=10)
+    )
     assert out == []
     assert ranker.calls == []
     assert post.calls == []
@@ -509,18 +581,35 @@ def test_final_rank_validates_top_k() -> None:
     post = StubPostProcessor(result=[])
     uc = FinalRankUseCase(final_ranker=ranker, postprocessor=post)
     with pytest.raises(ValueError):
-        uc.execute(FinalRankCommand(user_id="u1", candidates=_scored_candidates(), seen_items=set(), top_k=0))
+        uc.execute(
+            FinalRankCommand(
+                user_id="u1", candidates=_scored_candidates(), seen_items=set(), top_k=0
+            )
+        )
 
 
 def test_reco_flow_executes_all_stages_and_passes_params() -> None:
     cands = [Candidate(user_id="u1", item_id=1, source="cf", score=1.0)]
-    preranked = [ScoredCandidate(user_id="u1", item_id=1, source="cf", base_score=1.0, pre_score=1.0, features={})]
+    preranked = [
+        ScoredCandidate(
+            user_id="u1",
+            item_id=1,
+            source="cf",
+            base_score=1.0,
+            pre_score=1.0,
+            features={},
+        )
+    ]
     final = [FinalItem(user_id="u1", item_id=1, source="cf", final_score=1.0)]
 
     stage1 = StubStage1(candidates=cands)
     stage2 = StubStage2(items=preranked)
     stage3 = StubStage3(items=final)
-    flow = RecoFlowUseCase(stage1=stage1, stage2=stage2, stage3=stage3)
+    flow = RecoFlowUseCase(
+        stage1=stage1,  # type: ignore[arg-type]
+        stage2=stage2,  # type: ignore[arg-type]
+        stage3=stage3,  # type: ignore[arg-type]
+    )
 
     cmd = RecoFlowCommand(
         user_id="u1",
@@ -537,6 +626,9 @@ def test_reco_flow_executes_all_stages_and_passes_params() -> None:
     assert out.candidates == cands
     assert out.preranked == preranked
     assert out.final_items == final
+    assert stage1.last_cmd is not None
+    assert stage2.last_cmd is not None
+    assert stage3.last_cmd is not None
     assert stage1.last_cmd.pool_size == 123
     assert stage2.last_cmd.top_m == 33
     assert stage3.last_cmd.top_k == 5
@@ -551,7 +643,11 @@ def test_reco_flow_uses_content_heavy_limits_for_short_history() -> None:
     stage1 = StubStage1(candidates=[])
     stage2 = StubStage2(items=[])
     stage3 = StubStage3(items=[])
-    flow = RecoFlowUseCase(stage1=stage1, stage2=stage2, stage3=stage3)
+    flow = RecoFlowUseCase(
+        stage1=stage1,  # type: ignore[arg-type]
+        stage2=stage2,  # type: ignore[arg-type]
+        stage3=stage3,  # type: ignore[arg-type]
+    )
 
     _ = flow.execute(
         RecoFlowCommand(
@@ -566,6 +662,7 @@ def test_reco_flow_uses_content_heavy_limits_for_short_history() -> None:
         )
     )
 
+    assert stage1.last_cmd is not None
     limits = stage1.last_cmd.source_limits
     assert limits["cf"] == 15
     assert limits["content"] == 280

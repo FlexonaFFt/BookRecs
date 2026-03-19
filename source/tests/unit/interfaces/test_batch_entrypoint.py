@@ -54,11 +54,15 @@ def test_success_manifest_exists_false_for_non_success(tmp_path: Path) -> None:
     assert mod._success_manifest_exists(str(tmp_path), "batch_20260309") is False
 
 
-def test_main_skips_when_success_exists(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_skips_when_success_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     run_name = "batch_20260309"
     run_dir = tmp_path / run_name
     run_dir.mkdir(parents=True)
-    (run_dir / "manifest.json").write_text(json.dumps({"status": "SUCCESS"}), encoding="utf-8")
+    (run_dir / "manifest.json").write_text(
+        json.dumps({"status": "SUCCESS"}), encoding="utf-8"
+    )
 
     monkeypatch.setenv("BOOKRECS_BATCH_EXECUTION_DATE", "2026-03-09")
     monkeypatch.delenv("BOOKRECS_BATCH_RUN_NAME", raising=False)
@@ -69,7 +73,11 @@ def test_main_skips_when_success_exists(tmp_path: Path, monkeypatch: pytest.Monk
         called["pipeline"] += 1
 
     monkeypatch.setattr(mod, "run_pipeline_from_env", _fake_run_pipeline)
-    monkeypatch.setattr(mod, "load_pipeline_settings", lambda: SimpleNamespace(output_root=str(tmp_path)))
+    monkeypatch.setattr(
+        mod,
+        "load_pipeline_settings",
+        lambda: SimpleNamespace(output_root=str(tmp_path)),
+    )
 
     mod.main()
 
@@ -77,7 +85,9 @@ def test_main_skips_when_success_exists(tmp_path: Path, monkeypatch: pytest.Monk
     assert mod.os.environ.get("BOOKRECS_TRAIN_RUN_NAME") == run_name
 
 
-def test_main_runs_when_no_success_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_runs_when_no_success_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     run_name = "batch_20260310"
 
     monkeypatch.setenv("BOOKRECS_BATCH_EXECUTION_DATE", "2026-03-10")
@@ -89,7 +99,11 @@ def test_main_runs_when_no_success_manifest(tmp_path: Path, monkeypatch: pytest.
         called["pipeline"] += 1
 
     monkeypatch.setattr(mod, "run_pipeline_from_env", _fake_run_pipeline)
-    monkeypatch.setattr(mod, "load_pipeline_settings", lambda: SimpleNamespace(output_root=str(tmp_path)))
+    monkeypatch.setattr(
+        mod,
+        "load_pipeline_settings",
+        lambda: SimpleNamespace(output_root=str(tmp_path)),
+    )
 
     mod.main()
 

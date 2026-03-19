@@ -24,7 +24,7 @@ def test_parse_days_invalid() -> None:
 def test_parse_end_date_default(monkeypatch: pytest.MonkeyPatch) -> None:
     class _Date(date):
         @classmethod
-        def today(cls) -> date:
+        def today(cls) -> _Date:
             return cls(2026, 3, 10)
 
     monkeypatch.setattr(mod, "date", _Date)

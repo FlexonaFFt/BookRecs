@@ -38,7 +38,9 @@ class ColdCandidateSource(CandidateSourcePort):
     def name(self) -> str:
         return "cold"
 
-    def generate(self, user_id: Any, seen_items: set[Any], limit: int) -> list[Candidate]:
+    def generate(
+        self, user_id: Any, seen_items: set[Any], limit: int
+    ) -> list[Candidate]:
         if limit <= 0 or not seen_items:
             return []
 
@@ -66,9 +68,30 @@ class ColdCandidateSource(CandidateSourcePort):
         score_map: dict[Any, float] = defaultdict(float)
         overlap_map: dict[Any, float] = defaultdict(float)
 
-        self._collect(score_map, overlap_map, author_tokens, self._author_index, seen_items, base_weight=4.4)
-        self._collect(score_map, overlap_map, series_tokens, self._series_index, seen_items, base_weight=4.0)
-        self._collect(score_map, overlap_map, tag_tokens, self._tag_index, seen_items, base_weight=1.5)
+        self._collect(
+            score_map,
+            overlap_map,
+            author_tokens,
+            self._author_index,
+            seen_items,
+            base_weight=4.4,
+        )
+        self._collect(
+            score_map,
+            overlap_map,
+            series_tokens,
+            self._series_index,
+            seen_items,
+            base_weight=4.0,
+        )
+        self._collect(
+            score_map,
+            overlap_map,
+            tag_tokens,
+            self._tag_index,
+            seen_items,
+            base_weight=1.5,
+        )
 
         ranked_rows: list[tuple[Any, float, float, float]] = []
         for item_id, raw_score in score_map.items():
@@ -91,7 +114,9 @@ class ColdCandidateSource(CandidateSourcePort):
         )
 
         out: list[Candidate] = []
-        for rank, (item_id, score, overlap, pop) in enumerate(ranked_rows[:limit], start=1):
+        for rank, (item_id, score, overlap, pop) in enumerate(
+            ranked_rows[:limit], start=1
+        ):
             out.append(
                 Candidate(
                     user_id=user_id,
@@ -124,9 +149,15 @@ class ColdCandidateSource(CandidateSourcePort):
             if item_id in seen_items:
                 continue
 
-            author_overlap = sum(author_tokens.get(token, 0) for token in meta.get("authors", []))
-            series_overlap = sum(series_tokens.get(token, 0) for token in meta.get("series", []))
-            tag_overlap = sum(tag_tokens.get(token, 0) for token in meta.get("tags", []))
+            author_overlap = sum(
+                author_tokens.get(token, 0) for token in meta.get("authors", [])
+            )
+            series_overlap = sum(
+                series_tokens.get(token, 0) for token in meta.get("series", [])
+            )
+            tag_overlap = sum(
+                tag_tokens.get(token, 0) for token in meta.get("tags", [])
+            )
 
             raw_score = (
                 4.8 * min(3.0, float(author_overlap))
@@ -146,7 +177,9 @@ class ColdCandidateSource(CandidateSourcePort):
 
         ranked_rows.sort(key=lambda row: (row[1], row[2], -row[3]), reverse=True)
         out: list[Candidate] = []
-        for rank, (item_id, score, overlap, pop) in enumerate(ranked_rows[:limit], start=1):
+        for rank, (item_id, score, overlap, pop) in enumerate(
+            ranked_rows[:limit], start=1
+        ):
             out.append(
                 Candidate(
                     user_id=user_id,
@@ -176,10 +209,18 @@ class ColdCandidateSource(CandidateSourcePort):
         for token, freq in tokens.items():
             if not token:
                 continue
-            token_items = [item_id for item_id in index.get(str(token), []) if item_id not in seen_items]
+            token_items = [
+                item_id
+                for item_id in index.get(str(token), [])
+                if item_id not in seen_items
+            ]
             token_items.sort(
                 key=lambda item_id: (
-                    item_id not in self._cold_item_ids if self._cold_item_ids else False,
+                    (
+                        item_id not in self._cold_item_ids
+                        if self._cold_item_ids
+                        else False
+                    ),
                     self._popularity(item_id),
                 )
             )
@@ -188,7 +229,11 @@ class ColdCandidateSource(CandidateSourcePort):
                     continue
                 if self._cold_item_ids and item_id not in self._cold_item_ids:
                     continue
-                increment = base_weight * min(3.0, float(freq)) * (1.0 + 0.75 * (1.0 - self._popularity(item_id)))
+                increment = (
+                    base_weight
+                    * min(3.0, float(freq))
+                    * (1.0 + 0.75 * (1.0 - self._popularity(item_id)))
+                )
                 score_map[item_id] += increment
                 overlap_map[item_id] += 1.0
 

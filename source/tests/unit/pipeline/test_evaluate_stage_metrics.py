@@ -91,6 +91,10 @@ def test_evaluate_pipeline_reports_stage_metrics() -> None:
         logger=DummyLogger(),
     )
 
-    assert metrics["candidate_recall@10"] >= metrics["prerank_recall@3"] >= metrics["recall@2"]
+    assert (
+        metrics["candidate_recall@10"]
+        >= metrics["prerank_recall@3"]
+        >= metrics["recall@2"]
+    )
     assert "cold_candidate_recall@10" in metrics
     assert "cold_prerank_recall@3" in metrics

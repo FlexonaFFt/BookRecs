@@ -23,6 +23,8 @@ class LinearPreRankerConfig:
     w_popularity: float = 0.04
     w_metadata_overlap: float = 0.16
     w_rank: float = 0.18
+
+
 # Считает скор кандидатов линейной комбинацией ручных признаков.
 class LinearPreRanker(PreRankerPort):
     """Simple linear pre-ranker used as Stage-2 baseline."""

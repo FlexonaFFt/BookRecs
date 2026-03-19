@@ -5,9 +5,7 @@ from datetime import datetime
 from airflow import DAG
 from airflow.models.param import Param
 from airflow.providers.docker.operators.docker import DockerOperator
-
 from dag_common import DEFAULT_ARGS, default_docker_args, docker_env
-
 
 with DAG(
     dag_id="bookrecs_backfill",

@@ -16,8 +16,8 @@ from source.infrastructure.inference.loader import ModelBundle
 from source.infrastructure.inference.logger import InferenceRequestLogger
 from source.infrastructure.processing.postprocessing import DefaultPostprocessor
 from source.infrastructure.ranking.candidates import (
-    ColdCandidateSource,
     CfCandidateSource,
+    ColdCandidateSource,
     ContentCandidateSource,
     PopularCandidateSource,
 )
@@ -50,8 +50,12 @@ class InferenceService:
         self._pop_scores: dict[Any, float] = stage1["pop_scores"]
         self._pop_items: list[Any] = stage1["pop_items"]
         self._cf_neighbors: dict[Any, list[tuple[Any, float]]] = stage1["cf_neighbors"]
-        self._content_similar: dict[Any, list[tuple[Any, float]]] = stage1["content_similar"]
-        self._item_metadata: dict[Any, dict[str, list[str]]] = stage1.get("item_metadata", {})
+        self._content_similar: dict[Any, list[tuple[Any, float]]] = stage1[
+            "content_similar"
+        ]
+        self._item_metadata: dict[Any, dict[str, list[str]]] = stage1.get(
+            "item_metadata", {}
+        )
         self._author_index: dict[str, list[Any]] = stage1.get("author_index", {})
         self._series_index: dict[str, list[Any]] = stage1.get("series_index", {})
         self._tag_index: dict[str, list[Any]] = stage1.get("tag_index", {})
@@ -77,10 +81,14 @@ class InferenceService:
                     ),
                     PopularCandidateSource(self._pop_items, self._pop_scores),
                 ],
-                fallback_source=PopularCandidateSource(self._pop_items, self._pop_scores),
+                fallback_source=PopularCandidateSource(
+                    self._pop_items, self._pop_scores
+                ),
             ),
             stage2=PreRankCandidatesUseCase(preranker=bundle.stage2),
-            stage3=FinalRankUseCase(final_ranker=bundle.stage3, postprocessor=DefaultPostprocessor()),
+            stage3=FinalRankUseCase(
+                final_ranker=bundle.stage3, postprocessor=DefaultPostprocessor()
+            ),
         )
 
     @property
@@ -161,7 +169,9 @@ class InferenceService:
             "cf": [{"item_id": i, "score": s} for i, s in cf_rows],
         }
 
-    def register_interaction(self, user_id: Any, item_id: Any, event_type: str = "implicit") -> None:
+    def register_interaction(
+        self, user_id: Any, item_id: Any, event_type: str = "implicit"
+    ) -> None:
         norm_item_id = self._normalize_item_id(item_id)
         if norm_item_id is None:
             raise ValueError("item_id is invalid for current model id type")
@@ -190,7 +200,11 @@ class InferenceService:
         return all_items - warm
 
     def _detect_item_id_type(self):
-        for pool in [self._pop_items, list(self._pop_scores.keys()), list(self._content_similar.keys())]:
+        for pool in [
+            self._pop_items,
+            list(self._pop_scores.keys()),
+            list(self._content_similar.keys()),
+        ]:
             if pool:
                 return type(pool[0])
         return str

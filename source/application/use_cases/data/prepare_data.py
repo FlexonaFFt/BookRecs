@@ -23,11 +23,14 @@ from source.domain.entities import (
 # Содержит входные данные команды подготовки данных.
 class PrepareDataCommand:
     """Input for dataset preparation flow."""
+
     dataset_name: str
     source: DatasetSource
     params: PreprocessingParams
     s3_prefix: str
     metadata: dict[str, Any] | None = None
+
+
 # Реализует сценарий подготовки данных.
 class PrepareDataUseCase:
     """Run full prepare-data flow: preprocess -> store -> registry -> runlog."""
@@ -58,7 +61,12 @@ class PrepareDataUseCase:
             metadata={"dataset_name": cmd.dataset_name},
         )
         self._run_log.start(run)
-        print(f"[prepare] Старт подготовки dataset={cmd.dataset_name}, run_id={run.run_id}", flush=True)
+        print(
+            "[prepare] Старт подготовки "
+            f"dataset={cmd.dataset_name}, "
+            f"run_id={run.run_id}",
+            flush=True,
+        )
 
         try:
             params_hash = self._build_params_hash(cmd)
@@ -69,14 +77,23 @@ class PrepareDataUseCase:
             )
 
             if existing is not None and self._dataset_store.exists(existing):
-                print("[prepare] Найден готовый датасет с тем же params_hash, шаг подготовки пропущен.", flush=True)
+                print(
+                    "[prepare] Найден готовый датасет "
+                    "с тем же params_hash, "
+                    "шаг подготовки пропущен.",
+                    flush=True,
+                )
                 run.mark_skipped("Dataset already exists for the same params hash.")
                 self._run_log.finish(run)
                 return existing
 
             print("[prepare] Запуск preprocessor.run(...)", flush=True)
             local_artifacts = self._preprocessor.run(cmd.source, cmd.params)
-            print("[prepare] Локальные артефакты готовы, начинаем публикацию в storage backend.", flush=True)
+            print(
+                "[prepare] Локальные артефакты готовы, "
+                "начинаем публикацию в storage backend.",
+                flush=True,
+            )
 
             dataset_version = DatasetVersion(
                 dataset_name=cmd.dataset_name,
@@ -88,8 +105,13 @@ class PrepareDataUseCase:
             )
             dataset_version.validate()
 
-            remote_artifacts = self._dataset_store.save(dataset_version, local_artifacts)
-            print("[prepare] Публикация артефактов завершена, обновляем registry.", flush=True)
+            remote_artifacts = self._dataset_store.save(
+                dataset_version, local_artifacts
+            )
+            print(
+                "[prepare] Публикация артефактов завершена, обновляем registry.",
+                flush=True,
+            )
             dataset_version = DatasetVersion(
                 dataset_name=dataset_version.dataset_name,
                 version_id=dataset_version.version_id,
@@ -116,7 +138,8 @@ class PrepareDataUseCase:
 
             self._dataset_registry.upsert(dataset_version)
             print(
-                f"[prepare] DatasetVersion сохранен: version_id={dataset_version.version_id}, "
+                "[prepare] DatasetVersion сохранен: "
+                f"version_id={dataset_version.version_id}, "
                 f"s3_prefix={dataset_version.s3_prefix}",
                 flush=True,
             )

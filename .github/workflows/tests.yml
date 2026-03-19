@@ -24,10 +24,16 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Run backend lint
+      - name: Install dependencies
+        run: uv sync --frozen --python 3.11 --no-install-project
+
+      - name: Run backend linters
         run: |
-          uv sync --frozen --python 3.11 --no-install-project
-          uv run ruff check source data
+          uv run black --check source/
+          uv run isort --check-only source/
+          uv run flake8 source/
+          uv run mypy source/ --ignore-missing-imports
+          uv run pylint source/ --rcfile=pyproject.toml
 
   backend-tests:
     runs-on: ubuntu-latest
@@ -46,12 +52,10 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install dependencies
-        run: |
-          uv sync --frozen --python 3.11
+        run: uv sync --frozen --python 3.11
 
       - name: Run backend unit tests
-        run: |
-          uv run pytest source/tests -vv
+        run: uv run pytest source/tests -vv
 
   frontend-lint:
     runs-on: ubuntu-latest

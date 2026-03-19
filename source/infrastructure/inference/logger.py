@@ -27,7 +27,9 @@ class InferenceRequestLogger:
             self._pg.execute(
                 f"""
                 INSERT INTO {self._table_name} (
-                    user_id, endpoint, request_json, response_json, model_dir, latency_ms
+                    user_id, endpoint,
+                    request_json, response_json,
+                    model_dir, latency_ms
                 )
                 VALUES (%s, %s, %s::jsonb, %s::jsonb, %s, %s)
                 """,
@@ -45,6 +47,8 @@ class InferenceRequestLogger:
 
     def _ensure_table(self) -> None:
         if self._bootstrap_done:
+            return
+        if self._pg is None:
             return
         self._pg.execute(
             f"""

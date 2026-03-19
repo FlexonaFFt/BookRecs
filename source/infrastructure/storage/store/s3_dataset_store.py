@@ -12,9 +12,10 @@ try:
 except ModuleNotFoundError:
     boto3 = None
     ClientError = Exception
+
+
 # Сохраняет артефакты датасета в S3-совместимое хранилище.
 class S3DatasetStore(DatasetStorePort):
-
 
     def __init__(
         self,
@@ -27,7 +28,9 @@ class S3DatasetStore(DatasetStorePort):
         self._endpoint_url = endpoint_url.strip() or None
         self._client = None
 
-    def save(self, dataset_version: DatasetVersion, artifacts: DatasetArtifacts) -> DatasetArtifacts:
+    def save(
+        self, dataset_version: DatasetVersion, artifacts: DatasetArtifacts
+    ) -> DatasetArtifacts:
 
         bucket, base_prefix = self._resolve_prefix(dataset_version.s3_prefix)
         version_prefix = self._join_key(base_prefix, dataset_version.version_id)
@@ -36,21 +39,45 @@ class S3DatasetStore(DatasetStorePort):
             flush=True,
         )
 
-        books_uri = self._upload(artifacts.books_uri, bucket, self._join_key(version_prefix, "books.parquet"))
-        train_uri = self._upload(artifacts.train_uri, bucket, self._join_key(version_prefix, "train.parquet"))
-        test_uri = self._upload(artifacts.test_uri, bucket, self._join_key(version_prefix, "test.parquet"))
-        local_train_uri = self._upload(
-            artifacts.local_train_uri, bucket, self._join_key(version_prefix, "local_train.parquet")
+        books_uri = self._upload(
+            artifacts.books_uri, bucket, self._join_key(version_prefix, "books.parquet")
         )
-        local_val_uri = self._upload(artifacts.local_val_uri, bucket, self._join_key(version_prefix, "local_val.parquet"))
+        train_uri = self._upload(
+            artifacts.train_uri, bucket, self._join_key(version_prefix, "train.parquet")
+        )
+        test_uri = self._upload(
+            artifacts.test_uri, bucket, self._join_key(version_prefix, "test.parquet")
+        )
+        local_train_uri = self._upload(
+            artifacts.local_train_uri,
+            bucket,
+            self._join_key(version_prefix, "local_train.parquet"),
+        )
+        local_val_uri = self._upload(
+            artifacts.local_val_uri,
+            bucket,
+            self._join_key(version_prefix, "local_val.parquet"),
+        )
         local_val_warm_uri = self._upload(
-            artifacts.local_val_warm_uri, bucket, self._join_key(version_prefix, "local_val_warm.parquet")
+            artifacts.local_val_warm_uri,
+            bucket,
+            self._join_key(version_prefix, "local_val_warm.parquet"),
         )
         local_val_cold_uri = self._upload(
-            artifacts.local_val_cold_uri, bucket, self._join_key(version_prefix, "local_val_cold.parquet")
+            artifacts.local_val_cold_uri,
+            bucket,
+            self._join_key(version_prefix, "local_val_cold.parquet"),
         )
-        summary_uri = self._upload(artifacts.summary_uri, bucket, self._join_key(version_prefix, "summary.json"))
-        manifest_uri = self._upload(artifacts.manifest_uri, bucket, self._join_key(version_prefix, "manifest.json"))
+        summary_uri = self._upload(
+            artifacts.summary_uri,
+            bucket,
+            self._join_key(version_prefix, "summary.json"),
+        )
+        manifest_uri = self._upload(
+            artifacts.manifest_uri,
+            bucket,
+            self._join_key(version_prefix, "manifest.json"),
+        )
 
         return DatasetArtifacts(
             books_uri=books_uri,
@@ -67,7 +94,9 @@ class S3DatasetStore(DatasetStorePort):
     def exists(self, dataset_version: DatasetVersion) -> bool:
 
         bucket, base_prefix = self._resolve_prefix(dataset_version.s3_prefix)
-        manifest_key = self._join_key(base_prefix, dataset_version.version_id, "manifest.json")
+        manifest_key = self._join_key(
+            base_prefix, dataset_version.version_id, "manifest.json"
+        )
 
         client = self._s3()
         try:
@@ -79,7 +108,10 @@ class S3DatasetStore(DatasetStorePort):
     def _s3(self):
 
         if boto3 is None:
-            raise RuntimeError("boto3 is required for S3 backend. Install dependency: pip install boto3")
+            raise RuntimeError(
+                "boto3 is required for S3 backend. "
+                "Install dependency: pip install boto3"
+            )
         if self._client is None:
             self._client = boto3.client(
                 "s3",
@@ -109,7 +141,9 @@ class S3DatasetStore(DatasetStorePort):
                 raise ValueError(f"Invalid s3 prefix: {s3_prefix}")
             return bucket, prefix
         if not self._bucket:
-            raise ValueError("S3 bucket is required (either in s3_prefix or --s3-bucket).")
+            raise ValueError(
+                "S3 bucket is required (either in s3_prefix or --s3-bucket)."
+            )
         return self._bucket, raw.lstrip("/")
 
     @staticmethod

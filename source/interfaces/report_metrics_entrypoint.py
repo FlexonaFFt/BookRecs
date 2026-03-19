@@ -11,11 +11,17 @@ def _resolve_run_dir() -> Path:
         return Path(run_dir_raw)
 
     run_id = (os.getenv("BOOKRECS_REPORT_RUN_ID") or "").strip()
-    output_root = Path((os.getenv("BOOKRECS_TRAIN_OUTPUT_ROOT") or "artifacts/runs").strip())
+    output_root = Path(
+        (os.getenv("BOOKRECS_TRAIN_OUTPUT_ROOT") or "artifacts/runs").strip()
+    )
     if run_id:
         return output_root / run_id
 
-    candidates = [path for path in output_root.iterdir() if path.is_dir()] if output_root.exists() else []
+    candidates = (
+        [path for path in output_root.iterdir() if path.is_dir()]
+        if output_root.exists()
+        else []
+    )
     if not candidates:
         raise FileNotFoundError(f"No runs found in {output_root}")
     return max(candidates, key=lambda path: path.stat().st_mtime)

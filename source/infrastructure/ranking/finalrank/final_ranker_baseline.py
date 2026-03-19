@@ -4,6 +4,8 @@ from typing import Any
 
 from source.application.ports import FinalRankerPort
 from source.domain.entities import FinalItem, ScoredCandidate
+
+
 # Формирует финальный рейтинг на основе скора из этапа 2.
 class FinalRankerBaseline(FinalRankerPort):
     """

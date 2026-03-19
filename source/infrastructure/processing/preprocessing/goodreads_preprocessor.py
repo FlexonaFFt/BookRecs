@@ -14,34 +14,46 @@ except ModuleNotFoundError:
 
 from source.application.ports import PreprocessorPort
 from source.domain.entities import DatasetArtifacts, DatasetSource, PreprocessingParams
-# Готовит очищенные датасеты и локальные обучающие/валидационные сплиты из сырых данных Goodreads.
-class GoodreadsPreprocessor(PreprocessorPort):
 
+
+# Готовит очищенные датасеты и локальные
+# обучающие/валидационные сплиты из сырых данных Goodreads.
+class GoodreadsPreprocessor(PreprocessorPort):
 
     def __init__(self, work_dir: str = "artifacts/tmp_preprocessed") -> None:
         self._work_dir = Path(work_dir)
 
-    def run(self, source: DatasetSource, params: PreprocessingParams) -> DatasetArtifacts:
+    def run(
+        self, source: DatasetSource, params: PreprocessingParams
+    ) -> DatasetArtifacts:
         if pd is None:
             raise RuntimeError(
-                "pandas is required for preprocessing. Install project dependencies first."
+                "pandas is required for preprocessing. "
+                "Install project dependencies first."
             )
         source.validate()
         params.validate()
 
         cached = self._cached_artifacts(source.dataset_name)
         if cached is not None:
-            print("[prepare] Используются локальные кэшированные артефакты.", flush=True)
+            print(
+                "[prepare] Используются локальные кэшированные артефакты.", flush=True
+            )
             return cached
 
         print(f"[prepare] Чтение books из {source.books_raw_uri}", flush=True)
         books_raw = self._read_books(source.books_raw_uri)
         print(f"[prepare] Книги загружены: {len(books_raw)} строк", flush=True)
         print("[prepare] Подготовка таблицы книг и item_id маппинга", flush=True)
-        books, book_to_item = self._prepare_books(books_raw, language_filter=params.language_filter_enabled)
+        books, book_to_item = self._prepare_books(
+            books_raw, language_filter=params.language_filter_enabled
+        )
         print(f"[prepare] Подготовлено книг: {len(books)}", flush=True)
 
-        print(f"[prepare] Чтение interactions из {source.interactions_raw_uri}", flush=True)
+        print(
+            f"[prepare] Чтение interactions из {source.interactions_raw_uri}",
+            flush=True,
+        )
         interactions = self._prepare_interactions(
             interactions_uri=source.interactions_raw_uri,
             book_to_item=book_to_item,
@@ -51,7 +63,10 @@ class GoodreadsPreprocessor(PreprocessorPort):
         print(f"[prepare] Применение k-core: {params.k_core}", flush=True)
         interactions = self._apply_k_core(interactions, params.k_core)
         print(f"[prepare] После k-core: {len(interactions)}", flush=True)
-        print(f"[prepare] Отбор хвоста по времени: {params.keep_recent_fraction}", flush=True)
+        print(
+            f"[prepare] Отбор хвоста по времени: {params.keep_recent_fraction}",
+            flush=True,
+        )
         interactions = self._keep_recent_tail(interactions, params.keep_recent_fraction)
         print(f"[prepare] После keep_recent_tail: {len(interactions)}", flush=True)
 
@@ -63,15 +78,18 @@ class GoodreadsPreprocessor(PreprocessorPort):
         )
         print(f"[prepare] Split train/test: {len(train)} / {len(test)}", flush=True)
         print("[prepare] Построение local_train/local_val split", flush=True)
-        local_train, local_val, local_val_warm, local_val_cold, local_split_ts = self._build_local_split(
-            train=train,
-            val_fraction=params.local_val_fraction,
-            warm_users_only=params.warm_users_only,
-            cold_max_interactions=params.cold_max_interactions,
+        local_train, local_val, local_val_warm, local_val_cold, local_split_ts = (
+            self._build_local_split(
+                train=train,
+                val_fraction=params.local_val_fraction,
+                warm_users_only=params.warm_users_only,
+                cold_max_interactions=params.cold_max_interactions,
+            )
         )
         local_train = self._add_interaction_weight(local_train)
         print(
-            f"[prepare] Local split train/val/warm/cold: {len(local_train)} / {len(local_val)} / "
+            "[prepare] Local split train/val/warm/cold: "
+            f"{len(local_train)} / {len(local_val)} / "
             f"{len(local_val_warm)} / {len(local_val_cold)}",
             flush=True,
         )
@@ -100,7 +118,9 @@ class GoodreadsPreprocessor(PreprocessorPort):
 
         train_item_counts = train.groupby("item_id").size().to_dict()
         cold_test_items = {
-            item_id for item_id in set(test["item_id"].tolist()) if int(train_item_counts.get(item_id, 0)) <= params.cold_max_interactions
+            item_id
+            for item_id in set(test["item_id"].tolist())
+            if int(train_item_counts.get(item_id, 0)) <= params.cold_max_interactions
         }
 
         summary = {
@@ -125,7 +145,9 @@ class GoodreadsPreprocessor(PreprocessorPort):
                 "cold_test_items": int(len(cold_test_items)),
             },
         }
-        summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+        summary_path.write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
 
         manifest = {
             "status": "SUCCESS",
@@ -140,7 +162,9 @@ class GoodreadsPreprocessor(PreprocessorPort):
                 "summary.json",
             ],
         }
-        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         print("[prepare] Локальные артефакты успешно сохранены.", flush=True)
 
         return DatasetArtifacts(
@@ -198,14 +222,20 @@ class GoodreadsPreprocessor(PreprocessorPort):
         _require_columns(books, required, "books")
         return books
 
-    def _prepare_books(self, books: pd.DataFrame, language_filter: bool) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def _prepare_books(
+        self, books: pd.DataFrame, language_filter: bool
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
 
         data = books.copy()
         for col in ["title", "description"]:
             data[col] = data[col].fillna("").astype(str)
 
         data["tags"] = data["popular_shelves"].apply(_extract_shelf_names)
-        data["series"] = data["series"].apply(_to_list) if "series" in data.columns else [[] for _ in range(len(data))]
+        data["series"] = (
+            data["series"].apply(_to_list)
+            if "series" in data.columns
+            else [[] for _ in range(len(data))]
+        )
         data["authors"] = data["authors"].apply(_extract_authors)
 
         if language_filter:
@@ -227,7 +257,16 @@ class GoodreadsPreprocessor(PreprocessorPort):
 
         cols = [
             c
-            for c in ["item_id", "series", "tags", "title", "description", "url", "image_url", "authors"]
+            for c in [
+                "item_id",
+                "series",
+                "tags",
+                "title",
+                "description",
+                "url",
+                "image_url",
+                "authors",
+            ]
             if c in data.columns
         ]
         reduced = data[cols].copy()
@@ -239,21 +278,47 @@ class GoodreadsPreprocessor(PreprocessorPort):
             rows.append(
                 {
                     "item_id": int(item_id),
-                    "series": _merge_unique_lists(part["series"]) if "series" in part.columns else [],
-                    "tags": _merge_unique_lists(part["tags"]) if "tags" in part.columns else [],
-                    "title": _first_non_empty(part["title"]) if "title" in part.columns else "",
-                    "description": _first_non_empty(part["description"]) if "description" in part.columns else "",
-                    "url": _first_non_empty(part["url"]) if "url" in part.columns else "",
-                    "image_url": _best_image(part["image_url"]) if "image_url" in part.columns else "",
-                    "authors": _merge_unique_lists(part["authors"]) if "authors" in part.columns else [],
+                    "series": (
+                        _merge_unique_lists(part["series"])
+                        if "series" in part.columns
+                        else []
+                    ),
+                    "tags": (
+                        _merge_unique_lists(part["tags"])
+                        if "tags" in part.columns
+                        else []
+                    ),
+                    "title": (
+                        _first_non_empty(part["title"])
+                        if "title" in part.columns
+                        else ""
+                    ),
+                    "description": (
+                        _first_non_empty(part["description"])
+                        if "description" in part.columns
+                        else ""
+                    ),
+                    "url": (
+                        _first_non_empty(part["url"]) if "url" in part.columns else ""
+                    ),
+                    "image_url": (
+                        _best_image(part["image_url"])
+                        if "image_url" in part.columns
+                        else ""
+                    ),
+                    "authors": (
+                        _merge_unique_lists(part["authors"])
+                        if "authors" in part.columns
+                        else []
+                    ),
                 }
             )
         out_books = pd.DataFrame(rows).sort_values("item_id").reset_index(drop=True)
         return out_books, book_to_item
 
-    def _prepare_interactions(self, interactions_uri: str,
-
-        book_to_item: pd.DataFrame, chunksize: int) -> pd.DataFrame:
+    def _prepare_interactions(
+        self, interactions_uri: str, book_to_item: pd.DataFrame, chunksize: int
+    ) -> pd.DataFrame:
 
         path = Path(interactions_uri)
         if not path.exists():
@@ -269,7 +334,9 @@ class GoodreadsPreprocessor(PreprocessorPort):
             _require_columns(chunk, required, "interactions_chunk")
             chunk = chunk[required].copy()
 
-            merged = chunk.merge(book_to_item, on="book_id", how="inner").drop(columns=["book_id"])
+            merged = chunk.merge(book_to_item, on="book_id", how="inner").drop(
+                columns=["book_id"]
+            )
             merged["date_added"] = pd.to_datetime(
                 merged["date_added"],
                 format="%a %b %d %H:%M:%S %z %Y",
@@ -279,19 +346,19 @@ class GoodreadsPreprocessor(PreprocessorPort):
             merged = merged.dropna(subset=["date_added"]).copy()
             merged["date_added"] = merged["date_added"].dt.tz_localize(None)
 
-            agg = (
-                merged.groupby(["user_id", "item_id"], as_index=False)
-                .agg(
-                    is_read=("is_read", "max"),
-                    rating=("rating", "max"),
-                    date_added=("date_added", "min"),
-                )
+            agg = merged.groupby(["user_id", "item_id"], as_index=False).agg(
+                is_read=("is_read", "max"),
+                rating=("rating", "max"),
+                date_added=("date_added", "min"),
             )
             partials.append(agg)
             if chunk_idx % 10 == 0:
                 print(
-                    f"[prepare] Обработано чанков interactions: {chunk_idx}, "
-                    f"сырьевых строк: {total_rows}, агрегированных блоков: {len(partials)}",
+                    "[prepare] Обработано чанков "
+                    f"interactions: {chunk_idx}, "
+                    f"сырьевых строк: {total_rows}, "
+                    f"агрегированных блоков: "
+                    f"{len(partials)}",
                     flush=True,
                 )
 
@@ -320,7 +387,9 @@ class GoodreadsPreprocessor(PreprocessorPort):
         return interactions[interactions["user_id"].isin(keep_users)].copy()
 
     @staticmethod
-    def _keep_recent_tail(interactions: pd.DataFrame, keep_recent_fraction: float) -> pd.DataFrame:
+    def _keep_recent_tail(
+        interactions: pd.DataFrame, keep_recent_fraction: float
+    ) -> pd.DataFrame:
         data = interactions.sort_values("date_added").reset_index(drop=True)
         if keep_recent_fraction >= 1:
             return data
@@ -328,10 +397,13 @@ class GoodreadsPreprocessor(PreprocessorPort):
         return data.tail(n_keep).reset_index(drop=True)
 
     @staticmethod
-    def _build_train_test(interactions: pd.DataFrame, test_fraction: float,
-        warm_users_only: bool) -> tuple[pd.DataFrame, pd.DataFrame, Any]:
+    def _build_train_test(
+        interactions: pd.DataFrame, test_fraction: float, warm_users_only: bool
+    ) -> tuple[pd.DataFrame, pd.DataFrame, Any]:
 
-        split_ts = interactions["date_added"].quantile(1 - test_fraction, interpolation="nearest")
+        split_ts = interactions["date_added"].quantile(
+            1 - test_fraction, interpolation="nearest"
+        )
         train = interactions[interactions["date_added"] < split_ts].copy()
         test = interactions[interactions["date_added"] >= split_ts].copy()
 
@@ -339,23 +411,30 @@ class GoodreadsPreprocessor(PreprocessorPort):
             train_users = set(train["user_id"].tolist())
             test = test[test["user_id"].isin(train_users)].copy()
 
-        test = test.sort_values(["user_id", "rating", "is_read"], ascending=[True, False, False])
+        test = test.sort_values(
+            ["user_id", "rating", "is_read"], ascending=[True, False, False]
+        )
         train = train.sort_values(["date_added", "user_id", "item_id"])
         test = test[["user_id", "item_id"]].reset_index(drop=True)
         train = train.reset_index(drop=True)
         return train, test, split_ts
 
     @staticmethod
-    def _build_local_split(train: pd.DataFrame, val_fraction: float,
+    def _build_local_split(
+        train: pd.DataFrame,
+        val_fraction: float,
         warm_users_only: bool,
-        cold_max_interactions: int) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, Any]:
+        cold_max_interactions: int,
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, Any]:
 
         if "date_added" not in train.columns:
             raise ValueError("Train must contain date_added for local split")
         if len(train) == 0:
             raise ValueError("Train is empty")
 
-        split_ts = train["date_added"].quantile(1 - val_fraction, interpolation="nearest")
+        split_ts = train["date_added"].quantile(
+            1 - val_fraction, interpolation="nearest"
+        )
         local_train = train[train["date_added"] < split_ts].copy()
         local_val = train[train["date_added"] >= split_ts].copy()
 
@@ -366,12 +445,22 @@ class GoodreadsPreprocessor(PreprocessorPort):
         val_items = set(local_val["item_id"].tolist())
         train_item_counts = local_train.groupby("item_id").size().to_dict()
         cold_items = {
-            item_id for item_id in val_items if int(train_item_counts.get(item_id, 0)) <= int(cold_max_interactions)
+            item_id
+            for item_id in val_items
+            if int(train_item_counts.get(item_id, 0)) <= int(cold_max_interactions)
         }
         warm_items = val_items - cold_items
 
-        local_val_warm = local_val[local_val["item_id"].isin(warm_items)].copy().reset_index(drop=True)
-        local_val_cold = local_val[local_val["item_id"].isin(cold_items)].copy().reset_index(drop=True)
+        local_val_warm = (
+            local_val[local_val["item_id"].isin(warm_items)]
+            .copy()
+            .reset_index(drop=True)
+        )
+        local_val_cold = (
+            local_val[local_val["item_id"].isin(cold_items)]
+            .copy()
+            .reset_index(drop=True)
+        )
 
         if len(local_val_warm) + len(local_val_cold) != len(local_val):
             raise ValueError("Warm/cold local split mismatch")
@@ -385,7 +474,9 @@ class GoodreadsPreprocessor(PreprocessorPort):
         out = train.copy()
         rating = pd.to_numeric(out["rating"], errors="coerce").fillna(0)
         is_read = pd.to_numeric(out["is_read"], errors="coerce").fillna(0)
-        out["interaction_weight"] = 1.0 + 0.25 * rating.clip(lower=0) + 0.5 * is_read.clip(lower=0)
+        out["interaction_weight"] = (
+            1.0 + 0.25 * rating.clip(lower=0) + 0.5 * is_read.clip(lower=0)
+        )
         return out
 
 

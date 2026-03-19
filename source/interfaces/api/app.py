@@ -14,20 +14,21 @@ try:
 except ModuleNotFoundError:
     boto3 = None
 
+from source.infrastructure.config import load_api_runtime_settings
 from source.infrastructure.inference import (
     InferenceRequestLogger,
     InferenceService,
     ModelBundleLoader,
-    resolve_model_uri,
     UserHistoryProvider,
+    resolve_model_uri,
 )
 from source.infrastructure.inference.demo_store import DemoStore
 from source.infrastructure.inference.service import InferenceRequest
 from source.infrastructure.storage.postgres import PostgresClient
-from source.infrastructure.config import load_api_runtime_settings
 from source.interfaces.api.schemas import (
     DemoBook,
     DemoCatalogResponse,
+    DemoUser,
     DemoUsersResponse,
     HealthResponse,
     InteractionRequest,
@@ -154,7 +155,9 @@ def create_app() -> FastAPI:
         svc = _service_or_503(state)
         safe_limit = min(max(1, int(limit)), 100)
         try:
-            return SimilarItemsResponse(**svc.similar_items(item_id=item_id, limit=safe_limit))
+            return SimilarItemsResponse(
+                **svc.similar_items(item_id=item_id, limit=safe_limit)
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -174,7 +177,9 @@ def create_app() -> FastAPI:
 
     @app.post("/v1/admin/reload-model")
     def reload_model() -> dict[str, Any]:
-        changed = _reload_model(state=state, settings=load_api_runtime_settings(), force=True)
+        changed = _reload_model(
+            state=state, settings=load_api_runtime_settings(), force=True
+        )
         svc = _service_or_503(state)
         return {
             "status": "ok",
@@ -190,7 +195,9 @@ def create_app() -> FastAPI:
         safe_limit = min(max(1, int(limit)), 5000)
         items = store.list_users(limit=safe_limit)
         return DemoUsersResponse(
-            items=[{"user_id": x.user_id, "history_len": x.history_len} for x in items],
+            items=[
+                DemoUser(user_id=x.user_id, history_len=x.history_len) for x in items
+            ],
             total=len(items),
         )
 
@@ -233,7 +240,9 @@ app = create_app()
 
 def _service_or_503(state: AppState) -> InferenceService:
     if state.service is None:
-        raise HTTPException(status_code=503, detail="Inference service is not initialized")
+        raise HTTPException(
+            status_code=503, detail="Inference service is not initialized"
+        )
     return state.service
 
 
@@ -253,21 +262,33 @@ def _reload_model(state: AppState, settings: Any, *, force: bool) -> bool:
 
     with state.model_reload_lock:
         state.model_reload_checked_at = time.monotonic()
-        resolved_uri, pointer = resolve_model_uri(settings.model_uri, settings.active_model_pointer)
+        resolved_uri, pointer = resolve_model_uri(
+            settings.model_uri, settings.active_model_pointer
+        )
         if not resolved_uri:
             if state.current_model_uri:
                 resolved_uri = state.current_model_uri
             else:
-                raise RuntimeError("Model URI is empty and no active model pointer found")
+                raise RuntimeError(
+                    "Model URI is empty and no active model pointer found"
+                )
 
-        if not force and state.current_model_uri == resolved_uri and state.service is not None:
+        if (
+            not force
+            and state.current_model_uri == resolved_uri
+            and state.service is not None
+        ):
             return False
 
         bundle = state.loader.load(model_uri=resolved_uri)
         state.service = InferenceService(
             bundle=bundle,
-            history=UserHistoryProvider(pg=state.runtime_pg, table_name=settings.history_table),
-            request_logger=InferenceRequestLogger(pg=state.runtime_pg, table_name=settings.inference_log_table),
+            history=UserHistoryProvider(
+                pg=state.runtime_pg, table_name=settings.history_table
+            ),
+            request_logger=InferenceRequestLogger(
+                pg=state.runtime_pg, table_name=settings.inference_log_table
+            ),
         )
         state.current_model_uri = resolved_uri
         state.current_model_run_id = pointer.run_id if pointer is not None else None

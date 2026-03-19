@@ -50,7 +50,9 @@ class LinearFinalReranker(FinalRankerPort):
             for item in ranked
         ]
 
-    def _rerank_with_source_diversity(self, candidates: list[ScoredCandidate], top_k: int) -> list[ScoredCandidate]:
+    def _rerank_with_source_diversity(
+        self, candidates: list[ScoredCandidate], top_k: int
+    ) -> list[ScoredCandidate]:
         if self._cfg.source_repeat_penalty <= 0:
             return sorted(candidates, key=self._score, reverse=True)[:top_k]
 
@@ -61,7 +63,9 @@ class LinearFinalReranker(FinalRankerPort):
             best_idx = 0
             best_score = None
             for i, item in enumerate(pool):
-                penalty = self._cfg.source_repeat_penalty * source_counts.get(item.source, 0)
+                penalty = self._cfg.source_repeat_penalty * source_counts.get(
+                    item.source, 0
+                )
                 score = self._score(item) - penalty
                 if best_score is None or score > best_score:
                     best_score = score

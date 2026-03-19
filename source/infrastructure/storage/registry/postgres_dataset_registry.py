@@ -7,17 +7,23 @@ from datetime import datetime
 from source.application.ports import DatasetRegistryPort
 from source.domain.entities import DatasetVersion, PreprocessingParams
 from source.infrastructure.storage.postgres.postgres_client import PostgresClient
+
+
 # Сохраняет версии датасета в PostgreSQL.
 class PostgresDatasetRegistry(DatasetRegistryPort):
-
 
     def __init__(self, pg: PostgresClient) -> None:
         self._pg = pg
 
-    def find_success_by_hash(self, dataset_name: str, params_hash: str) -> DatasetVersion | None:
+    def find_success_by_hash(
+        self, dataset_name: str, params_hash: str
+    ) -> DatasetVersion | None:
         row = self._pg.fetchone(
             """
-            SELECT dataset_name, version_id, params_hash, s3_prefix, params_json, stats_json, metadata_json, created_at
+            SELECT dataset_name, version_id,
+                   params_hash, s3_prefix,
+                   params_json, stats_json,
+                   metadata_json, created_at
             FROM dataset_registry
             WHERE dataset_name = %s AND params_hash = %s
             """,

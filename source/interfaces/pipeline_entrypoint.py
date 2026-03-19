@@ -4,7 +4,10 @@ from pathlib import Path
 
 from data.goodreads import download_goodreads_raw
 from source.application.use_cases import PrepareDataCommand, PrepareDataUseCase
-from source.application.use_cases.training import TrainPipelineCommand, TrainPipelineUseCase
+from source.application.use_cases.training import (
+    TrainPipelineCommand,
+    TrainPipelineUseCase,
+)
 from source.domain.entities import DatasetSource, PreprocessingParams
 from source.infrastructure.config import load_pipeline_settings
 from source.infrastructure.processing.preprocessing import GoodreadsPreprocessor
@@ -18,15 +21,25 @@ def run_pipeline_from_env() -> None:
 
     print(f"[pipeline] dataset_name={settings.dataset_name}")
     print(f"[pipeline] raw_dir={settings.raw_dir}")
-    print(f"[pipeline] registry_backend={settings.registry_backend} store_backend={settings.store_backend}")
+    print(
+        f"[pipeline] registry_backend="
+        f"{settings.registry_backend} "
+        f"store_backend="
+        f"{settings.store_backend}"
+    )
 
     if settings.run_migrate and settings.registry_backend == "postgres":
         if not settings.pg_dsn.strip():
-            raise ValueError("BOOKRECS_PG_DSN is required when BOOKRECS_REGISTRY_BACKEND=postgres")
+            raise ValueError(
+                "BOOKRECS_PG_DSN is required when BOOKRECS_REGISTRY_BACKEND=postgres"
+            )
         run_migration(pg_dsn=settings.pg_dsn, migration_path=settings.migration_path)
         print(f"[pipeline] migrations applied from {settings.migration_path}")
 
-    if not Path(settings.books_raw_uri).exists() or not Path(settings.interactions_raw_uri).exists():
+    if (
+        not Path(settings.books_raw_uri).exists()
+        or not Path(settings.interactions_raw_uri).exists()
+    ):
         download_goodreads_raw(raw_dir=settings.raw_dir, force=False)
         print("[pipeline] raw data downloaded")
 
@@ -100,6 +113,7 @@ def run_pipeline_from_env() -> None:
         print(f"[pipeline] run_dir={train_result.run_dir}")
     else:
         print("[pipeline] train skipped")
+
 
 def main() -> None:
     run_pipeline_from_env()

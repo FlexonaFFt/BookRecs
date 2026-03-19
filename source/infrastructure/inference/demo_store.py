@@ -43,7 +43,10 @@ class DemoStore:
             (safe_limit,),
         )
         return [
-            DemoUser(user_id=str(row["user_id"]), history_len=int(row.get("history_len", 0) or 0))
+            DemoUser(
+                user_id=str(row["user_id"]),
+                history_len=int(row.get("history_len", 0) or 0),
+            )
             for row in rows
         ]
 
@@ -71,7 +74,14 @@ class DemoStore:
             params.append(f"%{safe_q}%")
 
         if safe_genre and safe_genre != "all":
-            where_parts.append("EXISTS (SELECT 1 FROM jsonb_array_elements_text(tags_json) AS t(tag) WHERE LOWER(t.tag) = %s)")
+            where_parts.append(
+                "EXISTS ("
+                "SELECT 1 "
+                "FROM jsonb_array_elements_text(tags_json) "
+                "AS t(tag) "
+                "WHERE LOWER(t.tag) = %s"
+                ")"
+            )
             params.append(safe_genre)
 
         where_sql = ""
@@ -85,7 +95,9 @@ class DemoStore:
         total = int((count_row or {}).get("total", 0) or 0)
 
         query = f"""
-            SELECT item_id, title, description, url, image_url, authors_json, tags_json, series_json
+            SELECT item_id, title, description, url,
+                   image_url, authors_json,
+                   tags_json, series_json
             FROM demo_books
             {where_sql}
             ORDER BY item_id ASC
@@ -99,7 +111,9 @@ class DemoStore:
             return None
         row = self._pg.fetchone(
             """
-            SELECT item_id, title, description, url, image_url, authors_json, tags_json, series_json
+            SELECT item_id, title, description, url,
+                   image_url, authors_json,
+                   tags_json, series_json
             FROM demo_books
             WHERE item_id = %s
             """,

@@ -43,7 +43,9 @@ class Settings:
 
         profile = _resolve_train_profile(_get)
         if profile not in {"auto", "default", "lite"}:
-            raise ValueError("BOOKRECS_TRAIN_PROFILE must be one of: auto, default, lite")
+            raise ValueError(
+                "BOOKRECS_TRAIN_PROFILE must be one of: auto, default, lite"
+            )
 
         auto_tune = env_bool(values, "BOOKRECS_TRAIN_AUTO_TUNE", False)
         profile_defaults = _profile_defaults(profile)
@@ -54,14 +56,18 @@ class Settings:
             auto_tune=auto_tune,
         ).lower()
         if prerank_model not in {"auto", "catboost", "linear"}:
-            raise ValueError("BOOKRECS_TRAIN_PRERANK_MODEL must be one of: auto, catboost, linear")
+            raise ValueError(
+                "BOOKRECS_TRAIN_PRERANK_MODEL must be one of: auto, catboost, linear"
+            )
 
         return cls(
             pg_dsn=_get("BOOKRECS_PG_DSN", ""),
             s3_bucket=_get("BOOKRECS_S3_BUCKET", ""),
             s3_region=_get("BOOKRECS_S3_REGION", "us-east-1"),
             s3_endpoint=_get("BOOKRECS_S3_ENDPOINT", ""),
-            train_dataset_dir=_get("BOOKRECS_TRAIN_DATASET_DIR", "artifacts/tmp_preprocessed/goodreads_ya"),
+            train_dataset_dir=_get(
+                "BOOKRECS_TRAIN_DATASET_DIR", "artifacts/tmp_preprocessed/goodreads_ya"
+            ),
             train_output_root=_get("BOOKRECS_TRAIN_OUTPUT_ROOT", "artifacts/runs"),
             train_profile=profile,
             train_auto_tune=auto_tune,
@@ -71,7 +77,9 @@ class Settings:
                 int(profile_defaults["eval_users_limit"]),
                 auto_tune=auto_tune,
             ),
-            cold_max_interactions=_parse_non_negative_int("BOOKRECS_COLD_MAX_INTERACTIONS", _get, 5),
+            cold_max_interactions=_parse_non_negative_int(
+                "BOOKRECS_COLD_MAX_INTERACTIONS", _get, 5
+            ),
             train_candidate_pool_size=_read_positive_int(
                 values,
                 "BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE",
@@ -90,7 +98,9 @@ class Settings:
                 int(profile_defaults["pre_top_m"]),
                 auto_tune=auto_tune,
             ),
-            train_final_top_k=_parse_positive_int("BOOKRECS_TRAIN_FINAL_TOP_K", _get, 10),
+            train_final_top_k=_parse_positive_int(
+                "BOOKRECS_TRAIN_FINAL_TOP_K", _get, 10
+            ),
             train_cf_max_neighbors=_read_positive_int(
                 values,
                 "BOOKRECS_TRAIN_CF_MAX_NEIGHBORS",
@@ -144,16 +154,24 @@ class Settings:
             "BOOKRECS_TRAIN_EVAL_USERS_LIMIT": str(self.train_eval_users_limit),
             "BOOKRECS_COLD_MAX_INTERACTIONS": str(self.cold_max_interactions),
             "BOOKRECS_TRAIN_CANDIDATE_POOL_SIZE": str(self.train_candidate_pool_size),
-            "BOOKRECS_TRAIN_PER_SOURCE_LIMIT": str(self.train_candidate_per_source_limit),
+            "BOOKRECS_TRAIN_PER_SOURCE_LIMIT": str(
+                self.train_candidate_per_source_limit
+            ),
             "BOOKRECS_TRAIN_PRE_TOP_M": str(self.train_pre_top_m),
             "BOOKRECS_TRAIN_FINAL_TOP_K": str(self.train_final_top_k),
             "BOOKRECS_TRAIN_CF_MAX_NEIGHBORS": str(self.train_cf_max_neighbors),
-            "BOOKRECS_TRAIN_CF_MAX_ITEMS_PER_USER": str(self.train_cf_max_items_per_user),
-            "BOOKRECS_TRAIN_CONTENT_MAX_NEIGHBORS": str(self.train_content_max_neighbors),
+            "BOOKRECS_TRAIN_CF_MAX_ITEMS_PER_USER": str(
+                self.train_cf_max_items_per_user
+            ),
+            "BOOKRECS_TRAIN_CONTENT_MAX_NEIGHBORS": str(
+                self.train_content_max_neighbors
+            ),
             "BOOKRECS_TRAIN_PRERANK_MODEL": self.train_prerank_model,
             "BOOKRECS_TRAIN_CATBOOST_ITERATIONS": str(self.train_catboost_iterations),
             "BOOKRECS_TRAIN_CATBOOST_DEPTH": str(self.train_catboost_depth),
-            "BOOKRECS_TRAIN_CATBOOST_LEARNING_RATE": str(self.train_catboost_learning_rate),
+            "BOOKRECS_TRAIN_CATBOOST_LEARNING_RATE": str(
+                self.train_catboost_learning_rate
+            ),
             "BOOKRECS_TRAIN_SEED": str(self.train_seed),
         }
 
@@ -219,11 +237,21 @@ class PipelineSettings:
         return cls(
             dataset_name=dataset_name,
             raw_dir=raw_dir,
-            books_raw_uri=env_str(values, "BOOKRECS_BOOKS_RAW_URI", f"{raw_dir}/books.json.gz"),
-            interactions_raw_uri=env_str(values, "BOOKRECS_INTERACTIONS_RAW_URI", f"{raw_dir}/interactions.json.gz"),
-            s3_prefix=env_str(values, "BOOKRECS_S3_PREFIX", f"s3://bookrecs/datasets/{dataset_name}"),
+            books_raw_uri=env_str(
+                values, "BOOKRECS_BOOKS_RAW_URI", f"{raw_dir}/books.json.gz"
+            ),
+            interactions_raw_uri=env_str(
+                values,
+                "BOOKRECS_INTERACTIONS_RAW_URI",
+                f"{raw_dir}/interactions.json.gz",
+            ),
+            s3_prefix=env_str(
+                values, "BOOKRECS_S3_PREFIX", f"s3://bookrecs/datasets/{dataset_name}"
+            ),
             k_core=env_positive_int(values, "BOOKRECS_K_CORE", 2),
-            keep_recent_fraction=env_float(values, "BOOKRECS_KEEP_RECENT_FRACTION", 0.6),
+            keep_recent_fraction=env_float(
+                values, "BOOKRECS_KEEP_RECENT_FRACTION", 0.6
+            ),
             test_fraction=env_float(values, "BOOKRECS_TEST_FRACTION", 0.25),
             local_val_fraction=env_float(values, "BOOKRECS_LOCAL_VAL_FRACTION", 0.2),
             cold_max_interactions=env_non_negative_int(
@@ -232,8 +260,12 @@ class PipelineSettings:
                 core.cold_max_interactions,
             ),
             warm_users_only=env_bool(values, "BOOKRECS_WARM_USERS_ONLY", True),
-            language_filter_enabled=env_bool(values, "BOOKRECS_LANGUAGE_FILTER_ENABLED", True),
-            interactions_chunksize=env_positive_int(values, "BOOKRECS_INTERACTIONS_CHUNKSIZE", 200_000),
+            language_filter_enabled=env_bool(
+                values, "BOOKRECS_LANGUAGE_FILTER_ENABLED", True
+            ),
+            interactions_chunksize=env_positive_int(
+                values, "BOOKRECS_INTERACTIONS_CHUNKSIZE", 200_000
+            ),
             store_backend=env_str(values, "BOOKRECS_STORE_BACKEND", "local"),
             registry_backend=env_str(values, "BOOKRECS_REGISTRY_BACKEND", "memory"),
             s3_bucket=env_str(values, "BOOKRECS_S3_BUCKET", core.s3_bucket),
@@ -248,11 +280,16 @@ class PipelineSettings:
             skip_prepare=env_bool(values, "BOOKRECS_SKIP_PREPARE", False),
             skip_train=env_bool(values, "BOOKRECS_SKIP_TRAIN", False),
             run_migrate=env_bool(values, "BOOKRECS_RUN_MIGRATE", True),
-            dataset_dir=env_optional_str(values, "BOOKRECS_TRAIN_DATASET_DIR") or f"artifacts/tmp_preprocessed/{dataset_name}",
-            output_root=env_str(values, "BOOKRECS_TRAIN_OUTPUT_ROOT", core.train_output_root),
+            dataset_dir=env_optional_str(values, "BOOKRECS_TRAIN_DATASET_DIR")
+            or f"artifacts/tmp_preprocessed/{dataset_name}",
+            output_root=env_str(
+                values, "BOOKRECS_TRAIN_OUTPUT_ROOT", core.train_output_root
+            ),
             run_name=env_optional_str(values, "BOOKRECS_TRAIN_RUN_NAME"),
             train_profile=env_str(values, "BOOKRECS_TRAIN_PROFILE", core.train_profile),
-            train_auto_tune=env_bool(values, "BOOKRECS_TRAIN_AUTO_TUNE", core.train_auto_tune),
+            train_auto_tune=env_bool(
+                values, "BOOKRECS_TRAIN_AUTO_TUNE", core.train_auto_tune
+            ),
             eval_users_limit=_read_positive_int(
                 values,
                 "BOOKRECS_TRAIN_EVAL_USERS_LIMIT",
@@ -275,7 +312,9 @@ class PipelineSettings:
                 core.train_pre_top_m,
                 auto_tune=auto_tune,
             ),
-            final_top_k=env_positive_int(values, "BOOKRECS_TRAIN_FINAL_TOP_K", core.train_final_top_k),
+            final_top_k=env_positive_int(
+                values, "BOOKRECS_TRAIN_FINAL_TOP_K", core.train_final_top_k
+            ),
             cf_mode=cf_mode,
             cf_max_neighbors=_read_positive_int(
                 values,
@@ -350,13 +389,21 @@ class ApiRuntimeSettings:
                 "BOOKRECS_ACTIVE_MODEL_POINTER",
                 "artifacts/runs/active_model.json",
             ),
-            auto_reload_sec=env_positive_int(values, "BOOKRECS_API_MODEL_AUTO_RELOAD_SEC", 60),
-            model_cache_dir=env_str(values, "BOOKRECS_API_MODEL_CACHE_DIR", "artifacts/cache/models"),
+            auto_reload_sec=env_positive_int(
+                values, "BOOKRECS_API_MODEL_AUTO_RELOAD_SEC", 60
+            ),
+            model_cache_dir=env_str(
+                values, "BOOKRECS_API_MODEL_CACHE_DIR", "artifacts/cache/models"
+            ),
             s3_region=env_str(values, "BOOKRECS_S3_REGION", "us-east-1"),
             s3_endpoint=env_str(values, "BOOKRECS_S3_ENDPOINT", ""),
             pg_dsn=env_str(values, "BOOKRECS_PG_DSN", ""),
-            history_table=env_str(values, "BOOKRECS_API_HISTORY_TABLE", "user_item_interactions"),
-            inference_log_table=env_str(values, "BOOKRECS_API_INFERENCE_LOG_TABLE", "inference_requests"),
+            history_table=env_str(
+                values, "BOOKRECS_API_HISTORY_TABLE", "user_item_interactions"
+            ),
+            inference_log_table=env_str(
+                values, "BOOKRECS_API_INFERENCE_LOG_TABLE", "inference_requests"
+            ),
             aws_access_key_id=env_optional_str(values, "AWS_ACCESS_KEY_ID"),
             aws_secret_access_key=env_optional_str(values, "AWS_SECRET_ACCESS_KEY"),
         )
@@ -425,7 +472,9 @@ def env_str(values: Mapping[str, str], name: str, default: str) -> str:
     return str(raw).strip()
 
 
-def env_optional_str(values: Mapping[str, str], name: str, default: str | None = None) -> str | None:
+def env_optional_str(
+    values: Mapping[str, str], name: str, default: str | None = None
+) -> str | None:
     raw = values.get(name)
     if raw is None:
         return default
@@ -443,7 +492,9 @@ def env_int(values: Mapping[str, str], name: str, default: int) -> int:
     try:
         return int(value)
     except ValueError as exc:
-        raise ValueError(f"Переменная {name} должна быть целым числом, получено: {raw}") from exc
+        raise ValueError(
+            f"Переменная {name} должна быть целым числом, получено: {raw}"
+        ) from exc
 
 
 def env_positive_int(values: Mapping[str, str], name: str, default: int) -> int:
@@ -460,7 +511,9 @@ def env_non_negative_int(values: Mapping[str, str], name: str, default: int) -> 
     return value
 
 
-def _parse_non_negative_int(name: str, getter: Callable[[str, str], str], default: int) -> int:
+def _parse_non_negative_int(
+    name: str, getter: Callable[[str, str], str], default: int
+) -> int:
     value = getter(name, str(default))
     try:
         parsed = int(value)
@@ -488,10 +541,14 @@ def env_float(values: Mapping[str, str], name: str, default: float) -> float:
     try:
         return float(value)
     except ValueError as exc:
-        raise ValueError(f"Переменная {name} должна быть числом, получено: {raw}") from exc
+        raise ValueError(
+            f"Переменная {name} должна быть числом, получено: {raw}"
+        ) from exc
 
 
-def _parse_positive_float(name: str, getter: Callable[[str, str], str], default: float) -> float:
+def _parse_positive_float(
+    name: str, getter: Callable[[str, str], str], default: float
+) -> float:
     value = getter(name, str(default))
     try:
         parsed = float(value)
@@ -655,7 +712,9 @@ def env_bool(values: Mapping[str, str], name: str, default: bool) -> bool:
     raise ValueError(f"Переменная {name} должна быть булевой, получено: {raw}")
 
 
-def _parse_positive_int(name: str, get_value: Callable[[str, str], str], default: int) -> int:
+def _parse_positive_int(
+    name: str, get_value: Callable[[str, str], str], default: int
+) -> int:
     raw = get_value(name, str(default))
     try:
         value = int(raw)

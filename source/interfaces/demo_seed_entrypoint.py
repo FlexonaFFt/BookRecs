@@ -66,7 +66,9 @@ def main() -> None:
     if not pg_dsn:
         raise ValueError("BOOKRECS_PG_DSN is required")
 
-    dataset_dir = Path(env_str("BOOKRECS_DEMO_DATASET_DIR", "artifacts/tmp_preprocessed/goodreads_ya"))
+    dataset_dir = Path(
+        env_str("BOOKRECS_DEMO_DATASET_DIR", "artifacts/tmp_preprocessed/goodreads_ya")
+    )
     users_limit = env_int("BOOKRECS_DEMO_USERS_LIMIT", 2000)
     max_history_per_user = env_int("BOOKRECS_DEMO_MAX_HISTORY_PER_USER", 100)
     reset = env_bool("BOOKRECS_DEMO_RESET", True)
@@ -100,14 +102,18 @@ def main() -> None:
     if missing_train:
         raise ValueError(f"train.parquet missing columns: {sorted(missing_train)}")
 
-    user_counts = train.groupby("user_id")["item_id"].size().sort_values(ascending=False)
+    user_counts = (
+        train.groupby("user_id")["item_id"].size().sort_values(ascending=False)
+    )
     selected_users = user_counts.head(users_limit).index
     filtered = train[train["user_id"].isin(selected_users)].copy()
 
     filtered["date_added"] = pd.to_datetime(filtered["date_added"], errors="coerce")
     filtered = filtered.dropna(subset=["date_added"])
     filtered = filtered.sort_values(["user_id", "date_added"], ascending=[True, False])
-    filtered = filtered.groupby("user_id", as_index=False).head(max_history_per_user).copy()
+    filtered = (
+        filtered.groupby("user_id", as_index=False).head(max_history_per_user).copy()
+    )
 
     history_len = (
         filtered.groupby("user_id")["item_id"]
@@ -142,7 +148,14 @@ def main() -> None:
         event_ts = to_event_ts(getattr(row, "date_added"))
         if event_ts is None:
             continue
-        seen_rows.append((str(getattr(row, "user_id")), int(getattr(row, "item_id")), "seed", event_ts))
+        seen_rows.append(
+            (
+                str(getattr(row, "user_id")),
+                int(getattr(row, "item_id")),
+                "seed",
+                event_ts,
+            )
+        )
 
     print(
         "[demo-seed] prepared rows: "
@@ -153,11 +166,17 @@ def main() -> None:
         with conn.cursor() as cur:
             if reset:
                 print("[demo-seed] truncate demo tables")
-                cur.execute("TRUNCATE TABLE demo_user_seen, demo_users, demo_books RESTART IDENTITY")
+                cur.execute(
+                    "TRUNCATE TABLE demo_user_seen, "
+                    "demo_users, demo_books "
+                    "RESTART IDENTITY"
+                )
 
             book_sql = """
                 INSERT INTO demo_books (
-                    item_id, title, description, url, image_url, authors_json, tags_json, series_json
+                    item_id, title, description,
+                    url, image_url, authors_json,
+                    tags_json, series_json
                 )
                 VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb)
                 ON CONFLICT (item_id) DO UPDATE SET

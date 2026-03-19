@@ -24,7 +24,9 @@ def _parse_end_date(raw: str | None) -> date:
     try:
         return date.fromisoformat(value)
     except ValueError as exc:
-        raise ValueError("BOOKRECS_BATCH_END_DATE must be in YYYY-MM-DD format") from exc
+        raise ValueError(
+            "BOOKRECS_BATCH_END_DATE must be in YYYY-MM-DD format"
+        ) from exc
 
 
 def _build_dates(end_date: date, days: int) -> list[str]:
@@ -42,7 +44,9 @@ def _parse_promote_enabled(raw: str | None) -> bool:
 def main() -> None:
     days = _parse_days(os.getenv("BOOKRECS_BATCH_BACKFILL_DAYS"))
     end_date = _parse_end_date(os.getenv("BOOKRECS_BATCH_END_DATE"))
-    promote_enabled = _parse_promote_enabled(os.getenv("BOOKRECS_BATCH_BACKFILL_PROMOTE"))
+    promote_enabled = _parse_promote_enabled(
+        os.getenv("BOOKRECS_BATCH_BACKFILL_PROMOTE")
+    )
     execution_dates = _build_dates(end_date=end_date, days=days)
 
     # Для backfill нужен run_name, зависящий от execution date.

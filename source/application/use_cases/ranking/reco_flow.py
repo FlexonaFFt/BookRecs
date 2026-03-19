@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from source.application.use_cases.ranking.final_rank import FinalRankCommand, FinalRankUseCase
+from source.application.use_cases.ranking.final_rank import (
+    FinalRankCommand,
+    FinalRankUseCase,
+)
 from source.application.use_cases.ranking.generate_candidates import (
     GenerateCandidatesCommand,
     GenerateCandidatesUseCase,
@@ -38,6 +41,8 @@ class RecoFlowResult:
     candidates: list[Candidate]
     preranked: list[ScoredCandidate]
     final_items: list[FinalItem]
+
+
 # Реализует сценарий оркестрации рекомендательного потока.
 class RecoFlowUseCase:
     """Unified recommendation orchestrator: Stage1 -> Stage2 -> Stage3."""

@@ -199,7 +199,9 @@ def test_pipeline_settings_reads_cold_threshold() -> None:
     assert settings.cold_max_interactions == 9
 
 
-def test_load_settings_lite_profile_overrides_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_settings_lite_profile_overrides_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("BOOKRECS_TRAIN_PROFILE", "lite")
     settings = load_settings()
     assert settings.train_profile == "lite"
@@ -212,19 +214,29 @@ def test_load_settings_lite_profile_overrides_defaults(monkeypatch: pytest.Monke
     assert settings.train_prerank_model == "linear"
 
 
-def test_load_settings_auto_profile_without_cgroup_uses_default(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_settings_auto_profile_without_cgroup_uses_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.delenv("BOOKRECS_TRAIN_PROFILE", raising=False)
-    monkeypatch.setattr("source.infrastructure.config.settings._read_memory_limit_mb", lambda: None)
-    monkeypatch.setattr("source.infrastructure.config.settings._read_meminfo_total_mb", lambda: None)
+    monkeypatch.setattr(
+        "source.infrastructure.config.settings._read_memory_limit_mb", lambda: None
+    )
+    monkeypatch.setattr(
+        "source.infrastructure.config.settings._read_meminfo_total_mb", lambda: None
+    )
     settings = load_settings()
     assert settings.train_profile == "auto"
     assert settings.train_candidate_pool_size == 450
     assert settings.train_prerank_model == "linear"
 
 
-def test_load_settings_auto_profile_with_small_memory_uses_lite(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_settings_auto_profile_with_small_memory_uses_lite(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("BOOKRECS_TRAIN_PROFILE", "auto")
-    monkeypatch.setattr("source.infrastructure.config.settings._read_memory_limit_mb", lambda: 4096)
+    monkeypatch.setattr(
+        "source.infrastructure.config.settings._read_memory_limit_mb", lambda: 4096
+    )
     settings = load_settings()
     assert settings.train_profile == "auto"
     assert settings.train_candidate_pool_size == 450
@@ -232,10 +244,16 @@ def test_load_settings_auto_profile_with_small_memory_uses_lite(monkeypatch: pyt
     assert settings.train_prerank_model == "linear"
 
 
-def test_load_settings_auto_profile_uses_meminfo_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_settings_auto_profile_uses_meminfo_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("BOOKRECS_TRAIN_PROFILE", "auto")
-    monkeypatch.setattr("source.infrastructure.config.settings._read_memory_limit_mb", lambda: None)
-    monkeypatch.setattr("source.infrastructure.config.settings._read_meminfo_total_mb", lambda: 6144)
+    monkeypatch.setattr(
+        "source.infrastructure.config.settings._read_memory_limit_mb", lambda: None
+    )
+    monkeypatch.setattr(
+        "source.infrastructure.config.settings._read_meminfo_total_mb", lambda: 6144
+    )
     settings = load_settings()
     assert settings.train_candidate_pool_size == 450
     assert settings.train_prerank_model == "linear"
