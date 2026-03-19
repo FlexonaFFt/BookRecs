@@ -78,6 +78,14 @@ services:
       - app_data:/app/data/raw_data
       - app_artifacts:/app/artifacts
 
+  frontend:
+    image: ghcr.io/flexonafft/bookrecs-frontend:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+
 volumes:
   pg_data:
   minio_data:
