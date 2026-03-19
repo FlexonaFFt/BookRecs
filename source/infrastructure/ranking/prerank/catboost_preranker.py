@@ -32,7 +32,9 @@ class CatBoostPreRankerConfig:
     verbose: bool = False
     auto_class_weights: str = "Balanced"
     allow_writing_files: bool = False
-    feature_names: list[str] = field(default_factory=lambda: list(PRE_RANK_FEATURE_COLUMNS))
+    feature_names: list[str] = field(
+        default_factory=lambda: list(PRE_RANK_FEATURE_COLUMNS)
+    )
 
 
 class CatBoostPreRanker(PreRankerPort):
@@ -113,7 +115,9 @@ class CatBoostPreRanker(PreRankerPort):
             return []
 
         feature_names = list(self._cfg.feature_names)
-        table = [{key: row.features.get(key, 0.0) for key in feature_names} for row in rows]
+        table = [
+            {key: row.features.get(key, 0.0) for key in feature_names} for row in rows
+        ]
         scores = self._predict_scores(table)
 
         scored: list[ScoredCandidate] = []
@@ -143,4 +147,6 @@ class CatBoostPreRanker(PreRankerPort):
         if hasattr(self._model, "predict"):
             pred = self._model.predict(features)
             return [float(value) for value in pred]
-        raise RuntimeError("CatBoost pre-ranker model does not support predict_proba/predict")
+        raise RuntimeError(
+            "CatBoost pre-ranker model does not support predict_proba/predict"
+        )

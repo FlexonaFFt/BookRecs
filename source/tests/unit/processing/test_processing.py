@@ -1,11 +1,22 @@
 from __future__ import annotations
 
 from source.domain.entities import Candidate, FinalItem
-from source.infrastructure.processing.postprocessing.default_postprocessor import DefaultPostprocessor
-from source.infrastructure.ranking.finalrank.policy_final_reranker import PolicyFinalReranker, PolicyFinalRerankerConfig
-from source.infrastructure.ranking.prerank.catboost_preranker import CatBoostPreRanker, CatBoostPreRankerConfig
+from source.infrastructure.processing.postprocessing.default_postprocessor import (
+    DefaultPostprocessor,
+)
+from source.infrastructure.ranking.finalrank.policy_final_reranker import (
+    PolicyFinalReranker,
+    PolicyFinalRerankerConfig,
+)
+from source.infrastructure.ranking.prerank.catboost_preranker import (
+    CatBoostPreRanker,
+    CatBoostPreRankerConfig,
+)
 from source.infrastructure.ranking.prerank.feature_builder import FeatureBuilder
-from source.infrastructure.ranking.prerank.linear_preranker import LinearPreRanker, LinearPreRankerConfig
+from source.infrastructure.ranking.prerank.linear_preranker import (
+    LinearPreRanker,
+    LinearPreRankerConfig,
+)
 
 
 class FakeProbModel:
@@ -16,7 +27,11 @@ class FakeProbModel:
             payload = rows
         out = []
         for row in payload:
-            score = 0.1 + 0.6 * float(row.get("score_cold", 0.0)) + 0.3 * float(row.get("metadata_overlap", 0.0))
+            score = (
+                0.1
+                + 0.6 * float(row.get("score_cold", 0.0))
+                + 0.3 * float(row.get("metadata_overlap", 0.0))
+            )
             score = max(0.0, min(1.0, score))
             out.append([1.0 - score, score])
         return out
@@ -47,7 +62,13 @@ def test_feature_builder_builds_expected_flags_and_normalized_scores() -> None:
             item_id=1,
             source="cf|pop",
             score=0.2,
-            features={"score_cf": 0.2, "rank_cf": 1.0, "score_pop": 0.2, "rank_pop": 2.0, "source_count": 2.0},
+            features={
+                "score_cf": 0.2,
+                "rank_cf": 1.0,
+                "score_pop": 0.2,
+                "rank_pop": 2.0,
+                "source_count": 2.0,
+            },
         ),
         Candidate(
             user_id="u1",
@@ -57,7 +78,9 @@ def test_feature_builder_builds_expected_flags_and_normalized_scores() -> None:
             features={"score_content": 1.2, "rank_content": 1.0, "source_count": 1.0},
         ),
     ]
-    rows = builder.build(candidates=candidates, user_id="u1", history_len=10, cold_item_ids={2})
+    rows = builder.build(
+        candidates=candidates, user_id="u1", history_len=10, cold_item_ids={2}
+    )
 
     by_id = {row.item_id: row for row in rows}
     assert by_id[1].features["score_cf"] == 1.0
@@ -89,11 +112,31 @@ def test_linear_preranker_returns_top_m_sorted_by_pre_score() -> None:
         )
     )
     candidates = [
-        Candidate(user_id="u1", item_id=1, source="cf", score=0.2, features={"score_cf": 0.2, "rank_cf": 3.0}),
-        Candidate(user_id="u1", item_id=2, source="cf", score=0.9, features={"score_cf": 0.9, "rank_cf": 1.0}),
-        Candidate(user_id="u1", item_id=3, source="cf", score=0.4, features={"score_cf": 0.4, "rank_cf": 2.0}),
+        Candidate(
+            user_id="u1",
+            item_id=1,
+            source="cf",
+            score=0.2,
+            features={"score_cf": 0.2, "rank_cf": 3.0},
+        ),
+        Candidate(
+            user_id="u1",
+            item_id=2,
+            source="cf",
+            score=0.9,
+            features={"score_cf": 0.9, "rank_cf": 1.0},
+        ),
+        Candidate(
+            user_id="u1",
+            item_id=3,
+            source="cf",
+            score=0.4,
+            features={"score_cf": 0.4, "rank_cf": 2.0},
+        ),
     ]
-    out = ranker.rank(candidates=candidates, user_id="u1", history_len=5, cold_item_ids=set(), top_m=2)
+    out = ranker.rank(
+        candidates=candidates, user_id="u1", history_len=5, cold_item_ids=set(), top_m=2
+    )
     assert [x.item_id for x in out] == [2, 3]
 
 
@@ -120,7 +163,12 @@ def test_linear_preranker_can_promote_cold_candidate_with_overlap_signal() -> No
             item_id=10,
             source="pop",
             score=1.0,
-            features={"score_pop": 1.0, "rank_pop": 1.0, "total_score": 1.0, "source_count": 1.0},
+            features={
+                "score_pop": 1.0,
+                "rank_pop": 1.0,
+                "total_score": 1.0,
+                "source_count": 1.0,
+            },
         ),
         Candidate(
             user_id="u1",
@@ -137,13 +185,17 @@ def test_linear_preranker_can_promote_cold_candidate_with_overlap_signal() -> No
         ),
     ]
 
-    out = ranker.rank(candidates=candidates, user_id="u1", history_len=5, cold_item_ids={20}, top_m=2)
+    out = ranker.rank(
+        candidates=candidates, user_id="u1", history_len=5, cold_item_ids={20}, top_m=2
+    )
     assert [x.item_id for x in out] == [20, 10]
 
 
 def test_linear_preranker_returns_empty_for_non_positive_top_m() -> None:
     ranker = LinearPreRanker()
-    out = ranker.rank(candidates=[], user_id="u1", history_len=0, cold_item_ids=set(), top_m=0)
+    out = ranker.rank(
+        candidates=[], user_id="u1", history_len=0, cold_item_ids=set(), top_m=0
+    )
     assert out == []
 
 
@@ -155,7 +207,12 @@ def test_catboost_preranker_ranks_candidates_from_model_scores() -> None:
             item_id=10,
             source="pop",
             score=1.0,
-            features={"score_pop": 1.0, "rank_pop": 1.0, "total_score": 1.0, "source_count": 1.0},
+            features={
+                "score_pop": 1.0,
+                "rank_pop": 1.0,
+                "total_score": 1.0,
+                "source_count": 1.0,
+            },
         ),
         Candidate(
             user_id="u1",
@@ -172,7 +229,9 @@ def test_catboost_preranker_ranks_candidates_from_model_scores() -> None:
         ),
     ]
 
-    out = ranker.rank(candidates=candidates, user_id="u1", history_len=5, cold_item_ids={20}, top_m=2)
+    out = ranker.rank(
+        candidates=candidates, user_id="u1", history_len=5, cold_item_ids={20}, top_m=2
+    )
     assert [x.item_id for x in out] == [20, 10]
 
 
@@ -212,7 +271,11 @@ def test_policy_final_reranker_balances_source_and_keeps_cold_item() -> None:
             source="cold",
             base_score=0.7,
             pre_score=0.78,
-            features={"is_cold_item": 1.0, "metadata_overlap": 0.8, "item_popularity": 0.1},
+            features={
+                "is_cold_item": 1.0,
+                "metadata_overlap": 0.8,
+                "item_popularity": 0.1,
+            },
         ),
     ]
 

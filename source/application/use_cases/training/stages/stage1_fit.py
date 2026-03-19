@@ -6,7 +6,9 @@ import os
 from collections import Counter, defaultdict
 from typing import Any
 
-from source.application.use_cases.training.common.data_ops import build_item_interaction_counts
+from source.application.use_cases.training.common.data_ops import (
+    build_item_interaction_counts,
+)
 
 
 def fit_stage1(data: dict[str, Any], cmd: Any, logger: Any) -> dict[str, Any]:
@@ -45,7 +47,8 @@ def fit_stage1(data: dict[str, Any], cmd: Any, logger: Any) -> dict[str, Any]:
     cold_item_ids = {
         item_id
         for item_id in catalog_item_ids
-        if int(item_interaction_counts.get(item_id, 0)) <= int(getattr(cmd, "cold_max_interactions", 0))
+        if int(item_interaction_counts.get(item_id, 0))
+        <= int(getattr(cmd, "cold_max_interactions", 0))
     }
     logger.end_step(
         "stage1_fit",
@@ -109,7 +112,9 @@ def fit_cf_neighbors(
     )
     min_cap = 20
     safe_batch_size = max(200, int(batch_size))
-    retained_neighbors = max(int(max_neighbors), int(max_neighbors) * max(1, int(retained_neighbors_factor)))
+    retained_neighbors = max(
+        int(max_neighbors), int(max_neighbors) * max(1, int(retained_neighbors_factor))
+    )
 
     users_total = len(user_items)
     logger.event(
@@ -141,7 +146,9 @@ def fit_cf_neighbors(
                 next_cap = max(min_cap, int(current_cap * 0.8))
                 if next_cap < current_cap:
                     current_cap = next_cap
-                    retained_neighbors = max(max_neighbors, int(retained_neighbors * 0.85))
+                    retained_neighbors = max(
+                        max_neighbors, int(retained_neighbors * 0.85)
+                    )
                     _prune_neighbor_counts(neighbor_counts, retained_neighbors)
                     logger.event(
                         "STAGE1_CF_ADAPT",
@@ -156,7 +163,11 @@ def fit_cf_neighbors(
 
         if i % max(1, users_total // 20) == 0 or i == users_total:
             rss_mb = _read_process_rss_mb()
-            ratio = (rss_mb / memory_limit_mb) if memory_limit_mb and memory_limit_mb > 0 else None
+            ratio = (
+                (rss_mb / memory_limit_mb)
+                if memory_limit_mb and memory_limit_mb > 0
+                else None
+            )
             logger.event(
                 "STAGE1_CF_PROGRESS",
                 done=i,
@@ -175,7 +186,9 @@ def fit_cf_neighbors(
     for item_id, counts in neighbor_counts.items():
         vals: list[tuple[Any, float]] = []
         for other_id, co in counts.items():
-            denom = math.sqrt(float(item_counts[item_id]) * float(item_counts[other_id]))
+            denom = math.sqrt(
+                float(item_counts[item_id]) * float(item_counts[other_id])
+            )
             if denom <= 0:
                 continue
             vals.append((other_id, float(co / denom)))
@@ -184,7 +197,9 @@ def fit_cf_neighbors(
     return out
 
 
-def _prune_neighbor_counts(neighbor_counts: dict[Any, Counter[Any]], retained_neighbors: int) -> None:
+def _prune_neighbor_counts(
+    neighbor_counts: dict[Any, Counter[Any]], retained_neighbors: int
+) -> None:
     if retained_neighbors <= 0:
         return
     for item_id, counts in list(neighbor_counts.items()):
@@ -249,14 +264,20 @@ def _read_memory_limit_mb() -> int | None:
     return None
 
 
-def fit_content_neighbors(books: Any, max_neighbors: int, logger: Any) -> dict[Any, list[tuple[Any, float]]]:
+def fit_content_neighbors(
+    books: Any, max_neighbors: int, logger: Any
+) -> dict[Any, list[tuple[Any, float]]]:
     data = books.copy()
     for col in ["authors", "series", "tags"]:
         if col not in data.columns:
             data[col] = [[] for _ in range(len(data))]
         data[col] = data[col].apply(lambda x: x if isinstance(x, list) else [])
 
-    by_item = data[["item_id", "authors", "series", "tags"]].drop_duplicates("item_id").reset_index(drop=True)
+    by_item = (
+        data[["item_id", "authors", "series", "tags"]]
+        .drop_duplicates("item_id")
+        .reset_index(drop=True)
+    )
 
     author_index: dict[str, list[Any]] = defaultdict(list)
     series_index: dict[str, list[Any]] = defaultdict(list)
@@ -292,7 +313,9 @@ def fit_content_neighbors(books: Any, max_neighbors: int, logger: Any) -> dict[A
                 if other != item_id:
                     score_map[other] += 0.5
 
-        ranked = sorted(score_map.items(), key=lambda x: x[1], reverse=True)[:max_neighbors]
+        ranked = sorted(score_map.items(), key=lambda x: x[1], reverse=True)[
+            :max_neighbors
+        ]
         out[item_id] = [(oid, float(score)) for oid, score in ranked]
         if i % max(1, total // 20) == 0 or i == total:
             logger.event("STAGE1_CONTENT_SCORE_PROGRESS", done=i, total=total)
@@ -306,7 +329,11 @@ def fit_metadata_retrieval(books: Any, logger: Any) -> dict[str, Any]:
             data[col] = [[] for _ in range(len(data))]
         data[col] = data[col].apply(lambda x: x if isinstance(x, list) else [])
 
-    by_item = data[["item_id", "authors", "series", "tags"]].drop_duplicates("item_id").reset_index(drop=True)
+    by_item = (
+        data[["item_id", "authors", "series", "tags"]]
+        .drop_duplicates("item_id")
+        .reset_index(drop=True)
+    )
     author_index: dict[str, list[Any]] = defaultdict(list)
     series_index: dict[str, list[Any]] = defaultdict(list)
     tag_index: dict[str, list[Any]] = defaultdict(list)

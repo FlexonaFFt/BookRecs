@@ -8,7 +8,9 @@ import pytest
 from source.interfaces import promote_model_entrypoint as mod
 
 
-def _write_manifest(tmp_path: Path, run_id: str, status: str = "SUCCESS", metrics: dict | None = None) -> None:
+def _write_manifest(
+    tmp_path: Path, run_id: str, status: str = "SUCCESS", metrics: dict | None = None
+) -> None:
     run_dir = tmp_path / run_id
     run_dir.mkdir(parents=True)
     payload = {
@@ -19,7 +21,9 @@ def _write_manifest(tmp_path: Path, run_id: str, status: str = "SUCCESS", metric
     (run_dir / "manifest.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
-def test_promote_writes_pointer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_promote_writes_pointer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write_manifest(tmp_path, "batch_20260310", metrics={"ndcg@10": 0.42})
     pointer_path = tmp_path / "active_model.json"
 
@@ -34,7 +38,9 @@ def test_promote_writes_pointer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     assert payload["model_uri"].endswith("/batch_20260310/models")
 
 
-def test_promote_checks_thresholds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_promote_checks_thresholds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write_manifest(tmp_path, "batch_20260310", metrics={"ndcg@10": 0.30})
     pointer_path = tmp_path / "active_model.json"
 
@@ -47,8 +53,12 @@ def test_promote_checks_thresholds(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         mod.main()
 
 
-def test_promote_checks_success_status(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _write_manifest(tmp_path, "batch_20260310", status="FAILED", metrics={"ndcg@10": 0.50})
+def test_promote_checks_success_status(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_manifest(
+        tmp_path, "batch_20260310", status="FAILED", metrics={"ndcg@10": 0.50}
+    )
     pointer_path = tmp_path / "active_model.json"
 
     monkeypatch.setenv("BOOKRECS_TRAIN_OUTPUT_ROOT", str(tmp_path))
@@ -60,7 +70,9 @@ def test_promote_checks_success_status(tmp_path: Path, monkeypatch: pytest.Monke
         mod.main()
 
 
-def test_promote_accepts_legacy_metric_aliases(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_promote_accepts_legacy_metric_aliases(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write_manifest(tmp_path, "batch_20260310", metrics={"ndcg_at_k": 0.42})
     pointer_path = tmp_path / "active_model.json"
 

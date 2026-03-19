@@ -27,9 +27,13 @@ def _env_optional_float(name: str) -> float | None:
 
 
 def _resolve_run_id() -> str:
-    run_id = _env_str("BOOKRECS_PROMOTE_RUN_NAME") or _env_str("BOOKRECS_TRAIN_RUN_NAME")
+    run_id = _env_str("BOOKRECS_PROMOTE_RUN_NAME") or _env_str(
+        "BOOKRECS_TRAIN_RUN_NAME"
+    )
     if not run_id:
-        raise ValueError("BOOKRECS_PROMOTE_RUN_NAME (or BOOKRECS_TRAIN_RUN_NAME) is required")
+        raise ValueError(
+            "BOOKRECS_PROMOTE_RUN_NAME (or BOOKRECS_TRAIN_RUN_NAME) is required"
+        )
     return run_id
 
 
@@ -72,24 +76,25 @@ def _validate_thresholds(manifest: dict[str, Any]) -> None:
 
     failed: list[str] = []
     for key, spec in thresholds.items():
-        threshold = spec["threshold"]
-        if threshold is None:
+        threshold_val: float | None = spec["threshold"]  # type: ignore[assignment]
+        if threshold_val is None:
             continue
+        aliases: tuple[str, ...] = spec["aliases"]  # type: ignore[assignment]
         value = None
-        for alias in spec["aliases"]:
+        for alias in aliases:
             if alias in metrics:
                 value = metrics.get(alias)
                 break
         if value is None:
-            failed.append(f"{key}=MISSING < {threshold}")
+            failed.append(f"{key}=MISSING < {threshold_val}")
             continue
         try:
             numeric = float(value)
         except (TypeError, ValueError):
-            failed.append(f"{key}=INVALID < {threshold}")
+            failed.append(f"{key}=INVALID < {threshold_val}")
             continue
-        if numeric < threshold:
-            failed.append(f"{key}={numeric:.6f} < {threshold}")
+        if numeric < threshold_val:
+            failed.append(f"{key}={numeric:.6f} < {threshold_val}")
 
     if failed:
         raise ValueError("promotion thresholds not met: " + "; ".join(failed))
@@ -97,7 +102,9 @@ def _validate_thresholds(manifest: dict[str, Any]) -> None:
 
 def main() -> None:
     output_root = _env_str("BOOKRECS_TRAIN_OUTPUT_ROOT", "artifacts/runs")
-    pointer_path = _env_str("BOOKRECS_ACTIVE_MODEL_POINTER", "artifacts/runs/active_model.json")
+    pointer_path = _env_str(
+        "BOOKRECS_ACTIVE_MODEL_POINTER", "artifacts/runs/active_model.json"
+    )
     require_success = _env_bool("BOOKRECS_PROMOTION_REQUIRE_SUCCESS", True)
     run_id = _resolve_run_id()
 
@@ -108,11 +115,17 @@ def main() -> None:
     pointer = build_local_pointer(
         run_id=run_id,
         output_root=output_root,
-        metrics=manifest.get("metrics", {}) if isinstance(manifest.get("metrics"), dict) else {},
+        metrics=(
+            manifest.get("metrics", {})
+            if isinstance(manifest.get("metrics"), dict)
+            else {}
+        ),
     )
     write_model_pointer(pointer_path, pointer)
     print(
-        f"[promote] success: run_id={run_id} model_uri={pointer.model_uri} pointer={pointer_path}",
+        f"[promote] success: run_id={run_id} "
+        f"model_uri={pointer.model_uri} "
+        f"pointer={pointer_path}",
         flush=True,
     )
 

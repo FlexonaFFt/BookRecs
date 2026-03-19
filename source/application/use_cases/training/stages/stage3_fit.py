@@ -14,14 +14,21 @@ from source.application.use_cases.ranking.source_limits import (
     source_limits_for_stage1,
     source_min_quota_for_stage1,
 )
-from source.application.use_cases.training.common.data_ops import build_seen_map, build_val_ground_truth, cold_items
+from source.application.use_cases.training.common.data_ops import (
+    build_seen_map,
+    build_val_ground_truth,
+    cold_items,
+)
 from source.infrastructure.ranking.candidates import (
-    ColdCandidateSource,
     CfCandidateSource,
+    ColdCandidateSource,
     ContentCandidateSource,
     PopularCandidateSource,
 )
-from source.infrastructure.ranking.finalrank import PolicyFinalReranker, PolicyFinalRerankerConfig
+from source.infrastructure.ranking.finalrank import (
+    PolicyFinalReranker,
+    PolicyFinalRerankerConfig,
+)
 
 
 # Обучает policy-based финальный реранкер на валидационном срезе.
@@ -33,7 +40,9 @@ def fit_stage3(
     logger: Any,
 ) -> PolicyFinalReranker:
     logger.start_step("stage3_fit", total=1)
-    val_users, gt_map = build_val_ground_truth(data["local_val"], limit=cmd.eval_users_limit)
+    val_users, gt_map = build_val_ground_truth(
+        data["local_val"], limit=cmd.eval_users_limit
+    )
     seen_by_user = build_seen_map(data["local_train"])
     cold = cold_items(
         data["local_train"],
@@ -59,7 +68,9 @@ def fit_stage3(
             ),
             PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
         ],
-        fallback_source=PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
+        fallback_source=PopularCandidateSource(
+            stage1["pop_items"], stage1["pop_scores"]
+        ),
     )
     stage2_uc = PreRankCandidatesUseCase(preranker=stage2_model)
 

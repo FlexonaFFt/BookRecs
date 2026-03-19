@@ -15,6 +15,8 @@ class PreRankCandidatesCommand:
     history_len: int
     cold_item_ids: set[Any]
     top_m: int = 300
+
+
 # Реализует сценарий предранжирования кандидатов.
 class PreRankCandidatesUseCase:
     """Stage 2: reduce candidate pool to top-M."""
@@ -38,7 +40,9 @@ class PreRankCandidatesUseCase:
         if ranked:
             return ranked
 
-        base_ranked = sorted(cmd.candidates, key=lambda c: c.score, reverse=True)[: cmd.top_m]
+        base_ranked = sorted(cmd.candidates, key=lambda c: c.score, reverse=True)[
+            : cmd.top_m
+        ]
         return [
             ScoredCandidate(
                 user_id=c.user_id,

@@ -4,6 +4,8 @@ from typing import Any
 
 from source.application.ports import CandidateSourcePort
 from source.domain.entities import Candidate
+
+
 # Генерирует кандидатов по соседям коллаборативной фильтрации.
 class CfCandidateSource(CandidateSourcePort):
 
@@ -14,7 +16,9 @@ class CfCandidateSource(CandidateSourcePort):
     def name(self) -> str:
         return "cf"
 
-    def generate(self, user_id: Any, seen_items: set[Any], limit: int) -> list[Candidate]:
+    def generate(
+        self, user_id: Any, seen_items: set[Any], limit: int
+    ) -> list[Candidate]:
         score_map: dict[Any, float] = {}
 
         for item_id in seen_items:

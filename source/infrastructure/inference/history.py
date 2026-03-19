@@ -39,7 +39,9 @@ class UserHistoryProvider:
         except Exception:
             return set()
 
-    def add_interaction(self, user_id: Any, item_id: Any, event_type: str = "implicit") -> None:
+    def add_interaction(
+        self, user_id: Any, item_id: Any, event_type: str = "implicit"
+    ) -> None:
         if self._pg is None:
             return
         try:
@@ -56,6 +58,8 @@ class UserHistoryProvider:
 
     def _ensure_table(self) -> None:
         if self._bootstrap_done:
+            return
+        if self._pg is None:
             return
         self._pg.execute(
             f"""

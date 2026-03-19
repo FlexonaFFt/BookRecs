@@ -87,7 +87,9 @@ class ModelBundleLoader:
                     candidates.append(path)
         if not candidates:
             raise FileNotFoundError(
-                "No local model directory found. Set BOOKRECS_API_MODEL_URI to local path or s3:// prefix."
+                "No local model directory found. "
+                "Set BOOKRECS_API_MODEL_URI to "
+                "local path or s3:// prefix."
             )
         candidates.sort(key=lambda x: x.stat().st_mtime, reverse=True)
         return str(candidates[0].resolve())
@@ -115,7 +117,10 @@ class ModelBundleLoader:
 
     def _s3(self):
         if boto3 is None:
-            raise RuntimeError("boto3 is required for S3 model loading. Install dependency: pip install boto3")
+            raise RuntimeError(
+                "boto3 is required for S3 model loading. "
+                "Install dependency: pip install boto3"
+            )
         if self._s3_client is None:
             self._s3_client = boto3.client(
                 "s3",

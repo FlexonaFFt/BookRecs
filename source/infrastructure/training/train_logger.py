@@ -6,6 +6,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+
 # Описывает логгер обучения.
 class TrainLogger:
     def __init__(self, run_id: str, log_file: Path) -> None:
@@ -15,7 +17,9 @@ class TrainLogger:
         self._step_started_at: dict[str, float] = {}
         self._run_started_at = time.time()
         self._event_seq = 0
-        self._stdout_format = (os.getenv("BOOKRECS_TRAIN_STDOUT_FORMAT") or "pretty").strip().lower()
+        self._stdout_format = (
+            (os.getenv("BOOKRECS_TRAIN_STDOUT_FORMAT") or "pretty").strip().lower()
+        )
 
     def event(self, event: str, **payload: Any) -> None:
         self._event_seq += 1
@@ -63,7 +67,13 @@ class TrainLogger:
     def end_step(self, step: str, status: str = "SUCCESS", **payload: Any) -> None:
         started = self._step_started_at.get(step, time.time())
         duration_sec = time.time() - started
-        self.event("END", step=step, status=status, duration_sec=round(duration_sec, 3), **payload)
+        self.event(
+            "END",
+            step=step,
+            status=status,
+            duration_sec=round(duration_sec, 3),
+            **payload,
+        )
 
     def _format_pretty(self, event: str, payload: dict[str, Any]) -> str:
         if event == "RUN_START":
@@ -95,12 +105,19 @@ class TrainLogger:
         if event == "END":
             step = payload.get("step")
             duration = _format_duration(payload.get("duration_sec"))
-            return f"[train] {step} {payload.get('status', 'DONE').lower()} in {duration}"
+            return (
+                f"[train] {step} {payload.get('status', 'DONE').lower()} in {duration}"
+            )
         if event == "RUN_END":
             duration = _format_duration(payload.get("duration_sec"))
             metrics = payload.get("metrics", {})
             metrics_summary = _format_metrics_summary(metrics)
-            return f"[train] run complete status={payload.get('status')} duration={duration} {metrics_summary}".strip()
+            return (
+                f"[train] run complete "
+                f"status={payload.get('status')} "
+                f"duration={duration} "
+                f"{metrics_summary}"
+            ).strip()
         return ""
 
 

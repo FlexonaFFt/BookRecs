@@ -6,7 +6,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-
 ARTIFACT_SCHEMA_VERSION = "1.0.0"
 
 
@@ -30,7 +29,9 @@ class ArtifactLayout:
             "stage1_model": self.stage1_model.relative_to(self.run_dir).as_posix(),
             "stage2_model": self.stage2_model.relative_to(self.run_dir).as_posix(),
             "stage3_model": self.stage3_model.relative_to(self.run_dir).as_posix(),
-            "metrics_snapshot": self.metrics_snapshot.relative_to(self.run_dir).as_posix(),
+            "metrics_snapshot": self.metrics_snapshot.relative_to(
+                self.run_dir
+            ).as_posix(),
             "metrics": self.metrics.relative_to(self.run_dir).as_posix(),
             "timings": self.timings.relative_to(self.run_dir).as_posix(),
             "manifest": self.manifest.relative_to(self.run_dir).as_posix(),

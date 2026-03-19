@@ -18,7 +18,11 @@ def resolve_cold_item_ids(
 ) -> set[Any]:
     counts = build_item_interaction_counts(train)
     threshold = max(0, int(max_train_interactions))
-    return {item_id for item_id in candidate_item_ids if int(counts.get(item_id, 0)) <= threshold}
+    return {
+        item_id
+        for item_id in candidate_item_ids
+        if int(counts.get(item_id, 0)) <= threshold
+    }
 
 
 def load_dataset(pd: Any, dataset_dir: str) -> dict[str, Any]:
@@ -41,7 +45,11 @@ def load_dataset(pd: Any, dataset_dir: str) -> dict[str, Any]:
 
 
 def build_seen_map(train: Any) -> dict[Any, set[Any]]:
-    return train.groupby("user_id", sort=False)["item_id"].agg(lambda x: set(x.tolist())).to_dict()
+    return (
+        train.groupby("user_id", sort=False)["item_id"]
+        .agg(lambda x: set(x.tolist()))
+        .to_dict()
+    )
 
 
 def cold_items(train: Any, val: Any, max_train_interactions: int = 0) -> set[Any]:
@@ -53,9 +61,15 @@ def cold_items(train: Any, val: Any, max_train_interactions: int = 0) -> set[Any
     )
 
 
-def build_val_ground_truth(val: Any, limit: int) -> tuple[list[Any], dict[Any, list[Any]]]:
+def build_val_ground_truth(
+    val: Any, limit: int
+) -> tuple[list[Any], dict[Any, list[Any]]]:
     grouped = val.groupby("user_id", sort=False)["item_id"].agg(list).reset_index()
     users = grouped["user_id"].tolist()[:limit]
     users_set = set(users)
-    gt_map = {row.user_id: list(row.item_id) for row in grouped.itertuples(index=False) if row.user_id in users_set}
+    gt_map = {
+        row.user_id: list(row.item_id)
+        for row in grouped.itertuples(index=False)
+        if row.user_id in users_set
+    }
     return users, gt_map

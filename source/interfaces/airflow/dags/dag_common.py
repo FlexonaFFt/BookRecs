@@ -81,7 +81,9 @@ def docker_mounts() -> list[Mount]:
     project_dir = Path(host_project_dir).expanduser()
     mounts = [
         Mount(source=str(project_dir / "data"), target="/app/data", type="bind"),
-        Mount(source=str(project_dir / "artifacts"), target="/app/artifacts", type="bind"),
+        Mount(
+            source=str(project_dir / "artifacts"), target="/app/artifacts", type="bind"
+        ),
     ]
     return mounts
 

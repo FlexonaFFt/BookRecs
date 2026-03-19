@@ -1,4 +1,7 @@
-from source.application.use_cases.ranking.final_rank import FinalRankCommand, FinalRankUseCase
+from source.application.use_cases.ranking.final_rank import (
+    FinalRankCommand,
+    FinalRankUseCase,
+)
 from source.application.use_cases.ranking.generate_candidates import (
     GenerateCandidatesCommand,
     GenerateCandidatesUseCase,

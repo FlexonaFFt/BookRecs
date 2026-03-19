@@ -11,10 +11,14 @@ from source.application.use_cases.ranking.source_limits import (
     source_limits_for_stage1,
     source_min_quota_for_stage1,
 )
-from source.application.use_cases.training.common.data_ops import build_seen_map, build_val_ground_truth, cold_items
+from source.application.use_cases.training.common.data_ops import (
+    build_seen_map,
+    build_val_ground_truth,
+    cold_items,
+)
 from source.infrastructure.ranking.candidates import (
-    ColdCandidateSource,
     CfCandidateSource,
+    ColdCandidateSource,
     ContentCandidateSource,
     PopularCandidateSource,
 )
@@ -26,9 +30,13 @@ from source.infrastructure.ranking.prerank import (
 )
 
 
-def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: Any) -> Any:
+def fit_stage2(
+    data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: Any
+) -> Any:
     logger.start_step("stage2_fit", total=3)
-    val_users, gt_map = build_val_ground_truth(data["local_val"], limit=cmd.eval_users_limit)
+    val_users, gt_map = build_val_ground_truth(
+        data["local_val"], limit=cmd.eval_users_limit
+    )
     seen_by_user = build_seen_map(data["local_train"])
     cold = cold_items(
         data["local_train"],
@@ -53,7 +61,9 @@ def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: A
         ),
         PopularCandidateSource(stage1["pop_items"], stage1["pop_scores"]),
     ]
-    stage1_uc = GenerateCandidatesUseCase(sources=candidate_sources, fallback_source=candidate_sources[-1])
+    stage1_uc = GenerateCandidatesUseCase(
+        sources=candidate_sources, fallback_source=candidate_sources[-1]
+    )
     feature_builder = FeatureBuilder()
     logger.progress("stage2_fit", done=1, total=3)
 
@@ -77,7 +87,7 @@ def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: A
 
     prerank_model = str(getattr(cmd, "prerank_model", "auto")).lower()
     if prerank_model == "linear":
-        model = LinearPreRanker()
+        result: LinearPreRanker | CatBoostPreRanker = LinearPreRanker()
         logger.progress("stage2_fit", done=3, total=3)
         logger.end_step(
             "stage2_fit",
@@ -86,7 +96,7 @@ def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: A
             train_rows=len(train_rows),
             eval_rows=len(eval_rows),
         )
-        return model
+        return result
 
     try:
         cfg = CatBoostPreRankerConfig(
@@ -95,7 +105,9 @@ def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: A
             depth=int(getattr(cmd, "catboost_depth", 6)),
             learning_rate=float(getattr(cmd, "catboost_learning_rate", 0.08)),
         )
-        model = CatBoostPreRanker.fit(train_rows=train_rows, eval_rows=eval_rows, cfg=cfg)
+        result = CatBoostPreRanker.fit(
+            train_rows=train_rows, eval_rows=eval_rows, cfg=cfg
+        )
         logger.progress("stage2_fit", done=3, total=3)
         logger.end_step(
             "stage2_fit",
@@ -105,10 +117,10 @@ def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: A
             eval_rows=len(eval_rows),
             config=asdict(cfg),
         )
-        return model
+        return result
     except Exception as exc:
         logger.event("STAGE2_FALLBACK_LINEAR", reason=str(exc))
-        model = LinearPreRanker()
+        result = LinearPreRanker()
         logger.progress("stage2_fit", done=3, total=3)
         logger.end_step(
             "stage2_fit",
@@ -117,7 +129,7 @@ def fit_stage2(data: dict[str, Any], stage1: dict[str, Any], cmd: Any, logger: A
             train_rows=len(train_rows),
             eval_rows=len(eval_rows),
         )
-        return model
+        return result
 
 
 def build_prerank_dataset(
@@ -181,8 +193,8 @@ def build_prerank_dataset(
             train_rows = rows[:]
             eval_rows = []
 
-    for row in train_rows:
-        row.pop("user_id", None)
-    for row in eval_rows:
-        row.pop("user_id", None)
+    for tr_row in train_rows:
+        tr_row.pop("user_id", None)
+    for ev_row in eval_rows:
+        ev_row.pop("user_id", None)
     return train_rows, eval_rows

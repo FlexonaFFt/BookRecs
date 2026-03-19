@@ -14,6 +14,8 @@ class FinalRankCommand:
     candidates: list[ScoredCandidate]
     seen_items: set[Any]
     top_k: int = 10
+
+
 # Реализует сценарий финального ранжирования.
 class FinalRankUseCase:
     """

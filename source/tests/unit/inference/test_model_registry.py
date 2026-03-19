@@ -12,7 +12,9 @@ from source.infrastructure.inference.model_registry import (
 
 
 def test_pointer_read_write_roundtrip(tmp_path: Path) -> None:
-    pointer = build_local_pointer(run_id="batch_20260310", output_root=str(tmp_path), metrics={"ndcg_at_k": 0.4})
+    pointer = build_local_pointer(
+        run_id="batch_20260310", output_root=str(tmp_path), metrics={"ndcg_at_k": 0.4}
+    )
     path = tmp_path / "active_model.json"
     write_model_pointer(str(path), pointer)
     loaded = read_model_pointer(str(path))

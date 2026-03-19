@@ -51,7 +51,9 @@ class PolicyFinalReranker(FinalRankerPort):
             for item in selected
         ]
 
-    def _rerank(self, candidates: list[ScoredCandidate], top_k: int) -> list[ScoredCandidate]:
+    def _rerank(
+        self, candidates: list[ScoredCandidate], top_k: int
+    ) -> list[ScoredCandidate]:
         pool = list(candidates)
         selected: list[ScoredCandidate] = []
         source_counts: dict[str, int] = {}
@@ -63,8 +65,14 @@ class PolicyFinalReranker(FinalRankerPort):
                 max(0, self._cfg.max_injected_cold_items),
                 max(0, self._cfg.target_cold_items),
             )
-            need_cold = max(0, self._cfg.target_cold_items - cold_selected - injectable_budget)
-            restrict_to_cold = need_cold > 0 and remaining_slots <= need_cold and any(self._is_cold(x) for x in pool)
+            need_cold = max(
+                0, self._cfg.target_cold_items - cold_selected - injectable_budget
+            )
+            restrict_to_cold = (
+                need_cold > 0
+                and remaining_slots <= need_cold
+                and any(self._is_cold(x) for x in pool)
+            )
 
             best_idx = 0
             best_score = None
@@ -81,7 +89,9 @@ class PolicyFinalReranker(FinalRankerPort):
             source_counts[picked.source] = source_counts.get(picked.source, 0) + 1
             if self._is_cold(picked):
                 cold_selected += 1
-        return self._inject_cold_tail(selected=selected, candidates=candidates, top_k=top_k)
+        return self._inject_cold_tail(
+            selected=selected, candidates=candidates, top_k=top_k
+        )
 
     def _inject_cold_tail(
         self,
@@ -101,8 +111,11 @@ class PolicyFinalReranker(FinalRankerPort):
         injected = 0
         result = list(selected[:top_k])
         cold_pool = [
-            item for item in candidates
-            if self._is_cold(item) and item.item_id not in selected_ids and self._eligible_for_injection(item)
+            item
+            for item in candidates
+            if self._is_cold(item)
+            and item.item_id not in selected_ids
+            and self._eligible_for_injection(item)
         ]
         if not cold_pool:
             return result
@@ -123,7 +136,10 @@ class PolicyFinalReranker(FinalRankerPort):
 
     def _eligible_for_injection(self, item: ScoredCandidate) -> bool:
         features = item.features or {}
-        return float(features.get("metadata_overlap", 0.0)) >= self._cfg.cold_injection_min_metadata_overlap
+        return (
+            float(features.get("metadata_overlap", 0.0))
+            >= self._cfg.cold_injection_min_metadata_overlap
+        )
 
     def _injection_priority(self, item: ScoredCandidate) -> float:
         features = item.features or {}
@@ -139,14 +155,18 @@ class PolicyFinalReranker(FinalRankerPort):
                 return idx
         return None
 
-    def _within_score_gap(self, cold_item: ScoredCandidate, replace_item: ScoredCandidate) -> bool:
+    def _within_score_gap(
+        self, cold_item: ScoredCandidate, replace_item: ScoredCandidate
+    ) -> bool:
         cold_score = float(cold_item.pre_score)
         replace_score = float(replace_item.pre_score)
         return (replace_score - cold_score) <= self._cfg.cold_injection_max_score_gap
 
     def _score(self, item: ScoredCandidate, source_counts: dict[str, int]) -> float:
         features = item.features or {}
-        source_penalty = self._cfg.source_repeat_penalty * source_counts.get(item.source, 0)
+        source_penalty = self._cfg.source_repeat_penalty * source_counts.get(
+            item.source, 0
+        )
         return float(
             item.pre_score
             + self._cfg.source_bias.get(item.source, 0.0)
