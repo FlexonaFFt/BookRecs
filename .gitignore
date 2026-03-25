@@ -26,6 +26,9 @@ venv/
 .env.*
 !.env.example
 
+# SSL certificates
+ssl/
+
 # Generated artifacts
 core/generated/*.json
 
