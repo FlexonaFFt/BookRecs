@@ -55,8 +55,6 @@ services:
       - .env
     command: ["python", "-m", "source.interfaces.pipeline_entrypoint"]
     depends_on:
-      postgres:
-        condition: service_healthy
       minio-init:
         condition: service_completed_successfully
     volumes:
@@ -70,8 +68,6 @@ services:
       - .env
     command: ["python", "-m", "source.interfaces.api_entrypoint"]
     depends_on:
-      postgres:
-        condition: service_healthy
       minio-init:
         condition: service_completed_successfully
     ports:
