@@ -162,55 +162,73 @@ def main() -> None:
         f"books={len(book_rows)} users={len(user_rows)} seen={len(seen_rows)}"
     )
 
-    with psycopg.connect(pg_dsn) as conn:
-        with conn.cursor() as cur:
-            if reset:
-                print("[demo-seed] truncate demo tables")
+    book_sql = """
+        INSERT INTO demo_books (
+            item_id, title, description,
+            url, image_url, authors_json,
+            tags_json, series_json
+        )
+        VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb)
+        ON CONFLICT (item_id) DO UPDATE SET
+            title = EXCLUDED.title,
+            description = EXCLUDED.description,
+            url = EXCLUDED.url,
+            image_url = EXCLUDED.image_url,
+            authors_json = EXCLUDED.authors_json,
+            tags_json = EXCLUDED.tags_json,
+            series_json = EXCLUDED.series_json
+    """
+
+    user_sql = """
+        INSERT INTO demo_users (user_id, history_len)
+        VALUES (%s, %s)
+        ON CONFLICT (user_id) DO UPDATE SET
+            history_len = EXCLUDED.history_len,
+            updated_at = NOW()
+    """
+
+    seen_sql = """
+        INSERT INTO demo_user_seen (user_id, item_id, event_type, event_ts)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (user_id, item_id) DO UPDATE SET
+            event_type = EXCLUDED.event_type,
+            event_ts = EXCLUDED.event_ts
+    """
+
+    if reset:
+        print("[demo-seed] truncate demo tables")
+        with psycopg.connect(pg_dsn) as conn:
+            conn.autocommit = True
+            with conn.cursor() as cur:
                 cur.execute(
-                    "TRUNCATE TABLE demo_user_seen, "
-                    "demo_users, demo_books "
-                    "RESTART IDENTITY"
+                    "TRUNCATE TABLE demo_user_seen, demo_users, demo_books RESTART IDENTITY"
                 )
 
-            book_sql = """
-                INSERT INTO demo_books (
-                    item_id, title, description,
-                    url, image_url, authors_json,
-                    tags_json, series_json
-                )
-                VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb)
-                ON CONFLICT (item_id) DO UPDATE SET
-                    title = EXCLUDED.title,
-                    description = EXCLUDED.description,
-                    url = EXCLUDED.url,
-                    image_url = EXCLUDED.image_url,
-                    authors_json = EXCLUDED.authors_json,
-                    tags_json = EXCLUDED.tags_json,
-                    series_json = EXCLUDED.series_json
-            """
-            for part in chunked(book_rows, 2000):
+    chunk_size = 500
+
+    chunks = list(chunked(book_rows, chunk_size))
+    for i, part in enumerate(chunks, 1):
+        with psycopg.connect(pg_dsn) as conn:
+            with conn.cursor() as cur:
                 cur.executemany(book_sql, part)
+            conn.commit()
+        print(f"[demo-seed] books {i}/{len(chunks)} ({i * chunk_size}/{len(book_rows)})")
 
-            user_sql = """
-                INSERT INTO demo_users (user_id, history_len)
-                VALUES (%s, %s)
-                ON CONFLICT (user_id) DO UPDATE SET
-                    history_len = EXCLUDED.history_len,
-                    updated_at = NOW()
-            """
-            for part in chunked(user_rows, 5000):
+    chunks = list(chunked(user_rows, chunk_size))
+    for i, part in enumerate(chunks, 1):
+        with psycopg.connect(pg_dsn) as conn:
+            with conn.cursor() as cur:
                 cur.executemany(user_sql, part)
+            conn.commit()
+        print(f"[demo-seed] users {i}/{len(chunks)} ({min(i * chunk_size, len(user_rows))}/{len(user_rows)})")
 
-            seen_sql = """
-                INSERT INTO demo_user_seen (user_id, item_id, event_type, event_ts)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (user_id, item_id) DO UPDATE SET
-                    event_type = EXCLUDED.event_type,
-                    event_ts = EXCLUDED.event_ts
-            """
-            for part in chunked(seen_rows, 5000):
+    chunks = list(chunked(seen_rows, chunk_size))
+    for i, part in enumerate(chunks, 1):
+        with psycopg.connect(pg_dsn) as conn:
+            with conn.cursor() as cur:
                 cur.executemany(seen_sql, part)
-        conn.commit()
+            conn.commit()
+        print(f"[demo-seed] seen {i}/{len(chunks)} ({min(i * chunk_size, len(seen_rows))}/{len(seen_rows)})")
 
     print("[demo-seed] done")
 
