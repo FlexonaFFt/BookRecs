@@ -1,0 +1,153 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  airflow-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${AIRFLOW_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_POSTGRES_DB}
+    volumes:
+      - airflow_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_POSTGRES_USER} -d ${AIRFLOW_POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  airflow-init:
+    image: ghcr.io/flexonafft/bookrecs-airflow:latest
+    restart: "no"
+    env_file:
+      - .env
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment: &airflow-env
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/${AIRFLOW_POSTGRES_DB}
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/${AIRFLOW_POSTGRES_DB}
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.session
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
+      BOOKRECS_BATCH_IMAGE: ${BOOKRECS_BATCH_IMAGE:-ghcr.io/flexonafft/bookrecs:latest}
+      BOOKRECS_DOCKER_NETWORK: ${BOOKRECS_DOCKER_NETWORK:-bookrecs_net}
+      BOOKRECS_HOST_PROJECT_DIR: ${BOOKRECS_HOST_PROJECT_DIR}
+      DOCKER_HOST: unix://var/run/docker.sock
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USERNAME}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+    command: >
+      bash -lc "
+      airflow db migrate &&
+      airflow users create
+      --username \"$${_AIRFLOW_WWW_USER_USERNAME}\"
+      --password \"$${_AIRFLOW_WWW_USER_PASSWORD}\"
+      --firstname Book
+      --lastname Recs
+      --role Admin
+      --email admin@example.com || true
+      "
+    volumes:
+      - ./source/interfaces/airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  airflow-webserver:
+    image: ghcr.io/flexonafft/bookrecs-airflow:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment: *airflow-env
+    command: webserver
+    ports:
+      - "${AIRFLOW_WEBSERVER_PORT:-8080}:8080"
+    volumes:
+      - ./source/interfaces/airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  airflow-scheduler:
+    image: ghcr.io/flexonafft/bookrecs-airflow:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment: *airflow-env
+    command: scheduler
+    volumes:
+      - ./source/interfaces/airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  airflow-worker:
+    image: ghcr.io/flexonafft/bookrecs-airflow:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment: *airflow-env
+    command: celery worker
+    volumes:
+      - ./source/interfaces/airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  airflow-triggerer:
+    image: ghcr.io/flexonafft/bookrecs-airflow:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment: *airflow-env
+    command: triggerer
+    volumes:
+      - ./source/interfaces/airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  airflow_pg_data:
+  airflow_logs:
+
+networks:
+  default:
+    name: ${BOOKRECS_DOCKER_NETWORK:-bookrecs_net}
+    external: true

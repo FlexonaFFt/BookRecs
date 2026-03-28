@@ -7,4 +7,6 @@ USER airflow
 RUN pip install --no-cache-dir \
     apache-airflow-providers-docker==3.11.0 \
     apache-airflow-providers-postgres==5.13.0 \
-    psycopg2-binary==2.9.10
+    apache-airflow-providers-celery==3.8.3 \
+    psycopg2-binary==2.9.10 \
+    redis==5.0.8
