@@ -60,30 +60,64 @@ jobs:
           tags: ${{ steps.meta-frontend.outputs.tags }}
           labels: ${{ steps.meta-frontend.outputs.labels }}
 
+      - name: Extract metadata for Airflow
+        id: meta-airflow
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-airflow
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest
+
+      - name: Build and push Airflow image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: source/interfaces/airflow/Dockerfile
+          push: true
+          tags: ${{ steps.meta-airflow.outputs.tags }}
+          labels: ${{ steps.meta-airflow.outputs.labels }}
+
   deploy:
     needs: docker-build-push
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to remote server
+      - name: Deploy app to remote server
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
-            # Pull latest config files from git
             if [ ! -d ~/bookrecs ]; then
               git clone https://github.com/${{ github.repository }}.git ~/bookrecs
             fi
             cd ~/bookrecs
             git pull origin main
-            # Create .env from .env.example if not exists
             if [ ! -f .env ]; then
               cp .env.example .env
-              echo ".env created from .env.example"
+              echo ".env created from .env.example — fill in secrets before use!"
             fi
-            # Login to ghcr.io and deploy
             echo "${{ secrets.DEPLOY_GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker image prune -f
+
+  deploy-airflow:
+    needs: docker-build-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Airflow stack to remote server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd ~/bookrecs
+            # Ensure the shared Docker network exists before starting Airflow
+            docker network create ${BOOKRECS_DOCKER_NETWORK:-bookrecs_net} 2>/dev/null || true
+            echo "${{ secrets.DEPLOY_GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose -f docker-compose.airflow.yml pull
+            docker compose -f docker-compose.airflow.yml up -d --remove-orphans
             docker image prune -f
