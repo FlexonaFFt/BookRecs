@@ -58,8 +58,8 @@ services:
       minio-init:
         condition: service_completed_successfully
     volumes:
-      - app_data:/app/data/raw_data
-      - app_artifacts:/app/artifacts
+      - ./data:/app/data/raw_data
+      - ./artifacts:/app/artifacts
 
   api:
     image: ghcr.io/flexonafft/bookrecs:latest
@@ -73,8 +73,8 @@ services:
     ports:
       - "${BOOKRECS_API_PORT:-8000}:8000"
     volumes:
-      - app_data:/app/data/raw_data
-      - app_artifacts:/app/artifacts
+      - ./data:/app/data/raw_data
+      - ./artifacts:/app/artifacts
 
   frontend:
     image: ghcr.io/flexonafft/bookrecs-frontend:latest
@@ -90,8 +90,6 @@ services:
 volumes:
   pg_data:
   minio_data:
-  app_data:
-  app_artifacts:
 
 networks:
   default:
