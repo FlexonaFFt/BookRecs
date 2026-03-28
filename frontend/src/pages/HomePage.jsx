@@ -435,7 +435,7 @@ export default function HomePage() {
       <div style={styles.cardFrame}>
         <header style={styles.cardHeader}>
           <div style={styles.nav}><Link to="/catalog">Catalog</Link><span>About</span></div>
-          <div style={styles.brand}>Folio.</div>
+          <Link to="/" style={{ ...styles.brand, textDecoration: 'none', color: 'inherit' }}>BookRec.</Link>
           <div style={{ ...styles.nav, justifyContent: 'flex-end' }}>
             <UserSwitcher
               users={users}

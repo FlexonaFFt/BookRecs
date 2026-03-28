@@ -432,7 +432,7 @@ export default function ProductPage() {
             <Link to="/catalog" style={{ textDecoration: 'none' }}>Catalog</Link>
             <Link to="/" style={{ textDecoration: 'none' }}>Home</Link>
           </nav>
-          <div style={{ fontFamily: "'Cinzel', serif", fontSize: '24px' }}>Folio.</div>
+          <Link to="/" style={{ fontFamily: "'Cinzel', serif", fontSize: '24px', textDecoration: 'none', color: 'inherit' }}>BookRec.</Link>
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '18px', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
             <UserSwitcher
               users={users}

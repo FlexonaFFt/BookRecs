@@ -27,13 +27,20 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --python 3.11 --no-install-project
 
-      - name: Run backend linters
-        run: |
-          uv run black --check source/
-          uv run isort --check-only source/
-          uv run flake8 source/
-          uv run mypy source/ --ignore-missing-imports
-          uv run pylint source/ --rcfile=pyproject.toml
+      - name: black (formatting)
+        run: uv run black --check source/
+
+      - name: isort (import order)
+        run: uv run isort --check-only source/
+
+      - name: flake8 (style)
+        run: uv run flake8 source/
+
+      - name: mypy (types)
+        run: uv run mypy source/ --ignore-missing-imports
+
+      - name: pylint (quality)
+        run: uv run pylint source/ --rcfile=pyproject.toml
 
   backend-tests:
     runs-on: ubuntu-latest

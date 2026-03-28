@@ -64,18 +64,6 @@ jobs:
     needs: docker-build-push
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Copy files to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "docker-compose.prod.yml,.env.example"
-          target: "~/bookrecs"
-
       - name: Deploy to remote server
         uses: appleboy/ssh-action@v1
         with:
@@ -83,7 +71,12 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
+            # Pull latest config files from git
+            if [ ! -d ~/bookrecs ]; then
+              git clone https://github.com/${{ github.repository }}.git ~/bookrecs
+            fi
             cd ~/bookrecs
+            git pull origin main
             # Create .env from .env.example if not exists
             if [ ! -f .env ]; then
               cp .env.example .env

@@ -319,7 +319,7 @@ export default function CatalogPage() {
             <Link to="/catalog" style={{ textDecoration: 'none' }}>Catalog</Link>
             <Link to="/" style={{ textDecoration: 'none' }}>Home</Link>
           </nav>
-          <div style={{ fontFamily: "'Cinzel', serif", fontSize: '24px' }}>Folio.</div>
+          <Link to="/" style={{ fontFamily: "'Cinzel', serif", fontSize: '24px', textDecoration: 'none', color: 'inherit' }}>BookRec.</Link>
           <nav style={{ display: 'flex', gap: '24px', justifyContent: 'flex-end', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', alignItems: 'center' }}>
             <UserSwitcher
               users={users}
