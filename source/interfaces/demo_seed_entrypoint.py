@@ -209,17 +209,23 @@ def main() -> None:
     with psycopg.connect(pg_dsn) as conn:
         if reset:
             print("[demo-seed] truncate demo tables")
-            conn.execute(
-                "TRUNCATE TABLE demo_user_seen, demo_users, demo_books"
-            )
+            conn.execute("TRUNCATE TABLE demo_user_seen, demo_users, demo_books")
             conn.commit()
 
             print(f"[demo-seed] copy {len(book_rows)} books")
             _copy_rows(
                 conn,
                 "demo_books",
-                ["item_id", "title", "description", "url", "image_url",
-                 "authors_json", "tags_json", "series_json"],
+                [
+                    "item_id",
+                    "title",
+                    "description",
+                    "url",
+                    "image_url",
+                    "authors_json",
+                    "tags_json",
+                    "series_json",
+                ],
                 book_rows,
             )
             conn.commit()
@@ -244,19 +250,25 @@ def main() -> None:
             for i, part in enumerate(chunks, 1):
                 conn.cursor().executemany(book_sql, part)
                 conn.commit()
-                print(f"[demo-seed] books {i}/{len(chunks)} ({min(i * chunk_size, len(book_rows))}/{len(book_rows)})")
+                print(
+                    f"[demo-seed] books {i}/{len(chunks)} ({min(i * chunk_size, len(book_rows))}/{len(book_rows)})"
+                )
 
             chunks = list(chunked(user_rows, chunk_size))
             for i, part in enumerate(chunks, 1):
                 conn.cursor().executemany(user_sql, part)
                 conn.commit()
-                print(f"[demo-seed] users {i}/{len(chunks)} ({min(i * chunk_size, len(user_rows))}/{len(user_rows)})")
+                print(
+                    f"[demo-seed] users {i}/{len(chunks)} ({min(i * chunk_size, len(user_rows))}/{len(user_rows)})"
+                )
 
             chunks = list(chunked(seen_rows, chunk_size))
             for i, part in enumerate(chunks, 1):
                 conn.cursor().executemany(seen_sql, part)
                 conn.commit()
-                print(f"[demo-seed] seen {i}/{len(chunks)} ({min(i * chunk_size, len(seen_rows))}/{len(seen_rows)})")
+                print(
+                    f"[demo-seed] seen {i}/{len(chunks)} ({min(i * chunk_size, len(seen_rows))}/{len(seen_rows)})"
+                )
 
     print("[demo-seed] done")
 
