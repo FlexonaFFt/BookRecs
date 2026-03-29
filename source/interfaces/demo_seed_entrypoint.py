@@ -45,13 +45,6 @@ def chunked(rows: Sequence[tuple], chunk_size: int) -> Iterable[Sequence[tuple]]
         yield rows[i : i + chunk_size]
 
 
-def _copy_rows(conn, table: str, columns: list[str], rows: Sequence[tuple]) -> None:
-    cols = ", ".join(columns)
-    with conn.cursor().copy(f"COPY {table} ({cols}) FROM STDIN") as copy:
-        for row in rows:
-            copy.write_row(row)
-
-
 def to_json_list(value: object) -> str:
     if isinstance(value, list):
         return json.dumps(value, ensure_ascii=False)
@@ -206,66 +199,34 @@ def main() -> None:
             event_ts = EXCLUDED.event_ts
     """
 
+    chunk_size = 500
+
     with psycopg.connect(pg_dsn) as conn:
         if reset:
             print("[demo-seed] truncate demo tables")
             conn.execute("TRUNCATE TABLE demo_user_seen, demo_users, demo_books")
             conn.commit()
 
-            print(f"[demo-seed] copy {len(book_rows)} books")
-            _copy_rows(
-                conn,
-                "demo_books",
-                [
-                    "item_id",
-                    "title",
-                    "description",
-                    "url",
-                    "image_url",
-                    "authors_json",
-                    "tags_json",
-                    "series_json",
-                ],
-                book_rows,
-            )
+        chunks = list(chunked(book_rows, chunk_size))
+        for i, part in enumerate(chunks, 1):
+            conn.cursor().executemany(book_sql, part)
             conn.commit()
+            done = min(i * chunk_size, len(book_rows))
+            print(f"[demo-seed] books {i}/{len(chunks)} ({done}/{len(book_rows)})")
 
-            print(f"[demo-seed] copy {len(user_rows)} users")
-            _copy_rows(conn, "demo_users", ["user_id", "history_len"], user_rows)
+        chunks = list(chunked(user_rows, chunk_size))
+        for i, part in enumerate(chunks, 1):
+            conn.cursor().executemany(user_sql, part)
             conn.commit()
+            done = min(i * chunk_size, len(user_rows))
+            print(f"[demo-seed] users {i}/{len(chunks)} ({done}/{len(user_rows)})")
 
-            print(f"[demo-seed] copy {len(seen_rows)} seen events")
-            _copy_rows(
-                conn,
-                "demo_user_seen",
-                ["user_id", "item_id", "event_type", "event_ts"],
-                seen_rows,
-            )
+        chunks = list(chunked(seen_rows, chunk_size))
+        for i, part in enumerate(chunks, 1):
+            conn.cursor().executemany(seen_sql, part)
             conn.commit()
-
-        else:
-            chunk_size = 500
-
-            chunks = list(chunked(book_rows, chunk_size))
-            for i, part in enumerate(chunks, 1):
-                conn.cursor().executemany(book_sql, part)
-                conn.commit()
-                done = min(i * chunk_size, len(book_rows))
-                print(f"[demo-seed] books {i}/{len(chunks)} ({done}/{len(book_rows)})")
-
-            chunks = list(chunked(user_rows, chunk_size))
-            for i, part in enumerate(chunks, 1):
-                conn.cursor().executemany(user_sql, part)
-                conn.commit()
-                done = min(i * chunk_size, len(user_rows))
-                print(f"[demo-seed] users {i}/{len(chunks)} ({done}/{len(user_rows)})")
-
-            chunks = list(chunked(seen_rows, chunk_size))
-            for i, part in enumerate(chunks, 1):
-                conn.cursor().executemany(seen_sql, part)
-                conn.commit()
-                done = min(i * chunk_size, len(seen_rows))
-                print(f"[demo-seed] seen {i}/{len(chunks)} ({done}/{len(seen_rows)})")
+            done = min(i * chunk_size, len(seen_rows))
+            print(f"[demo-seed] seen {i}/{len(chunks)} ({done}/{len(seen_rows)})")
 
     print("[demo-seed] done")
 
