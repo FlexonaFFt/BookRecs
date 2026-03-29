@@ -58,6 +58,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+        required: false
       minio-init:
         condition: service_completed_successfully
     volumes:
@@ -75,6 +76,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+        required: false
       minio-init:
         condition: service_completed_successfully
     ports:
