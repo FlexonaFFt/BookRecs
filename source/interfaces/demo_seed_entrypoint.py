@@ -250,25 +250,22 @@ def main() -> None:
             for i, part in enumerate(chunks, 1):
                 conn.cursor().executemany(book_sql, part)
                 conn.commit()
-                print(
-                    f"[demo-seed] books {i}/{len(chunks)} ({min(i * chunk_size, len(book_rows))}/{len(book_rows)})"
-                )
+                done = min(i * chunk_size, len(book_rows))
+                print(f"[demo-seed] books {i}/{len(chunks)} ({done}/{len(book_rows)})")
 
             chunks = list(chunked(user_rows, chunk_size))
             for i, part in enumerate(chunks, 1):
                 conn.cursor().executemany(user_sql, part)
                 conn.commit()
-                print(
-                    f"[demo-seed] users {i}/{len(chunks)} ({min(i * chunk_size, len(user_rows))}/{len(user_rows)})"
-                )
+                done = min(i * chunk_size, len(user_rows))
+                print(f"[demo-seed] users {i}/{len(chunks)} ({done}/{len(user_rows)})")
 
             chunks = list(chunked(seen_rows, chunk_size))
             for i, part in enumerate(chunks, 1):
                 conn.cursor().executemany(seen_sql, part)
                 conn.commit()
-                print(
-                    f"[demo-seed] seen {i}/{len(chunks)} ({min(i * chunk_size, len(seen_rows))}/{len(seen_rows)})"
-                )
+                done = min(i * chunk_size, len(seen_rows))
+                print(f"[demo-seed] seen {i}/{len(chunks)} ({done}/{len(seen_rows)})")
 
     print("[demo-seed] done")
 
