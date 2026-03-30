@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 
 from source.domain.entities import Candidate, FinalItem
@@ -101,10 +103,10 @@ def _make_raw_interactions(n_rows: int) -> pd.DataFrame:
     )
 
 
-def test_prepare_interactions_early_exit_respects_max_rows(tmp_path: "Path") -> None:
+def test_prepare_interactions_early_exit_respects_max_rows(tmp_path: Path) -> None:
     """Проверяет, что при max_rows ранний выход работает без ошибок."""
-    import json, gzip
-    from datetime import timezone
+    import gzip
+    import json
 
     rows = []
     for i in range(500):
@@ -138,8 +140,9 @@ def test_prepare_interactions_early_exit_respects_max_rows(tmp_path: "Path") -> 
     assert len(result_limited) <= len(result_full)
 
 
-def test_prepare_interactions_max_rows_zero_reads_all(tmp_path: "Path") -> None:
-    import json, gzip
+def test_prepare_interactions_max_rows_zero_reads_all(tmp_path: Path) -> None:
+    import gzip
+    import json
 
     rows = [
         {
