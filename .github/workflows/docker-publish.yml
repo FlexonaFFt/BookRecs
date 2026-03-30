@@ -89,11 +89,14 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
-            if [ ! -d ~/bookrecs ]; then
+            if [ ! -d ~/bookrecs/.git ]; then
+              rm -rf ~/bookrecs
               git clone https://github.com/${{ github.repository }}.git ~/bookrecs
             fi
             cd ~/bookrecs
-            git pull origin main
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
             if [ ! -f .env ]; then
               cp .env.example .env
               echo ".env created from .env.example — fill in secrets before use!"
