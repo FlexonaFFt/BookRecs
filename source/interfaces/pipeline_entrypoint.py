@@ -81,6 +81,7 @@ def run_pipeline_from_env() -> None:
                 ),
                 s3_prefix=settings.s3_prefix,
                 metadata={"runner": "pipeline_entrypoint"},
+                local_dataset_dir=settings.dataset_dir,
             )
         )
         print(f"[pipeline] prepare completed version_id={prepare_result.version_id}")

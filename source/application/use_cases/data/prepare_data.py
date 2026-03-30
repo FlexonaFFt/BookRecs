@@ -29,6 +29,7 @@ class PrepareDataCommand:
     params: PreprocessingParams
     s3_prefix: str
     metadata: dict[str, Any] | None = None
+    local_dataset_dir: str = ""
 
 
 # Реализует сценарий подготовки данных.
@@ -83,6 +84,13 @@ class PrepareDataUseCase:
                     "шаг подготовки пропущен.",
                     flush=True,
                 )
+                if cmd.local_dataset_dir:
+                    print(
+                        "[prepare] Восстановление артефактов из хранилища "
+                        f"в {cmd.local_dataset_dir}",
+                        flush=True,
+                    )
+                    self._dataset_store.restore(existing, cmd.local_dataset_dir)
                 run.mark_skipped("Dataset already exists for the same params hash.")
                 self._run_log.finish(run)
                 return existing

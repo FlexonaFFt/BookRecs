@@ -93,6 +93,34 @@ class S3DatasetStore(DatasetStorePort):
             manifest_uri=manifest_uri,
         )
 
+    def restore(self, dataset_version: DatasetVersion, local_dir: str) -> None:
+        """Download all dataset artifacts from S3 to local_dir (skip existing files)."""
+        bucket, base_prefix = self._resolve_prefix(dataset_version.s3_prefix)
+        version_prefix = self._join_key(base_prefix, dataset_version.version_id)
+        dest_dir = Path(local_dir)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        files = [
+            "books.parquet",
+            "train.parquet",
+            "test.parquet",
+            "local_train.parquet",
+            "local_val.parquet",
+            "local_val_warm.parquet",
+            "local_val_cold.parquet",
+            "summary.json",
+            "manifest.json",
+        ]
+        for fname in files:
+            dest = dest_dir / fname
+            if dest.exists():
+                continue
+            key = self._join_key(version_prefix, fname)
+            print(
+                f"[prepare] Restore s3://{bucket}/{key} -> {dest}",
+                flush=True,
+            )
+            self._s3().download_file(bucket, key, str(dest))
+
     def exists(self, dataset_version: DatasetVersion) -> bool:
 
         bucket, base_prefix = self._resolve_prefix(dataset_version.s3_prefix)

@@ -32,6 +32,9 @@ class DatasetStorePort(ABC):
     def exists(self, dataset_version: DatasetVersion) -> bool:
         raise NotImplementedError
 
+    def restore(self, dataset_version: DatasetVersion, local_dir: str) -> None:
+        """Download remote artifacts to local_dir. No-op for local stores."""
+
 
 # Определяет контракт порта реестра датасета.
 class DatasetRegistryPort(ABC):
