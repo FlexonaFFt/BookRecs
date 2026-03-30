@@ -32,6 +32,7 @@ def build_prepare_storage_backends(
     s3_bucket: str,
     s3_region: str,
     s3_endpoint: str,
+    s3_verify_ssl: bool = True,
 ) -> PrepareDataStorageBackends:
     if registry_backend == "postgres":
         if not pg_dsn.strip():
@@ -48,6 +49,7 @@ def build_prepare_storage_backends(
             bucket=s3_bucket,
             region=s3_region,
             endpoint_url=s3_endpoint,
+            verify_ssl=s3_verify_ssl,
         )
     else:
         dataset_store = LocalDatasetStore()

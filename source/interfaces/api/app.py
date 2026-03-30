@@ -79,17 +79,25 @@ def create_app() -> FastAPI:
             local_cache_root=settings.model_cache_dir,
             aws_access_key_id=settings.aws_access_key_id,
             aws_secret_access_key=settings.aws_secret_access_key,
+            verify_ssl=settings.s3_verify_ssl,
         )
         state.model_reload_interval_sec = max(0, settings.auto_reload_sec)
-        _reload_model(state=state, settings=settings, force=True)
-        svc = _service_or_503(state)
+        try:
+            _reload_model(state=state, settings=settings, force=True)
+        except Exception as exc:
+            print(
+                f"[api] Warning: model not loaded on startup: {exc}. "
+                "Recommendations will return 503 until model is available.",
+                flush=True,
+            )
+        model_uri_for_check = state.current_model_uri or settings.model_uri
         state.s3_ok = _check_s3_available(
-            svc.model_dir,
-            state.current_model_uri or settings.model_uri,
+            model_uri_for_check,
             settings.s3_region,
             settings.s3_endpoint,
             settings.aws_access_key_id,
             settings.aws_secret_access_key,
+            verify_ssl=settings.s3_verify_ssl,
         )
         state.demo_store = DemoStore(pg=runtime_pg)
         yield
@@ -315,14 +323,14 @@ def _to_demo_book(book: Any) -> DemoBook:
 
 
 def _check_s3_available(
-    model_dir: str,
     model_uri: str,
     region: str,
     endpoint: str,
     aws_access_key_id: str | None,
     aws_secret_access_key: str | None,
+    *,
+    verify_ssl: bool = True,
 ) -> bool:
-    _ = model_dir
     if not model_uri or not model_uri.startswith("s3://"):
         return False
     if boto3 is None:
@@ -339,6 +347,7 @@ def _check_s3_available(
             endpoint_url=(endpoint or None),
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
+            verify=verify_ssl,
         )
         client.head_object(Bucket=bucket, Key=f"{key}/stage1.pkl")
         return True

@@ -51,6 +51,7 @@ def run_pipeline_from_env() -> None:
             s3_bucket=settings.s3_bucket,
             s3_region=settings.s3_region,
             s3_endpoint=settings.s3_endpoint,
+            s3_verify_ssl=settings.s3_verify_ssl,
         )
         prepare_use_case = PrepareDataUseCase(
             preprocessor=GoodreadsPreprocessor(),
@@ -75,6 +76,8 @@ def run_pipeline_from_env() -> None:
                     warm_users_only=settings.warm_users_only,
                     language_filter_enabled=settings.language_filter_enabled,
                     interactions_chunksize=settings.interactions_chunksize,
+                    max_users=settings.max_users,
+                    max_interactions_rows=settings.max_interactions_rows,
                 ),
                 s3_prefix=settings.s3_prefix,
                 metadata={"runner": "pipeline_entrypoint"},

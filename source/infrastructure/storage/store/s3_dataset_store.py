@@ -22,10 +22,12 @@ class S3DatasetStore(DatasetStorePort):
         bucket: str = "",
         region: str = "us-east-1",
         endpoint_url: str = "",
+        verify_ssl: bool = True,
     ) -> None:
         self._bucket = bucket.strip()
         self._region = region.strip() or "us-east-1"
         self._endpoint_url = endpoint_url.strip() or None
+        self._verify_ssl = verify_ssl
         self._client = None
 
     def save(
@@ -117,6 +119,7 @@ class S3DatasetStore(DatasetStorePort):
                 "s3",
                 region_name=self._region,
                 endpoint_url=self._endpoint_url,
+                verify=self._verify_ssl,
             )
         return self._client
 

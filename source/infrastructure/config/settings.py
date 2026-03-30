@@ -12,12 +12,15 @@ class Settings:
     s3_bucket: str
     s3_region: str
     s3_endpoint: str
+    s3_verify_ssl: bool
     train_dataset_dir: str
     train_output_root: str
     train_profile: str
     train_auto_tune: bool
     train_eval_users_limit: int
     cold_max_interactions: int
+    max_users: int
+    max_interactions_rows: int
     train_candidate_pool_size: int
     train_candidate_per_source_limit: int
     train_pre_top_m: int
@@ -65,6 +68,7 @@ class Settings:
             s3_bucket=_get("BOOKRECS_S3_BUCKET", ""),
             s3_region=_get("BOOKRECS_S3_REGION", "us-east-1"),
             s3_endpoint=_get("BOOKRECS_S3_ENDPOINT", ""),
+            s3_verify_ssl=env_bool(values, "BOOKRECS_S3_VERIFY_SSL", True),
             train_dataset_dir=_get(
                 "BOOKRECS_TRAIN_DATASET_DIR", "artifacts/tmp_preprocessed/goodreads_ya"
             ),
@@ -79,6 +83,10 @@ class Settings:
             ),
             cold_max_interactions=_parse_non_negative_int(
                 "BOOKRECS_COLD_MAX_INTERACTIONS", _get, 5
+            ),
+            max_users=env_non_negative_int(values, "BOOKRECS_MAX_USERS", 0),
+            max_interactions_rows=env_non_negative_int(
+                values, "BOOKRECS_MAX_INTERACTIONS_ROWS", 0
             ),
             train_candidate_pool_size=_read_positive_int(
                 values,
@@ -147,6 +155,9 @@ class Settings:
             "BOOKRECS_S3_BUCKET": self.s3_bucket,
             "BOOKRECS_S3_REGION": self.s3_region,
             "BOOKRECS_S3_ENDPOINT": self.s3_endpoint,
+            "BOOKRECS_S3_VERIFY_SSL": "true" if self.s3_verify_ssl else "false",
+            "BOOKRECS_MAX_USERS": str(self.max_users),
+            "BOOKRECS_MAX_INTERACTIONS_ROWS": str(self.max_interactions_rows),
             "BOOKRECS_TRAIN_DATASET_DIR": self.train_dataset_dir,
             "BOOKRECS_TRAIN_OUTPUT_ROOT": self.train_output_root,
             "BOOKRECS_TRAIN_PROFILE": self.train_profile,
@@ -188,6 +199,8 @@ class PipelineSettings:
     test_fraction: float
     local_val_fraction: float
     cold_max_interactions: int
+    max_users: int
+    max_interactions_rows: int
     warm_users_only: bool
     language_filter_enabled: bool
     interactions_chunksize: int
@@ -196,6 +209,7 @@ class PipelineSettings:
     s3_bucket: str
     s3_region: str
     s3_endpoint: str
+    s3_verify_ssl: bool
     pg_dsn: str
     migration_path: str
     skip_prepare: bool
@@ -259,6 +273,12 @@ class PipelineSettings:
                 "BOOKRECS_COLD_MAX_INTERACTIONS",
                 core.cold_max_interactions,
             ),
+            max_users=env_non_negative_int(
+                values, "BOOKRECS_MAX_USERS", core.max_users
+            ),
+            max_interactions_rows=env_non_negative_int(
+                values, "BOOKRECS_MAX_INTERACTIONS_ROWS", core.max_interactions_rows
+            ),
             warm_users_only=env_bool(values, "BOOKRECS_WARM_USERS_ONLY", True),
             language_filter_enabled=env_bool(
                 values, "BOOKRECS_LANGUAGE_FILTER_ENABLED", True
@@ -271,6 +291,9 @@ class PipelineSettings:
             s3_bucket=env_str(values, "BOOKRECS_S3_BUCKET", core.s3_bucket),
             s3_region=env_str(values, "BOOKRECS_S3_REGION", core.s3_region),
             s3_endpoint=env_str(values, "BOOKRECS_S3_ENDPOINT", core.s3_endpoint),
+            s3_verify_ssl=env_bool(
+                values, "BOOKRECS_S3_VERIFY_SSL", core.s3_verify_ssl
+            ),
             pg_dsn=env_str(values, "BOOKRECS_PG_DSN", core.pg_dsn),
             migration_path=env_str(
                 values,
@@ -370,6 +393,7 @@ class ApiRuntimeSettings:
     model_cache_dir: str
     s3_region: str
     s3_endpoint: str
+    s3_verify_ssl: bool
     pg_dsn: str
     history_table: str
     inference_log_table: str
@@ -397,6 +421,7 @@ class ApiRuntimeSettings:
             ),
             s3_region=env_str(values, "BOOKRECS_S3_REGION", "us-east-1"),
             s3_endpoint=env_str(values, "BOOKRECS_S3_ENDPOINT", ""),
+            s3_verify_ssl=env_bool(values, "BOOKRECS_S3_VERIFY_SSL", True),
             pg_dsn=env_str(values, "BOOKRECS_PG_DSN", ""),
             history_table=env_str(
                 values, "BOOKRECS_API_HISTORY_TABLE", "user_item_interactions"

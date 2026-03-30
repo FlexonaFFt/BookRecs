@@ -17,13 +17,11 @@ class InferenceRequestLogger:
         self._pg = pg
         _validate_table_name(table_name)
         self._table_name = table_name
-        self._bootstrap_done = False
 
     def log(self, payload: dict[str, Any]) -> None:
         if self._pg is None:
             return
         try:
-            self._ensure_table()
             self._pg.execute(
                 f"""
                 INSERT INTO {self._table_name} (
@@ -44,33 +42,6 @@ class InferenceRequestLogger:
             )
         except Exception:
             return
-
-    def _ensure_table(self) -> None:
-        if self._bootstrap_done:
-            return
-        if self._pg is None:
-            return
-        self._pg.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS {self._table_name} (
-                id BIGSERIAL PRIMARY KEY,
-                user_id TEXT NOT NULL,
-                endpoint TEXT NOT NULL,
-                request_json JSONB NOT NULL DEFAULT '{{}}'::jsonb,
-                response_json JSONB NOT NULL DEFAULT '{{}}'::jsonb,
-                model_dir TEXT NOT NULL DEFAULT '',
-                latency_ms INT NOT NULL DEFAULT 0,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            """
-        )
-        self._pg.execute(
-            f"""
-            CREATE INDEX IF NOT EXISTS idx_{self._table_name}_endpoint_time
-            ON {self._table_name} (endpoint, created_at DESC)
-            """
-        )
-        self._bootstrap_done = True
 
 
 def _validate_table_name(table_name: str) -> None:

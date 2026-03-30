@@ -22,6 +22,8 @@ services:
 
   minio:
     image: minio/minio:latest
+    profiles:
+      - local-s3
     restart: unless-stopped
     env_file:
       - .env
@@ -34,16 +36,24 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   minio-init:
     image: minio/mc:latest
+    profiles:
+      - local-s3
     depends_on:
       minio:
-        condition: service_started
+        condition: service_healthy
     env_file:
       - .env
     entrypoint: >
       /bin/sh -c "
-      until mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; do sleep 1; done &&
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
       mc mb -p local/${BOOKRECS_S3_BUCKET} || true
       "
 
@@ -51,6 +61,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    profiles:
+      - batch
     restart: "no"
     env_file:
       - .env
@@ -60,6 +72,24 @@ services:
         condition: service_healthy
         required: false
       minio-init:
+        condition: service_completed_successfully
+        required: false
+    volumes:
+      - ./data:/app/data
+      - ./artifacts:/app/artifacts
+
+  demo-seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles:
+      - batch
+    restart: "no"
+    env_file:
+      - .env
+    command: ["python", "-m", "source.interfaces.demo_seed_entrypoint"]
+    depends_on:
+      pipeline:
         condition: service_completed_successfully
     volumes:
       - ./data:/app/data
@@ -79,6 +109,10 @@ services:
         required: false
       minio-init:
         condition: service_completed_successfully
+        required: false
+      demo-seed:
+        condition: service_completed_successfully
+        required: false
     ports:
       - "${BOOKRECS_API_PORT:-8000}:8000"
     volumes:

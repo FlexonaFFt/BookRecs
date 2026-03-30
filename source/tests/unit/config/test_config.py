@@ -152,12 +152,15 @@ def test_env_settings_io_read_and_write() -> None:
         s3_bucket=settings.s3_bucket,
         s3_region=settings.s3_region,
         s3_endpoint=settings.s3_endpoint,
+        s3_verify_ssl=settings.s3_verify_ssl,
         train_dataset_dir=settings.train_dataset_dir,
         train_output_root=settings.train_output_root,
         train_profile=settings.train_profile,
         train_auto_tune=settings.train_auto_tune,
         train_eval_users_limit=777,
         cold_max_interactions=settings.cold_max_interactions,
+        max_users=settings.max_users,
+        max_interactions_rows=settings.max_interactions_rows,
         train_candidate_pool_size=settings.train_candidate_pool_size,
         train_candidate_per_source_limit=settings.train_candidate_per_source_limit,
         train_pre_top_m=settings.train_pre_top_m,
@@ -257,3 +260,71 @@ def test_load_settings_auto_profile_uses_meminfo_fallback(
     settings = load_settings()
     assert settings.train_candidate_pool_size == 450
     assert settings.train_prerank_model == "linear"
+
+
+def test_max_users_defaults_to_zero() -> None:
+    settings = Settings.from_mapping({"BOOKRECS_TRAIN_PROFILE": "lite"})
+    assert settings.max_users == 0
+
+
+def test_max_users_reads_from_env() -> None:
+    settings = Settings.from_mapping(
+        {"BOOKRECS_TRAIN_PROFILE": "lite", "BOOKRECS_MAX_USERS": "5000"}
+    )
+    assert settings.max_users == 5000
+
+
+def test_max_users_raises_for_negative() -> None:
+    with pytest.raises(ValueError):
+        Settings.from_mapping(
+            {"BOOKRECS_TRAIN_PROFILE": "lite", "BOOKRECS_MAX_USERS": "-1"}
+        )
+
+
+def test_pipeline_settings_max_users_propagates() -> None:
+    settings = PipelineSettings.from_mapping({"BOOKRECS_MAX_USERS": "3000"})
+    assert settings.max_users == 3000
+
+
+def test_max_users_roundtrip_via_to_env_mapping() -> None:
+    s = Settings.from_mapping(
+        {"BOOKRECS_TRAIN_PROFILE": "lite", "BOOKRECS_MAX_USERS": "7500"}
+    )
+    env = s.to_env_mapping()
+    assert env["BOOKRECS_MAX_USERS"] == "7500"
+
+
+def test_max_interactions_rows_defaults_to_zero() -> None:
+    settings = Settings.from_mapping({"BOOKRECS_TRAIN_PROFILE": "lite"})
+    assert settings.max_interactions_rows == 0
+
+
+def test_max_interactions_rows_reads_from_env() -> None:
+    settings = Settings.from_mapping(
+        {"BOOKRECS_TRAIN_PROFILE": "lite", "BOOKRECS_MAX_INTERACTIONS_ROWS": "500000"}
+    )
+    assert settings.max_interactions_rows == 500_000
+
+
+def test_max_interactions_rows_raises_for_negative() -> None:
+    with pytest.raises(ValueError):
+        Settings.from_mapping(
+            {"BOOKRECS_TRAIN_PROFILE": "lite", "BOOKRECS_MAX_INTERACTIONS_ROWS": "-1"}
+        )
+
+
+def test_max_interactions_rows_roundtrip_via_to_env_mapping() -> None:
+    s = Settings.from_mapping(
+        {
+            "BOOKRECS_TRAIN_PROFILE": "lite",
+            "BOOKRECS_MAX_INTERACTIONS_ROWS": "300000",
+        }
+    )
+    assert s.to_env_mapping()["BOOKRECS_MAX_INTERACTIONS_ROWS"] == "300000"
+
+
+def test_pipeline_settings_max_interactions_rows_propagates() -> None:
+    settings = PipelineSettings.from_mapping(
+        {"BOOKRECS_MAX_INTERACTIONS_ROWS": "100000"}
+    )
+    assert settings.max_interactions_rows == 100_000
