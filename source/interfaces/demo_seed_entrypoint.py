@@ -45,6 +45,18 @@ def chunked(rows: Sequence[tuple], chunk_size: int) -> Iterable[Sequence[tuple]]
         yield rows[i : i + chunk_size]
 
 
+def _insert_chunk(
+    conn,
+    insert_prefix: str,
+    row_placeholder: str,
+    rows: Sequence[tuple],
+    conflict_suffix: str = "",
+) -> None:
+    values = ", ".join([row_placeholder] * len(rows))
+    flat = [v for row in rows for v in row]
+    conn.execute(f"{insert_prefix} {values} {conflict_suffix}", flat)
+
+
 def to_json_list(value: object) -> str:
     if isinstance(value, list):
         return json.dumps(value, ensure_ascii=False)
@@ -85,8 +97,12 @@ def main() -> None:
     if not train_path.exists():
         raise FileNotFoundError(f"Train parquet not found: {train_path}")
 
-    print(f"[demo-seed] run migrations from {migration_path}")
-    run_migration(pg_dsn=pg_dsn, migration_path=migration_path)
+    run_migrate = env_bool("BOOKRECS_RUN_MIGRATE", True)
+    if run_migrate:
+        print(f"[demo-seed] run migrations from {migration_path}")
+        run_migration(pg_dsn=pg_dsn, migration_path=migration_path)
+    else:
+        print("[demo-seed] skip migrations (BOOKRECS_RUN_MIGRATE=false)")
 
     print(f"[demo-seed] read books from {books_path}")
     books = pd.read_parquet(books_path)
@@ -162,55 +178,64 @@ def main() -> None:
         f"books={len(book_rows)} users={len(user_rows)} seen={len(seen_rows)}"
     )
 
+    book_insert = (
+        "INSERT INTO demo_books"
+        " (item_id, title, description, url, image_url,"
+        "  authors_json, tags_json, series_json) VALUES"
+    )
+    book_row = "(%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb)"
+    book_conflict = (
+        "ON CONFLICT (item_id) DO UPDATE SET"
+        " title=EXCLUDED.title, description=EXCLUDED.description,"
+        " url=EXCLUDED.url, image_url=EXCLUDED.image_url,"
+        " authors_json=EXCLUDED.authors_json,"
+        " tags_json=EXCLUDED.tags_json, series_json=EXCLUDED.series_json"
+    )
+
+    user_insert = "INSERT INTO demo_users (user_id, history_len) VALUES"
+    user_row = "(%s, %s)"
+    user_conflict = (
+        "ON CONFLICT (user_id) DO UPDATE SET"
+        " history_len=EXCLUDED.history_len, updated_at=NOW()"
+    )
+
+    seen_insert = (
+        "INSERT INTO demo_user_seen (user_id, item_id, event_type, event_ts) VALUES"
+    )
+    seen_row = "(%s, %s, %s, %s)"
+    seen_conflict = (
+        "ON CONFLICT (user_id, item_id) DO UPDATE SET"
+        " event_type=EXCLUDED.event_type, event_ts=EXCLUDED.event_ts"
+    )
+
+    chunk_size = 500
+
     with psycopg.connect(pg_dsn) as conn:
-        with conn.cursor() as cur:
-            if reset:
-                print("[demo-seed] truncate demo tables")
-                cur.execute(
-                    "TRUNCATE TABLE demo_user_seen, "
-                    "demo_users, demo_books "
-                    "RESTART IDENTITY"
-                )
+        if reset:
+            print("[demo-seed] truncate demo tables")
+            conn.execute("TRUNCATE TABLE demo_user_seen, demo_users, demo_books")
+            conn.commit()
 
-            book_sql = """
-                INSERT INTO demo_books (
-                    item_id, title, description,
-                    url, image_url, authors_json,
-                    tags_json, series_json
-                )
-                VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb)
-                ON CONFLICT (item_id) DO UPDATE SET
-                    title = EXCLUDED.title,
-                    description = EXCLUDED.description,
-                    url = EXCLUDED.url,
-                    image_url = EXCLUDED.image_url,
-                    authors_json = EXCLUDED.authors_json,
-                    tags_json = EXCLUDED.tags_json,
-                    series_json = EXCLUDED.series_json
-            """
-            for part in chunked(book_rows, 2000):
-                cur.executemany(book_sql, part)
+        chunks = list(chunked(book_rows, chunk_size))
+        for i, part in enumerate(chunks, 1):
+            _insert_chunk(conn, book_insert, book_row, part, book_conflict)
+            conn.commit()
+            done = min(i * chunk_size, len(book_rows))
+            print(f"[demo-seed] books {i}/{len(chunks)} ({done}/{len(book_rows)})")
 
-            user_sql = """
-                INSERT INTO demo_users (user_id, history_len)
-                VALUES (%s, %s)
-                ON CONFLICT (user_id) DO UPDATE SET
-                    history_len = EXCLUDED.history_len,
-                    updated_at = NOW()
-            """
-            for part in chunked(user_rows, 5000):
-                cur.executemany(user_sql, part)
+        chunks = list(chunked(user_rows, chunk_size))
+        for i, part in enumerate(chunks, 1):
+            _insert_chunk(conn, user_insert, user_row, part, user_conflict)
+            conn.commit()
+            done = min(i * chunk_size, len(user_rows))
+            print(f"[demo-seed] users {i}/{len(chunks)} ({done}/{len(user_rows)})")
 
-            seen_sql = """
-                INSERT INTO demo_user_seen (user_id, item_id, event_type, event_ts)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (user_id, item_id) DO UPDATE SET
-                    event_type = EXCLUDED.event_type,
-                    event_ts = EXCLUDED.event_ts
-            """
-            for part in chunked(seen_rows, 5000):
-                cur.executemany(seen_sql, part)
-        conn.commit()
+        chunks = list(chunked(seen_rows, chunk_size))
+        for i, part in enumerate(chunks, 1):
+            _insert_chunk(conn, seen_insert, seen_row, part, seen_conflict)
+            conn.commit()
+            done = min(i * chunk_size, len(seen_rows))
+            print(f"[demo-seed] seen {i}/{len(chunks)} ({done}/{len(seen_rows)})")
 
     print("[demo-seed] done")
 
