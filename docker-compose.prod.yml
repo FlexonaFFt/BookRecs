@@ -3,10 +3,27 @@
 services:
   pipeline:
     image: ghcr.io/flexonafft/bookrecs:latest
+    profiles:
+      - batch
     restart: "no"
     env_file:
       - .env
     command: ["python", "-m", "source.interfaces.pipeline_entrypoint"]
+    volumes:
+      - app_data:/app/data/raw_data
+      - app_artifacts:/app/artifacts
+
+  demo-seed:
+    image: ghcr.io/flexonafft/bookrecs:latest
+    profiles:
+      - batch
+    restart: "no"
+    env_file:
+      - .env
+    command: ["python", "-m", "source.interfaces.demo_seed_entrypoint"]
+    depends_on:
+      pipeline:
+        condition: service_completed_successfully
     volumes:
       - app_data:/app/data/raw_data
       - app_artifacts:/app/artifacts

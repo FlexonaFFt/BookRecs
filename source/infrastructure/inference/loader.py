@@ -31,12 +31,14 @@ class ModelBundleLoader:
         local_cache_root: str = "artifacts/cache/models",
         aws_access_key_id: str | None = None,
         aws_secret_access_key: str | None = None,
+        verify_ssl: bool = True,
     ) -> None:
         self._s3_region = s3_region or "us-east-1"
         self._s3_endpoint = s3_endpoint or None
         self._local_cache_root = Path(local_cache_root)
         self._aws_access_key_id = aws_access_key_id
         self._aws_secret_access_key = aws_secret_access_key
+        self._verify_ssl = verify_ssl
         self._s3_client = None
 
     def load(self, model_uri: str | None) -> ModelBundle:
@@ -128,5 +130,6 @@ class ModelBundleLoader:
                 endpoint_url=self._s3_endpoint,
                 aws_access_key_id=self._aws_access_key_id,
                 aws_secret_access_key=self._aws_secret_access_key,
+                verify=self._verify_ssl,
             )
         return self._s3_client

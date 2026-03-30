@@ -61,6 +61,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    profiles:
+      - batch
     restart: "no"
     env_file:
       - .env
@@ -80,6 +82,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    profiles:
+      - batch
     restart: "no"
     env_file:
       - .env
