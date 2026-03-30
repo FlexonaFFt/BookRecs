@@ -1,3 +1,8 @@
+from source.infrastructure.storage.experiments.postgres_experiment_log import (
+    ExperimentResult,
+    OfflineExperiment,
+    PostgresExperimentLog,
+)
 from source.infrastructure.storage.factory import (
     PrepareDataStorageBackends,
     build_prepare_storage_backends,
@@ -24,4 +29,7 @@ __all__ = [
     "LocalDatasetStore",
     "S3DatasetStore",
     "build_prepare_storage_backends",
+    "OfflineExperiment",
+    "ExperimentResult",
+    "PostgresExperimentLog",
 ]
