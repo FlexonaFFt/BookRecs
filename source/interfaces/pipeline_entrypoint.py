@@ -51,6 +51,7 @@ def run_pipeline_from_env() -> None:
             s3_bucket=settings.s3_bucket,
             s3_region=settings.s3_region,
             s3_endpoint=settings.s3_endpoint,
+            s3_verify_ssl=settings.s3_verify_ssl,
         )
         prepare_use_case = PrepareDataUseCase(
             preprocessor=GoodreadsPreprocessor(),

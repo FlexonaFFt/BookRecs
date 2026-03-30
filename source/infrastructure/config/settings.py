@@ -12,6 +12,7 @@ class Settings:
     s3_bucket: str
     s3_region: str
     s3_endpoint: str
+    s3_verify_ssl: bool
     train_dataset_dir: str
     train_output_root: str
     train_profile: str
@@ -65,6 +66,7 @@ class Settings:
             s3_bucket=_get("BOOKRECS_S3_BUCKET", ""),
             s3_region=_get("BOOKRECS_S3_REGION", "us-east-1"),
             s3_endpoint=_get("BOOKRECS_S3_ENDPOINT", ""),
+            s3_verify_ssl=env_bool(values, "BOOKRECS_S3_VERIFY_SSL", True),
             train_dataset_dir=_get(
                 "BOOKRECS_TRAIN_DATASET_DIR", "artifacts/tmp_preprocessed/goodreads_ya"
             ),
@@ -147,6 +149,7 @@ class Settings:
             "BOOKRECS_S3_BUCKET": self.s3_bucket,
             "BOOKRECS_S3_REGION": self.s3_region,
             "BOOKRECS_S3_ENDPOINT": self.s3_endpoint,
+            "BOOKRECS_S3_VERIFY_SSL": "true" if self.s3_verify_ssl else "false",
             "BOOKRECS_TRAIN_DATASET_DIR": self.train_dataset_dir,
             "BOOKRECS_TRAIN_OUTPUT_ROOT": self.train_output_root,
             "BOOKRECS_TRAIN_PROFILE": self.train_profile,
@@ -196,6 +199,7 @@ class PipelineSettings:
     s3_bucket: str
     s3_region: str
     s3_endpoint: str
+    s3_verify_ssl: bool
     pg_dsn: str
     migration_path: str
     skip_prepare: bool
@@ -271,6 +275,7 @@ class PipelineSettings:
             s3_bucket=env_str(values, "BOOKRECS_S3_BUCKET", core.s3_bucket),
             s3_region=env_str(values, "BOOKRECS_S3_REGION", core.s3_region),
             s3_endpoint=env_str(values, "BOOKRECS_S3_ENDPOINT", core.s3_endpoint),
+            s3_verify_ssl=env_bool(values, "BOOKRECS_S3_VERIFY_SSL", core.s3_verify_ssl),
             pg_dsn=env_str(values, "BOOKRECS_PG_DSN", core.pg_dsn),
             migration_path=env_str(
                 values,
@@ -370,6 +375,7 @@ class ApiRuntimeSettings:
     model_cache_dir: str
     s3_region: str
     s3_endpoint: str
+    s3_verify_ssl: bool
     pg_dsn: str
     history_table: str
     inference_log_table: str
@@ -397,6 +403,7 @@ class ApiRuntimeSettings:
             ),
             s3_region=env_str(values, "BOOKRECS_S3_REGION", "us-east-1"),
             s3_endpoint=env_str(values, "BOOKRECS_S3_ENDPOINT", ""),
+            s3_verify_ssl=env_bool(values, "BOOKRECS_S3_VERIFY_SSL", True),
             pg_dsn=env_str(values, "BOOKRECS_PG_DSN", ""),
             history_table=env_str(
                 values, "BOOKRECS_API_HISTORY_TABLE", "user_item_interactions"
