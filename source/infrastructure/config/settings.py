@@ -273,7 +273,9 @@ class PipelineSettings:
                 "BOOKRECS_COLD_MAX_INTERACTIONS",
                 core.cold_max_interactions,
             ),
-            max_users=env_non_negative_int(values, "BOOKRECS_MAX_USERS", core.max_users),
+            max_users=env_non_negative_int(
+                values, "BOOKRECS_MAX_USERS", core.max_users
+            ),
             max_interactions_rows=env_non_negative_int(
                 values, "BOOKRECS_MAX_INTERACTIONS_ROWS", core.max_interactions_rows
             ),
@@ -289,7 +291,9 @@ class PipelineSettings:
             s3_bucket=env_str(values, "BOOKRECS_S3_BUCKET", core.s3_bucket),
             s3_region=env_str(values, "BOOKRECS_S3_REGION", core.s3_region),
             s3_endpoint=env_str(values, "BOOKRECS_S3_ENDPOINT", core.s3_endpoint),
-            s3_verify_ssl=env_bool(values, "BOOKRECS_S3_VERIFY_SSL", core.s3_verify_ssl),
+            s3_verify_ssl=env_bool(
+                values, "BOOKRECS_S3_VERIFY_SSL", core.s3_verify_ssl
+            ),
             pg_dsn=env_str(values, "BOOKRECS_PG_DSN", core.pg_dsn),
             migration_path=env_str(
                 values,

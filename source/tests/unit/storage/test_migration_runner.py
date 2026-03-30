@@ -118,12 +118,8 @@ def test_run_migration_skips_already_applied_single_file(
 def test_run_migration_applies_only_new_files_in_dir(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    (tmp_path / "0001_init.sql").write_text(
-        "CREATE TABLE a (id INT)", encoding="utf-8"
-    )
-    (tmp_path / "0002_more.sql").write_text(
-        "CREATE TABLE b (id INT)", encoding="utf-8"
-    )
+    (tmp_path / "0001_init.sql").write_text("CREATE TABLE a (id INT)", encoding="utf-8")
+    (tmp_path / "0002_more.sql").write_text("CREATE TABLE b (id INT)", encoding="utf-8")
 
     fake = _make_fake_client(monkeypatch)
 

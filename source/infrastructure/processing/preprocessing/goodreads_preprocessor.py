@@ -420,11 +420,7 @@ class GoodreadsPreprocessor(PreprocessorPort):
         unique_users = interactions["user_id"].unique()
         if len(unique_users) <= max_users:
             return interactions
-        sampled = (
-            pd.Series(unique_users)
-            .sample(n=max_users, random_state=42)
-            .tolist()
-        )
+        sampled = pd.Series(unique_users).sample(n=max_users, random_state=42).tolist()
         return interactions[interactions["user_id"].isin(set(sampled))].copy()
 
     @staticmethod

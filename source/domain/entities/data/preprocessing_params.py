@@ -14,7 +14,7 @@ class PreprocessingParams:
     warm_users_only: bool = True
     language_filter_enabled: bool = True
     interactions_chunksize: int = 200_000
-    max_users: int = 0              # 0 = без ограничения
+    max_users: int = 0  # 0 = без ограничения
     max_interactions_rows: int = 0  # 0 = читать весь файл
 
     def validate(self) -> None:
