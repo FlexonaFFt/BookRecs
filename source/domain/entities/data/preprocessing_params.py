@@ -14,6 +14,8 @@ class PreprocessingParams:
     warm_users_only: bool = True
     language_filter_enabled: bool = True
     interactions_chunksize: int = 200_000
+    max_users: int = 0              # 0 = без ограничения
+    max_interactions_rows: int = 0  # 0 = читать весь файл
 
     def validate(self) -> None:
         if self.k_core < 0:
@@ -28,3 +30,7 @@ class PreprocessingParams:
             raise ValueError("cold_max_interactions must be >= 0")
         if self.interactions_chunksize <= 0:
             raise ValueError("interactions_chunksize must be > 0")
+        if self.max_users < 0:
+            raise ValueError("max_users must be >= 0")
+        if self.max_interactions_rows < 0:
+            raise ValueError("max_interactions_rows must be >= 0")

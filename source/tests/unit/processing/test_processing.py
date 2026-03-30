@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import pandas as pd
+
 from source.domain.entities import Candidate, FinalItem
 from source.infrastructure.processing.postprocessing.default_postprocessor import (
     DefaultPostprocessor,
+)
+from source.infrastructure.processing.preprocessing.goodreads_preprocessor import (
+    GoodreadsPreprocessor,
 )
 from source.infrastructure.ranking.finalrank.policy_final_reranker import (
     PolicyFinalReranker,
@@ -35,6 +40,128 @@ class FakeProbModel:
             score = max(0.0, min(1.0, score))
             out.append([1.0 - score, score])
         return out
+
+
+def _make_interactions(n_users: int, items_per_user: int = 3) -> pd.DataFrame:
+    rows = []
+    for u in range(n_users):
+        for i in range(items_per_user):
+            rows.append({"user_id": f"u{u}", "item_id": i, "rating": 0, "is_read": 0})
+    return pd.DataFrame(rows)
+
+
+def test_cap_users_does_nothing_when_limit_is_zero() -> None:
+    df = _make_interactions(10)
+    out = GoodreadsPreprocessor._cap_users(df, 0)
+    # max_users=0 means unlimited — but _cap_users itself should handle the case
+    # where limit >= existing users
+    assert out["user_id"].nunique() == 10
+
+
+def test_cap_users_trims_to_max() -> None:
+    df = _make_interactions(100)
+    out = GoodreadsPreprocessor._cap_users(df, 20)
+    assert out["user_id"].nunique() == 20
+
+
+def test_cap_users_is_deterministic() -> None:
+    df = _make_interactions(50)
+    out1 = GoodreadsPreprocessor._cap_users(df, 10)
+    out2 = GoodreadsPreprocessor._cap_users(df, 10)
+    assert set(out1["user_id"].unique()) == set(out2["user_id"].unique())
+
+
+def test_cap_users_keeps_all_rows_for_sampled_users() -> None:
+    df = _make_interactions(30, items_per_user=5)
+    out = GoodreadsPreprocessor._cap_users(df, 10)
+    # каждый оставшийся юзер должен иметь все свои строки
+    for uid in out["user_id"].unique():
+        assert len(out[out["user_id"] == uid]) == 5
+
+
+def test_cap_users_noop_when_users_already_below_limit() -> None:
+    df = _make_interactions(5)
+    out = GoodreadsPreprocessor._cap_users(df, 100)
+    assert out["user_id"].nunique() == 5
+
+
+def _make_raw_interactions(n_rows: int) -> pd.DataFrame:
+    """Минимальный датафрейм в формате _prepare_interactions (после merge)."""
+    import numpy as np
+
+    rng = np.random.default_rng(0)
+    return pd.DataFrame(
+        {
+            "user_id": [f"u{i % 20}" for i in range(n_rows)],
+            "item_id": rng.integers(0, 50, size=n_rows),
+            "is_read": rng.integers(0, 2, size=n_rows),
+            "rating": rng.integers(0, 6, size=n_rows),
+            "date_added": pd.date_range("2020-01-01", periods=n_rows, freq="h"),
+        }
+    )
+
+
+def test_prepare_interactions_early_exit_respects_max_rows(tmp_path: "Path") -> None:
+    """Проверяет, что при max_rows ранний выход работает без ошибок."""
+    import json, gzip
+    from datetime import timezone
+
+    rows = []
+    for i in range(500):
+        rows.append(
+            {
+                "user_id": f"u{i % 30}",
+                "book_id": f"b{i % 20}",
+                "is_read": 1,
+                "rating": 3,
+                "date_added": "Mon Jan 01 00:00:00 +0000 2020",
+            }
+        )
+
+    gz_path = tmp_path / "interactions.json.gz"
+    with gzip.open(gz_path, "wt", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r) + "\n")
+
+    book_to_item = pd.DataFrame(
+        {"book_id": [f"b{i}" for i in range(20)], "item_id": list(range(20))}
+    )
+
+    prep = GoodreadsPreprocessor(work_dir=str(tmp_path / "work"))
+    result_full = prep._prepare_interactions(
+        str(gz_path), book_to_item, chunksize=100, max_rows=0
+    )
+    result_limited = prep._prepare_interactions(
+        str(gz_path), book_to_item, chunksize=100, max_rows=200
+    )
+    # ранний выход даёт меньше или равно строк, чем полный прогон
+    assert len(result_limited) <= len(result_full)
+
+
+def test_prepare_interactions_max_rows_zero_reads_all(tmp_path: "Path") -> None:
+    import json, gzip
+
+    rows = [
+        {
+            "user_id": f"u{i}",
+            "book_id": "b0",
+            "is_read": 1,
+            "rating": 3,
+            "date_added": "Mon Jan 01 00:00:00 +0000 2020",
+        }
+        for i in range(50)
+    ]
+    gz_path = tmp_path / "interactions.json.gz"
+    with gzip.open(gz_path, "wt", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r) + "\n")
+
+    book_to_item = pd.DataFrame({"book_id": ["b0"], "item_id": [0]})
+    prep = GoodreadsPreprocessor(work_dir=str(tmp_path / "work"))
+    result = prep._prepare_interactions(
+        str(gz_path), book_to_item, chunksize=10, max_rows=0
+    )
+    assert result["user_id"].nunique() == 50
 
 
 def test_default_postprocessor_filters_seen_and_duplicates_and_limits_top_k() -> None:

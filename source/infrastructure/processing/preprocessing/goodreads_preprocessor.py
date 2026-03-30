@@ -58,11 +58,20 @@ class GoodreadsPreprocessor(PreprocessorPort):
             interactions_uri=source.interactions_raw_uri,
             book_to_item=book_to_item,
             chunksize=params.interactions_chunksize,
+            max_rows=params.max_interactions_rows,
         )
         print(f"[prepare] Interactions после merge: {len(interactions)}", flush=True)
         print(f"[prepare] Применение k-core: {params.k_core}", flush=True)
         interactions = self._apply_k_core(interactions, params.k_core)
         print(f"[prepare] После k-core: {len(interactions)}", flush=True)
+        if params.max_users > 0:
+            interactions = self._cap_users(interactions, params.max_users)
+            print(
+                f"[prepare] После cap_users({params.max_users}): "
+                f"{interactions['user_id'].nunique()} юзеров, "
+                f"{len(interactions)} строк",
+                flush=True,
+            )
         print(
             f"[prepare] Отбор хвоста по времени: {params.keep_recent_fraction}",
             flush=True,
@@ -317,7 +326,11 @@ class GoodreadsPreprocessor(PreprocessorPort):
         return out_books, book_to_item
 
     def _prepare_interactions(
-        self, interactions_uri: str, book_to_item: pd.DataFrame, chunksize: int
+        self,
+        interactions_uri: str,
+        book_to_item: pd.DataFrame,
+        chunksize: int,
+        max_rows: int = 0,
     ) -> pd.DataFrame:
 
         path = Path(interactions_uri)
@@ -329,38 +342,52 @@ class GoodreadsPreprocessor(PreprocessorPort):
 
         reader = pd.read_json(path, lines=True, compression="gzip", chunksize=chunksize)
         total_rows = 0
-        for chunk_idx, chunk in enumerate(reader, start=1):
-            total_rows += len(chunk)
-            _require_columns(chunk, required, "interactions_chunk")
-            chunk = chunk[required].copy()
+        try:
+            for chunk_idx, chunk in enumerate(reader, start=1):
+                total_rows += len(chunk)
+                _require_columns(chunk, required, "interactions_chunk")
+                chunk = chunk[required].copy()
 
-            merged = chunk.merge(book_to_item, on="book_id", how="inner").drop(
-                columns=["book_id"]
-            )
-            merged["date_added"] = pd.to_datetime(
-                merged["date_added"],
-                format="%a %b %d %H:%M:%S %z %Y",
-                errors="coerce",
-                utc=True,
-            )
-            merged = merged.dropna(subset=["date_added"]).copy()
-            merged["date_added"] = merged["date_added"].dt.tz_localize(None)
-
-            agg = merged.groupby(["user_id", "item_id"], as_index=False).agg(
-                is_read=("is_read", "max"),
-                rating=("rating", "max"),
-                date_added=("date_added", "min"),
-            )
-            partials.append(agg)
-            if chunk_idx % 10 == 0:
-                print(
-                    "[prepare] Обработано чанков "
-                    f"interactions: {chunk_idx}, "
-                    f"сырьевых строк: {total_rows}, "
-                    f"агрегированных блоков: "
-                    f"{len(partials)}",
-                    flush=True,
+                merged = chunk.merge(book_to_item, on="book_id", how="inner").drop(
+                    columns=["book_id"]
                 )
+                merged["date_added"] = pd.to_datetime(
+                    merged["date_added"],
+                    format="%a %b %d %H:%M:%S %z %Y",
+                    errors="coerce",
+                    utc=True,
+                )
+                merged = merged.dropna(subset=["date_added"]).copy()
+                merged["date_added"] = merged["date_added"].dt.tz_localize(None)
+
+                agg = merged.groupby(["user_id", "item_id"], as_index=False).agg(
+                    is_read=("is_read", "max"),
+                    rating=("rating", "max"),
+                    date_added=("date_added", "min"),
+                )
+                partials.append(agg)
+                if chunk_idx % 10 == 0:
+                    print(
+                        "[prepare] Обработано чанков "
+                        f"interactions: {chunk_idx}, "
+                        f"сырьевых строк: {total_rows}, "
+                        f"агрегированных блоков: "
+                        f"{len(partials)}",
+                        flush=True,
+                    )
+                if max_rows > 0 and total_rows >= max_rows:
+                    print(
+                        f"[prepare] Ранний выход: прочитано {total_rows} строк "
+                        f"(лимит max_interactions_rows={max_rows})",
+                        flush=True,
+                    )
+                    break
+        except EOFError:
+            print(
+                f"[prepare] Предупреждение: gz-файл обрезан, "
+                f"обработано {total_rows} строк из имеющихся. Продолжаем.",
+                flush=True,
+            )
 
         if not partials:
             raise ValueError("No interactions after preprocessing")
@@ -385,6 +412,20 @@ class GoodreadsPreprocessor(PreprocessorPort):
         user_counts = interactions.groupby("user_id")["item_id"].nunique()
         keep_users = set(user_counts[user_counts > k_core].index.tolist())
         return interactions[interactions["user_id"].isin(keep_users)].copy()
+
+    @staticmethod
+    def _cap_users(interactions: pd.DataFrame, max_users: int) -> pd.DataFrame:
+        if max_users <= 0:
+            return interactions
+        unique_users = interactions["user_id"].unique()
+        if len(unique_users) <= max_users:
+            return interactions
+        sampled = (
+            pd.Series(unique_users)
+            .sample(n=max_users, random_state=42)
+            .tolist()
+        )
+        return interactions[interactions["user_id"].isin(set(sampled))].copy()
 
     @staticmethod
     def _keep_recent_tail(

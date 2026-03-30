@@ -76,6 +76,21 @@ services:
       - ./data:/app/data
       - ./artifacts:/app/artifacts
 
+  demo-seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: "no"
+    env_file:
+      - .env
+    command: ["python", "-m", "source.interfaces.demo_seed_entrypoint"]
+    depends_on:
+      pipeline:
+        condition: service_completed_successfully
+    volumes:
+      - ./data:/app/data
+      - ./artifacts:/app/artifacts
+
   api:
     build:
       context: .
@@ -89,6 +104,9 @@ services:
         condition: service_healthy
         required: false
       minio-init:
+        condition: service_completed_successfully
+        required: false
+      demo-seed:
         condition: service_completed_successfully
         required: false
     ports:
