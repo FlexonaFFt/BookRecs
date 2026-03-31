@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from hashlib import sha256
-from typing import Any
+from typing import Any, Callable, Optional
 from uuid import uuid4
 
 from source.application.ports import (
@@ -30,6 +30,9 @@ class PrepareDataCommand:
     s3_prefix: str
     metadata: dict[str, Any] | None = None
     local_dataset_dir: str = ""
+    ensure_raw_data_fn: Optional[Callable[[], None]] = field(
+        default=None, compare=False, hash=False
+    )
 
 
 # Реализует сценарий подготовки данных.
@@ -95,6 +98,8 @@ class PrepareDataUseCase:
                 self._run_log.finish(run)
                 return existing
 
+            if cmd.ensure_raw_data_fn is not None:
+                cmd.ensure_raw_data_fn()
             print("[prepare] Запуск preprocessor.run(...)", flush=True)
             local_artifacts = self._preprocessor.run(cmd.source, cmd.params)
             print(

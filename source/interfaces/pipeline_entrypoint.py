@@ -36,14 +36,16 @@ def run_pipeline_from_env() -> None:
         run_migration(pg_dsn=settings.pg_dsn, migration_path=settings.migration_path)
         print(f"[pipeline] migrations applied from {settings.migration_path}")
 
-    if (
-        not Path(settings.books_raw_uri).exists()
-        or not Path(settings.interactions_raw_uri).exists()
-    ):
-        download_goodreads_raw(raw_dir=settings.raw_dir, force=False)
-        print("[pipeline] raw data downloaded")
-
     if not settings.skip_prepare:
+
+        def _ensure_raw_data() -> None:
+            if (
+                not Path(settings.books_raw_uri).exists()
+                or not Path(settings.interactions_raw_uri).exists()
+            ):
+                download_goodreads_raw(raw_dir=settings.raw_dir, force=False)
+                print("[pipeline] raw data downloaded")
+
         storage_backends = build_prepare_storage_backends(
             registry_backend=settings.registry_backend,
             pg_dsn=settings.pg_dsn,
@@ -82,6 +84,7 @@ def run_pipeline_from_env() -> None:
                 s3_prefix=settings.s3_prefix,
                 metadata={"runner": "pipeline_entrypoint"},
                 local_dataset_dir=settings.dataset_dir,
+                ensure_raw_data_fn=_ensure_raw_data,
             )
         )
         print(f"[pipeline] prepare completed version_id={prepare_result.version_id}")
