@@ -1,0 +1,32 @@
+name: Train Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_users:
+        description: "Max users (0 = all)"
+        required: false
+        default: "0"
+      max_interactions_rows:
+        description: "Max interactions rows (0 = all)"
+        required: false
+        default: "0"
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run pipeline on remote server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd ~/bookrecs
+            echo "${{ secrets.DEPLOY_GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose -f docker-compose.prod.yml --profile batch run --rm \
+              -e BOOKRECS_MAX_USERS=${{ github.event.inputs.max_users }} \
+              -e BOOKRECS_MAX_INTERACTIONS_ROWS=${{ github.event.inputs.max_interactions_rows }} \
+              pipeline
+            docker compose -f docker-compose.prod.yml --profile batch run --rm demo-seed
