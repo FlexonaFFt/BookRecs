@@ -1,5 +1,7 @@
 # Production docker-compose — использует внешние Postgres и S3 (рег.ру или другой провайдер).
 # Локальные контейнеры postgres/minio здесь отсутствуют — всё через .env.
+name: bookrecs
+
 services:
   pipeline:
     image: ghcr.io/flexonafft/bookrecs:latest
