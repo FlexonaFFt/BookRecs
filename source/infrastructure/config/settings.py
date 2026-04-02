@@ -234,6 +234,7 @@ class PipelineSettings:
     catboost_depth: int
     catboost_learning_rate: float
     seed: int
+    active_model_pointer: str
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> PipelineSettings:
@@ -382,6 +383,11 @@ class PipelineSettings:
                 auto_tune=auto_tune,
             ),
             seed=env_positive_int(values, "BOOKRECS_TRAIN_SEED", core.train_seed),
+            active_model_pointer=env_str(
+                values,
+                "BOOKRECS_ACTIVE_MODEL_POINTER",
+                "artifacts/runs/active_model.json",
+            ),
         )
 
 

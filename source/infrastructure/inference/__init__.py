@@ -1,6 +1,7 @@
 from source.infrastructure.inference.history import UserHistoryProvider
 from source.infrastructure.inference.loader import ModelBundle, ModelBundleLoader
 from source.infrastructure.inference.logger import InferenceRequestLogger
+from source.infrastructure.inference.model_publisher import upload_model_to_s3
 from source.infrastructure.inference.model_registry import (
     ModelPointer,
     build_local_pointer,
@@ -20,5 +21,6 @@ __all__ = [
     "build_local_pointer",
     "read_model_pointer",
     "resolve_model_uri",
+    "upload_model_to_s3",
     "write_model_pointer",
 ]
