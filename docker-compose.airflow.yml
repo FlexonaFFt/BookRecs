@@ -10,29 +10,12 @@ services:
       timeout: 5s
       retries: 20
 
-  airflow-postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${AIRFLOW_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${AIRFLOW_POSTGRES_DB}
-    volumes:
-      - airflow_pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_POSTGRES_USER} -d ${AIRFLOW_POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
   airflow-init:
     image: ghcr.io/flexonafft/bookrecs-airflow:latest
     restart: "no"
     env_file:
       - .env
     depends_on:
-      airflow-postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     environment: &airflow-env
@@ -40,9 +23,9 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/${AIRFLOW_POSTGRES_DB}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW_DB_DSN}
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${AIRFLOW_POSTGRES_USER}:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/${AIRFLOW_POSTGRES_DB}
+      AIRFLOW__CELERY__RESULT_BACKEND: db+${AIRFLOW_DB_DSN}
       AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.session
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
       BOOKRECS_BATCH_IMAGE: ${BOOKRECS_BATCH_IMAGE:-ghcr.io/flexonafft/bookrecs:latest}
@@ -73,8 +56,6 @@ services:
     env_file:
       - .env
     depends_on:
-      airflow-postgres:
-        condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
       redis:
@@ -94,8 +75,6 @@ services:
     env_file:
       - .env
     depends_on:
-      airflow-postgres:
-        condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
       redis:
@@ -113,8 +92,6 @@ services:
     env_file:
       - .env
     depends_on:
-      airflow-postgres:
-        condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
       redis:
@@ -132,8 +109,6 @@ services:
     env_file:
       - .env
     depends_on:
-      airflow-postgres:
-        condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
       redis:
@@ -146,7 +121,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
-  airflow_pg_data:
   airflow_logs:
 
 networks:
