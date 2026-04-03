@@ -8,10 +8,14 @@ from source.domain.entities import DatasetArtifacts, DatasetVersion
 
 try:
     import boto3
+    import urllib3
     from botocore.exceptions import ClientError
+    from urllib3.exceptions import InsecureRequestWarning
 except ModuleNotFoundError:
     boto3 = None
+    urllib3 = None  # type: ignore[assignment]
     ClientError = Exception
+    InsecureRequestWarning = None  # type: ignore[assignment,misc]
 
 
 # Сохраняет артефакты датасета в S3-совместимое хранилище.
@@ -143,6 +147,8 @@ class S3DatasetStore(DatasetStorePort):
                 "Install dependency: pip install boto3"
             )
         if self._client is None:
+            if not self._verify_ssl and urllib3 is not None:
+                urllib3.disable_warnings(InsecureRequestWarning)
             self._client = boto3.client(
                 "s3",
                 region_name=self._region,

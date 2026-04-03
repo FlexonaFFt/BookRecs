@@ -11,8 +11,12 @@ from fastapi import FastAPI, HTTPException
 
 try:
     import boto3
+    import urllib3
+    from urllib3.exceptions import InsecureRequestWarning
 except ModuleNotFoundError:
     boto3 = None
+    urllib3 = None  # type: ignore[assignment]
+    InsecureRequestWarning = None  # type: ignore[assignment,misc]
 
 from source.infrastructure.config import load_api_runtime_settings
 from source.infrastructure.inference import (
@@ -341,6 +345,8 @@ def _check_s3_available(
     if not bucket or not key:
         return False
     try:
+        if not verify_ssl and urllib3 is not None:
+            urllib3.disable_warnings(InsecureRequestWarning)
         client = boto3.client(
             "s3",
             region_name=region,

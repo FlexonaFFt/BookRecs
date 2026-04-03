@@ -4,8 +4,12 @@ from pathlib import Path
 
 try:
     import boto3
+    import urllib3
+    from urllib3.exceptions import InsecureRequestWarning
 except ModuleNotFoundError:
     boto3 = None
+    urllib3 = None  # type: ignore[assignment]
+    InsecureRequestWarning = None  # type: ignore[assignment,misc]
 
 
 def upload_model_to_s3(
@@ -22,6 +26,8 @@ def upload_model_to_s3(
         raise RuntimeError("boto3 is required for S3 model publishing.")
 
     model_dir = Path(output_root) / run_id / "models"
+    if not verify_ssl and urllib3 is not None:
+        urllib3.disable_warnings(InsecureRequestWarning)
     client = boto3.client(
         "s3",
         region_name=s3_region,

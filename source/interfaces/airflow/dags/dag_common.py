@@ -75,17 +75,29 @@ def docker_env() -> dict[str, str]:
 
 
 def docker_mounts() -> list[Mount]:
-    host_project_dir = env_if_set("BOOKRECS_HOST_PROJECT_DIR")
-    if host_project_dir is None:
-        return []
+    mounts: list[Mount] = []
 
-    project_dir = Path(host_project_dir).expanduser()
-    mounts = [
-        Mount(source=str(project_dir / "data"), target="/app/data", type="bind"),
-        Mount(
-            source=str(project_dir / "artifacts"), target="/app/artifacts", type="bind"
-        ),
-    ]
+    artifacts_volume = env_if_set("BOOKRECS_ARTIFACTS_VOLUME")
+    if artifacts_volume:
+        mounts.append(
+            Mount(source=artifacts_volume, target="/app/artifacts", type="volume")
+        )
+
+    host_project_dir = env_if_set("BOOKRECS_HOST_PROJECT_DIR")
+    if host_project_dir:
+        project_dir = Path(host_project_dir).expanduser()
+        mounts.append(
+            Mount(source=str(project_dir / "data"), target="/app/data", type="bind")
+        )
+        if not artifacts_volume:
+            mounts.append(
+                Mount(
+                    source=str(project_dir / "artifacts"),
+                    target="/app/artifacts",
+                    type="bind",
+                )
+            )
+
     return mounts
 
 

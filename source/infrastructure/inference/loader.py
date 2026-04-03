@@ -9,8 +9,12 @@ from urllib.parse import urlparse
 
 try:
     import boto3
+    import urllib3
+    from urllib3.exceptions import InsecureRequestWarning
 except ModuleNotFoundError:
     boto3 = None
+    urllib3 = None  # type: ignore[assignment]
+    InsecureRequestWarning = None  # type: ignore[assignment,misc]
 
 
 @dataclass(frozen=True)
@@ -124,6 +128,8 @@ class ModelBundleLoader:
                 "Install dependency: pip install boto3"
             )
         if self._s3_client is None:
+            if not self._verify_ssl and urllib3 is not None:
+                urllib3.disable_warnings(InsecureRequestWarning)
             self._s3_client = boto3.client(
                 "s3",
                 region_name=self._s3_region,
