@@ -131,15 +131,27 @@ jobs:
         run: uv sync --frozen --python 3.11
 
       - name: Run backend unit tests
-        run: uv run pytest source/tests -vv --junit-xml=pytest-report.xml
+        run: |
+          uv run pytest source/tests -vv --junit-xml=pytest-report.xml
 
-      - name: Publish test report
-        uses: mikepenz/action-junit-report@v4
+      - name: Test summary
         if: always()
-        with:
-          report_paths: pytest-report.xml
-          detailed_summary: true
-          include_passed: true
+        run: |
+          total=$(python3 -c "import xml.etree.ElementTree as ET; t=ET.parse('pytest-report.xml').getroot(); print(t.get('tests', 0))")
+          failed=$(python3 -c "import xml.etree.ElementTree as ET; t=ET.parse('pytest-report.xml').getroot(); print(t.get('failures', 0))")
+          errors=$(python3 -c "import xml.etree.ElementTree as ET; t=ET.parse('pytest-report.xml').getroot(); print(t.get('errors', 0))")
+          passed=$((total - failed - errors))
+          if [[ "$failed" == "0" && "$errors" == "0" ]]; then
+            echo "## ✅ Backend Tests Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Backend Tests Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "| Result | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| ✅ Passed | $passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| ❌ Failed | $failed |" >> $GITHUB_STEP_SUMMARY
+          echo "| 💥 Errors | $errors |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📊 Total  | $total |" >> $GITHUB_STEP_SUMMARY
 
   frontend-lint:
     runs-on: ubuntu-latest
