@@ -137,9 +137,24 @@ jobs:
       - name: Test summary
         if: always()
         run: |
-          total=$(python3 -c "import xml.etree.ElementTree as ET; t=ET.parse('pytest-report.xml').getroot(); print(t.get('tests', 0))")
-          failed=$(python3 -c "import xml.etree.ElementTree as ET; t=ET.parse('pytest-report.xml').getroot(); print(t.get('failures', 0))")
-          errors=$(python3 -c "import xml.etree.ElementTree as ET; t=ET.parse('pytest-report.xml').getroot(); print(t.get('errors', 0))")
+          total=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          root = ET.parse('pytest-report.xml').getroot()
+          suites = root.findall('testsuite') if root.tag == 'testsuites' else [root]
+          print(sum(int(s.get('tests', 0)) for s in suites))
+          ")
+          failed=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          root = ET.parse('pytest-report.xml').getroot()
+          suites = root.findall('testsuite') if root.tag == 'testsuites' else [root]
+          print(sum(int(s.get('failures', 0)) for s in suites))
+          ")
+          errors=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          root = ET.parse('pytest-report.xml').getroot()
+          suites = root.findall('testsuite') if root.tag == 'testsuites' else [root]
+          print(sum(int(s.get('errors', 0)) for s in suites))
+          ")
           passed=$((total - failed - errors))
           if [[ "$failed" == "0" && "$errors" == "0" ]]; then
             echo "## ✅ Backend Tests Passed" >> $GITHUB_STEP_SUMMARY
