@@ -62,7 +62,9 @@ def run_pipeline_from_env() -> None:
             s3_verify_ssl=settings.s3_verify_ssl,
         )
         prepare_use_case = PrepareDataUseCase(
-            preprocessor=GoodreadsPreprocessor(),
+            preprocessor=GoodreadsPreprocessor(
+                cutoff_date=settings.simulation_cutoff_date
+            ),
             dataset_store=storage_backends.dataset_store,
             dataset_registry=storage_backends.dataset_registry,
             run_log=storage_backends.run_log,
