@@ -98,6 +98,8 @@ services:
         condition: service_healthy
     environment: *airflow-env
     command: celery worker
+    group_add:
+      - "${DOCKER_GID:-999}"
     volumes:
       - ./source/interfaces/airflow/dags:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
