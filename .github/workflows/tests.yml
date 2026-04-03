@@ -27,20 +27,89 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --python 3.11 --no-install-project
 
+      - name: Init lint summary
+        run: |
+          echo "## Backend Lint Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Tool | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+
       - name: black (formatting)
-        run: uv run black --check source/
+        id: black
+        continue-on-error: true
+        run: |
+          if output=$(uv run black --check source/ 2>&1); then
+            echo "✅ All files formatted correctly"
+            echo "| black | ✅ passed | All files formatted correctly |" >> $GITHUB_STEP_SUMMARY
+          else
+            count=$(echo "$output" | grep -c "would reformat" || true)
+            echo "| black | ❌ failed | $count file(s) need reformatting |" >> $GITHUB_STEP_SUMMARY
+            echo "$output" && exit 1
+          fi
 
       - name: isort (import order)
-        run: uv run isort --check-only source/
+        id: isort
+        continue-on-error: true
+        run: |
+          if output=$(uv run isort --check-only source/ 2>&1); then
+            echo "✅ All imports sorted correctly"
+            echo "| isort | ✅ passed | All imports sorted correctly |" >> $GITHUB_STEP_SUMMARY
+          else
+            count=$(echo "$output" | grep -c "ERROR" || true)
+            echo "| isort | ❌ failed | $count file(s) with wrong import order |" >> $GITHUB_STEP_SUMMARY
+            echo "$output" && exit 1
+          fi
 
       - name: flake8 (style)
-        run: uv run flake8 source/
+        id: flake8
+        continue-on-error: true
+        run: |
+          if output=$(uv run flake8 source/ 2>&1); then
+            echo "✅ No style issues found"
+            echo "| flake8 | ✅ passed | No style issues |" >> $GITHUB_STEP_SUMMARY
+          else
+            count=$(echo "$output" | wc -l | tr -d ' ')
+            echo "| flake8 | ❌ failed | $count violation(s) found |" >> $GITHUB_STEP_SUMMARY
+            echo "$output" && exit 1
+          fi
 
       - name: mypy (types)
-        run: uv run mypy source/ --ignore-missing-imports
+        id: mypy
+        continue-on-error: true
+        run: |
+          if output=$(uv run mypy source/ --ignore-missing-imports 2>&1); then
+            files=$(echo "$output" | grep -oP '\d+ source files' || echo "source files")
+            echo "✅ No type errors ($files)"
+            echo "| mypy | ✅ passed | No type errors ($files) |" >> $GITHUB_STEP_SUMMARY
+          else
+            count=$(echo "$output" | grep -c "error:" || true)
+            echo "| mypy | ❌ failed | $count type error(s) |" >> $GITHUB_STEP_SUMMARY
+            echo "$output" && exit 1
+          fi
 
       - name: pylint (quality)
-        run: uv run pylint source/ --rcfile=pyproject.toml
+        id: pylint
+        continue-on-error: true
+        run: |
+          if output=$(uv run pylint source/ --rcfile=pyproject.toml 2>&1); then
+            score=$(echo "$output" | grep -oP 'rated at \K[0-9.]+/[0-9.]+' || echo "n/a")
+            echo "✅ Code quality score: $score"
+            echo "| pylint | ✅ passed | Score: $score |" >> $GITHUB_STEP_SUMMARY
+          else
+            score=$(echo "$output" | grep -oP 'rated at \K[0-9.]+/[0-9.]+' || echo "n/a")
+            echo "| pylint | ❌ failed | Score: $score |" >> $GITHUB_STEP_SUMMARY
+            echo "$output" && exit 1
+          fi
+
+      - name: Fail if any lint check failed
+        if: always()
+        run: |
+          if [[ "${{ steps.black.outcome }}" == "failure" ||
+                "${{ steps.isort.outcome }}" == "failure" ||
+                "${{ steps.flake8.outcome }}" == "failure" ||
+                "${{ steps.mypy.outcome }}" == "failure" ||
+                "${{ steps.pylint.outcome }}" == "failure" ]]; then
+            exit 1
+          fi
 
   backend-tests:
     runs-on: ubuntu-latest
@@ -62,7 +131,15 @@ jobs:
         run: uv sync --frozen --python 3.11
 
       - name: Run backend unit tests
-        run: uv run pytest source/tests -vv
+        run: uv run pytest source/tests -vv --junit-xml=pytest-report.xml
+
+      - name: Publish test report
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          report_paths: pytest-report.xml
+          detailed_summary: true
+          include_passed: true
 
   frontend-lint:
     runs-on: ubuntu-latest
