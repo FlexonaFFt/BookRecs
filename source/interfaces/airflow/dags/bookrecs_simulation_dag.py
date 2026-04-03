@@ -16,7 +16,7 @@ with DAG(
     max_active_runs=1,
     tags=["bookrecs", "simulation", "ml"],
 ) as dag:
-    run_simulation = DockerOperator(
+    DockerOperator(
         task_id="run_simulation",
         command="python -m source.interfaces.simulation_batch_entrypoint",
         environment={
@@ -36,34 +36,3 @@ with DAG(
         },
         **{k: v for k, v in default_docker_args().items() if k != "environment"},
     )
-
-    promote_model = DockerOperator(
-        task_id="promote_model",
-        command="python -m source.interfaces.promote_model_entrypoint",
-        environment={
-            **docker_env(),
-            "BOOKRECS_PROMOTE_RUN_NAME": "simulation_{{ ds_nodash }}",
-            "BOOKRECS_ACTIVE_MODEL_POINTER": (
-                env_if_set("BOOKRECS_ACTIVE_MODEL_POINTER")
-                or "artifacts/runs/active_model.json"
-            ),
-            "BOOKRECS_PROMOTION_REQUIRE_SUCCESS": (
-                env_if_set("BOOKRECS_PROMOTION_REQUIRE_SUCCESS") or "true"
-            ),
-            "BOOKRECS_PROMOTION_MIN_NDCG10": (
-                env_if_set("BOOKRECS_PROMOTION_MIN_NDCG10") or ""
-            ),
-            "BOOKRECS_PROMOTION_MIN_RECALL10": (
-                env_if_set("BOOKRECS_PROMOTION_MIN_RECALL10") or ""
-            ),
-            "BOOKRECS_PROMOTION_MIN_COLD_NDCG10": (
-                env_if_set("BOOKRECS_PROMOTION_MIN_COLD_NDCG10") or ""
-            ),
-            "BOOKRECS_PROMOTION_MIN_COLD_RECALL10": (
-                env_if_set("BOOKRECS_PROMOTION_MIN_COLD_RECALL10") or ""
-            ),
-        },
-        **{k: v for k, v in default_docker_args().items() if k != "environment"},
-    )
-
-    run_simulation >> promote_model
