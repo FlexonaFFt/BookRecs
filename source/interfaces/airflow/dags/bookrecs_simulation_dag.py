@@ -4,12 +4,12 @@ from datetime import datetime
 
 from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
-from dag_common import DEFAULT_ARGS, default_docker_args, docker_env, env_if_set
+from dag_common import DEFAULT_ARGS, default_docker_args, docker_env
 
 with DAG(
     dag_id="bookrecs_simulation",
     default_args=DEFAULT_ARGS,
-    description="BookRecs temporal simulation — retraining on growing data slices",
+    description="BookRecs simulation — daily retraining on existing dataset from S3",
     schedule="0 3 * * *",
     start_date=datetime(2026, 3, 1),
     catchup=True,
@@ -19,20 +19,6 @@ with DAG(
     DockerOperator(
         task_id="run_simulation",
         command="python -m source.interfaces.simulation_batch_entrypoint",
-        environment={
-            **docker_env(),
-            "BOOKRECS_SIMULATION_WINDOW_START": (
-                env_if_set("BOOKRECS_SIMULATION_WINDOW_START") or "2026-03-01"
-            ),
-            "BOOKRECS_SIMULATION_WINDOW_END": (
-                env_if_set("BOOKRECS_SIMULATION_WINDOW_END") or "2026-04-01"
-            ),
-            "BOOKRECS_SIMULATION_DATA_START": (
-                env_if_set("BOOKRECS_SIMULATION_DATA_START") or "2011-01-01"
-            ),
-            "BOOKRECS_SIMULATION_DATA_END": (
-                env_if_set("BOOKRECS_SIMULATION_DATA_END") or "2017-01-01"
-            ),
-        },
+        environment=docker_env(),
         **{k: v for k, v in default_docker_args().items() if k != "environment"},
     )

@@ -235,7 +235,6 @@ class PipelineSettings:
     catboost_learning_rate: float
     seed: int
     active_model_pointer: str
-    simulation_cutoff_date: str | None
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> PipelineSettings:
@@ -388,9 +387,6 @@ class PipelineSettings:
                 values,
                 "BOOKRECS_ACTIVE_MODEL_POINTER",
                 "artifacts/runs/active_model.json",
-            ),
-            simulation_cutoff_date=env_optional_str(
-                values, "BOOKRECS_SIMULATION_CUTOFF_DATE"
             ),
         )
 

@@ -63,10 +63,6 @@ def docker_env() -> dict[str, str]:
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
         "AWS_DEFAULT_REGION",
-        "BOOKRECS_SIMULATION_WINDOW_START",
-        "BOOKRECS_SIMULATION_WINDOW_END",
-        "BOOKRECS_SIMULATION_DATA_START",
-        "BOOKRECS_SIMULATION_DATA_END",
     ]
 
     for key in passthrough_names:

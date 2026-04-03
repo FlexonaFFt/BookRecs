@@ -20,13 +20,8 @@ from source.domain.entities import DatasetArtifacts, DatasetSource, Preprocessin
 # обучающие/валидационные сплиты из сырых данных Goodreads.
 class GoodreadsPreprocessor(PreprocessorPort):
 
-    def __init__(
-        self,
-        work_dir: str = "artifacts/tmp_preprocessed",
-        cutoff_date: str | None = None,
-    ) -> None:
+    def __init__(self, work_dir: str = "artifacts/tmp_preprocessed") -> None:
         self._work_dir = Path(work_dir)
-        self._cutoff_date = cutoff_date
 
     def run(
         self, source: DatasetSource, params: PreprocessingParams
@@ -364,10 +359,6 @@ class GoodreadsPreprocessor(PreprocessorPort):
                 )
                 merged = merged.dropna(subset=["date_added"]).copy()
                 merged["date_added"] = merged["date_added"].dt.tz_localize(None)
-
-                if self._cutoff_date is not None:
-                    cutoff_ts = pd.Timestamp(self._cutoff_date)
-                    merged = merged[merged["date_added"] <= cutoff_ts]
 
                 agg = merged.groupby(["user_id", "item_id"], as_index=False).agg(
                     is_read=("is_read", "max"),
