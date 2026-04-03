@@ -29,6 +29,7 @@ def docker_env() -> dict[str, str]:
         "BOOKRECS_S3_BUCKET",
         "BOOKRECS_S3_REGION",
         "BOOKRECS_S3_ENDPOINT",
+        "BOOKRECS_S3_VERIFY_SSL",
         "BOOKRECS_PG_DSN",
         "BOOKRECS_PG_MIGRATION_PATH",
         "BOOKRECS_SKIP_PREPARE",
