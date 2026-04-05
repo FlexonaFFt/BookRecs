@@ -4,7 +4,7 @@ import json
 import os
 from datetime import datetime
 
-import psycopg
+import psycopg2 as psycopg
 from airflow import DAG
 from airflow.operators.python import BranchPythonOperator, PythonOperator
 from airflow.providers.docker.operators.docker import DockerOperator

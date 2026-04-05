@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from datetime import datetime
 
-import psycopg
+import psycopg2 as psycopg
 from airflow import DAG
 from airflow.operators.python import PythonOperator, ShortCircuitOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
