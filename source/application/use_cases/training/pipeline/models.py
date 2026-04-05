@@ -25,6 +25,7 @@ class TrainPipelineCommand:
     catboost_depth: int = 6
     catboost_learning_rate: float = 0.08
     seed: int = 42
+    data_fraction: float = 1.0
 
 
 @dataclass(frozen=True)

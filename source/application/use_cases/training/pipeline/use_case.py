@@ -60,7 +60,7 @@ class TrainPipelineUseCase:
             artifact_schema_version=ARTIFACT_SCHEMA_VERSION,
         )
 
-        data = load_dataset(pd, cmd.dataset_dir)
+        data = load_dataset(pd, cmd.dataset_dir, data_fraction=cmd.data_fraction)
         logger.event(
             "DATA_LOADED",
             train_rows=int(len(data["local_train"])),

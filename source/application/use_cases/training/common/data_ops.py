@@ -25,7 +25,7 @@ def resolve_cold_item_ids(
     }
 
 
-def load_dataset(pd: Any, dataset_dir: str) -> dict[str, Any]:
+def load_dataset(pd: Any, dataset_dir: str, data_fraction: float = 1.0) -> dict[str, Any]:
     from pathlib import Path
 
     root = Path(dataset_dir)
@@ -37,9 +37,16 @@ def load_dataset(pd: Any, dataset_dir: str) -> dict[str, Any]:
     for name, path in required.items():
         if not path.exists():
             raise FileNotFoundError(f"{name} file not found: {path}")
+
+    local_train = pd.read_parquet(required["local_train"])
+    if 0.0 < data_fraction < 1.0:
+        local_train = local_train.sample(
+            frac=data_fraction, random_state=42
+        ).reset_index(drop=True)
+
     return {
         "books": pd.read_parquet(required["books"]),
-        "local_train": pd.read_parquet(required["local_train"]),
+        "local_train": local_train,
         "local_val": pd.read_parquet(required["local_val"]),
     }
 

@@ -120,6 +120,7 @@ def run_pipeline_from_env() -> None:
                 catboost_depth=settings.catboost_depth,
                 catboost_learning_rate=settings.catboost_learning_rate,
                 seed=settings.seed,
+                data_fraction=settings.train_data_fraction,
             )
         )
         print(f"[pipeline] train completed run_id={train_result.run_id}")

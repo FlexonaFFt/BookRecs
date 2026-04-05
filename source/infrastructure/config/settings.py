@@ -235,6 +235,7 @@ class PipelineSettings:
     catboost_learning_rate: float
     seed: int
     active_model_pointer: str
+    train_data_fraction: float
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> PipelineSettings:
@@ -387,6 +388,9 @@ class PipelineSettings:
                 values,
                 "BOOKRECS_ACTIVE_MODEL_POINTER",
                 "artifacts/runs/active_model.json",
+            ),
+            train_data_fraction=env_float(
+                values, "BOOKRECS_TRAIN_DATA_FRACTION", 1.0
             ),
         )
 
