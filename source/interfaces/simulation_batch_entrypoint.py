@@ -11,10 +11,13 @@ def main() -> None:
         execution_date_str.replace("-", "") if execution_date_str else "manual"
     )
 
-    os.environ["BOOKRECS_BATCH_RUN_NAME"] = f"simulation_{execution_compact}"
+    existing_run_name = (os.getenv("BOOKRECS_BATCH_RUN_NAME") or "").strip()
+    if not existing_run_name:
+        os.environ["BOOKRECS_BATCH_RUN_NAME"] = f"simulation_{execution_compact}"
 
+    run_name = os.environ["BOOKRECS_BATCH_RUN_NAME"]
     print(f"[simulation] execution_date={execution_date_str or 'N/A'}", flush=True)
-    print(f"[simulation] run_name=simulation_{execution_compact}", flush=True)
+    print(f"[simulation] run_name={run_name}", flush=True)
 
     _run_batch()
 

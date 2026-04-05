@@ -7,7 +7,8 @@ import psycopg2 as psycopg
 from airflow import DAG
 from airflow.operators.python import PythonOperator, ShortCircuitOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
-from dag_common import DEFAULT_ARGS
+from airflow.providers.docker.operators.docker import DockerOperator
+from dag_common import DEFAULT_ARGS, default_docker_args, docker_env
 
 
 def _pg_dsn() -> str:
@@ -89,6 +90,12 @@ def save_checkpoint(**context) -> None:
     )
 
 
+def _retrain_env() -> dict[str, str]:
+    env = docker_env()
+    env["BOOKRECS_BATCH_RUN_NAME"] = "retrain_{{ ds_nodash }}"
+    return env
+
+
 with DAG(
     dag_id="bookrecs_retrain_on_volume",
     default_args=DEFAULT_ARGS,
@@ -104,11 +111,11 @@ with DAG(
         python_callable=check_volume_threshold,
     )
 
-    trigger_retrain = TriggerDagRunOperator(
-        task_id="trigger_retrain",
-        trigger_dag_id="bookrecs_simulation",
-        wait_for_completion=True,
-        poke_interval=30,
+    retrain = DockerOperator(
+        task_id="retrain",
+        command="python -m source.interfaces.batch_entrypoint",
+        environment=_retrain_env(),
+        **{k: v for k, v in default_docker_args().items() if k != "environment"},
     )
 
     save_checkpoint_task = PythonOperator(
@@ -122,4 +129,4 @@ with DAG(
         wait_for_completion=False,
     )
 
-    check_volume >> trigger_retrain >> save_checkpoint_task >> trigger_data_quality
+    check_volume >> retrain >> save_checkpoint_task >> trigger_data_quality
