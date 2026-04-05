@@ -22,18 +22,21 @@ def check_volume_threshold(**context) -> bool:
     dsn = _pg_dsn()
 
     with psycopg.connect(dsn) as conn:
-        row = conn.execute(
-            "SELECT COUNT(*) FROM user_item_interactions WHERE event_type = 'seed'"
-        ).fetchone()
-        current_count = int(row[0]) if row else 0
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) FROM user_item_interactions WHERE event_type = 'seed'"
+            )
+            row = cur.fetchone()
+            current_count = int(row[0]) if row else 0
 
-        row = conn.execute(
-            """
-            SELECT interactions_count FROM training_checkpoints
-            ORDER BY trained_at DESC LIMIT 1
-            """
-        ).fetchone()
-        last_count = int(row[0]) if row else 0
+            cur.execute(
+                """
+                SELECT interactions_count FROM training_checkpoints
+                ORDER BY trained_at DESC LIMIT 1
+                """
+            )
+            row = cur.fetchone()
+            last_count = int(row[0]) if row else 0
 
     print(
         f"[retrain-check] current={current_count} last_trained={last_count}", flush=True
@@ -71,11 +74,12 @@ def save_checkpoint(**context) -> None:
     )
 
     with psycopg.connect(dsn) as conn:
-        conn.execute(
-            "INSERT INTO training_checkpoints (run_id, interactions_count)"
-            " VALUES (%s, %s)",
-            (run_id, current_count),
-        )
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO training_checkpoints (run_id, interactions_count)"
+                " VALUES (%s, %s)",
+                (run_id, current_count),
+            )
         conn.commit()
 
     print(

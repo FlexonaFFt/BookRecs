@@ -44,6 +44,7 @@ class InteractionRequest(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     model_dir: str
+    run_id: str | None
     postgres: bool
     s3: bool
 

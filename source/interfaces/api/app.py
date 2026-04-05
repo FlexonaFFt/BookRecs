@@ -119,6 +119,7 @@ def create_app() -> FastAPI:
         return HealthResponse(
             status="ok",
             model_dir=svc.model_dir,
+            run_id=state.current_model_run_id,
             postgres=state.postgres_ok,
             s3=state.s3_ok,
         )

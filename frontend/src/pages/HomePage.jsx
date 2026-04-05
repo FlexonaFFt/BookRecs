@@ -6,6 +6,7 @@ import { addCartItem, getCartCount, onCartUpdate } from '../utils/cartStore';
 import {
   fetchDemoBook,
   fetchDemoUsers,
+  fetchHealth,
   postInteraction,
   fetchRecommendations,
   getStoredUserId,
@@ -124,7 +125,7 @@ const styles = {
     minHeight: '100px',
     borderTop: '1px solid #1A1A1A',
     display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
+    gridTemplateColumns: 'repeat(5, 1fr)',
   },
   specItem: {
     borderRight: '1px solid #1A1A1A',
@@ -347,6 +348,13 @@ export default function HomePage() {
   const [selectedUserId, setSelectedUserId] = useState('');
   const [recommendedBook, setRecommendedBook] = useState(fallbackBook);
   const [loadingReco, setLoadingReco] = useState(false);
+  const [modelInfo, setModelInfo] = useState(null);
+
+  useEffect(() => {
+    fetchHealth()
+      .then((h) => setModelInfo(h))
+      .catch(() => setModelInfo(null));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -502,7 +510,8 @@ export default function HomePage() {
           <SpecItem label="Book ID" value={String(recommendedBook.item_id || 'N/A')} />
           <SpecItem label="Series" value={series} />
           <SpecItem label="Pages" value={String(pageCount)} />
-          <SpecItem label="Part" value={partLabel} last />
+          <SpecItem label="Part" value={partLabel} />
+          <SpecItem label="Model" value={modelInfo?.run_id ? String(modelInfo.run_id).slice(0, 20) : 'N/A'} last />
         </footer>
       </div>
     </div>

@@ -70,6 +70,14 @@ export async function fetchSimilarItems(itemId, limit = 8) {
   return res.json();
 }
 
+export async function fetchHealth() {
+  const res = await fetch('/healthz');
+  if (!res.ok) {
+    throw new Error(`health http ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function postInteraction({ userId, itemId, eventType }) {
   if (!userId || itemId === null || itemId === undefined) {
     return;

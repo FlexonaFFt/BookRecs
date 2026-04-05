@@ -22,29 +22,33 @@ def report_metrics(**_) -> None:
     limit = int(os.getenv("BOOKRECS_REPORT_RUNS_LIMIT", "5"))
 
     with psycopg.connect(dsn) as conn:
-        runs = conn.execute(
-            """
-            SELECT run_id, status, started_at, finished_at, metrics_json
-            FROM pipeline_runs
-            WHERE pipeline_name = 'bookrecs'
-            ORDER BY finished_at DESC
-            LIMIT %s
-            """,
-            (limit,),
-        ).fetchall()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT run_id, status, started_at, finished_at, metrics_json
+                FROM pipeline_runs
+                WHERE pipeline_name = 'bookrecs'
+                ORDER BY finished_at DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            runs = cur.fetchall()
 
-        row = conn.execute(
-            "SELECT COUNT(*) FROM user_item_interactions WHERE event_type = 'seed'"
-        ).fetchone()
-        seeded_count = int(row[0]) if row else 0
+            cur.execute(
+                "SELECT COUNT(*) FROM user_item_interactions WHERE event_type = 'seed'"
+            )
+            row = cur.fetchone()
+            seeded_count = int(row[0]) if row else 0
 
-        checkpoint = conn.execute(
-            """
-            SELECT interactions_count, trained_at
-            FROM training_checkpoints
-            ORDER BY trained_at DESC LIMIT 1
-            """
-        ).fetchone()
+            cur.execute(
+                """
+                SELECT interactions_count, trained_at
+                FROM training_checkpoints
+                ORDER BY trained_at DESC LIMIT 1
+                """
+            )
+            checkpoint = cur.fetchone()
 
     print("[metrics-report] ════════════════════════════════", flush=True)
     print(f"[metrics-report] seeded interactions : {seeded_count}", flush=True)

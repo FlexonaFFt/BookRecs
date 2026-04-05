@@ -36,16 +36,18 @@ def decide_promotion(**context) -> str:
     force_after_skips = int(os.getenv("BOOKRECS_QUALITY_FORCE_AFTER_SKIPS", "2"))
 
     with psycopg.connect(dsn) as conn:
-        rows = conn.execute(
-            """
-            SELECT run_id, status, metrics_json
-            FROM pipeline_runs
-            WHERE pipeline_name = 'bookrecs'
-              AND status = 'SUCCESS'
-            ORDER BY finished_at DESC
-            LIMIT 3
-            """
-        ).fetchall()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT run_id, status, metrics_json
+                FROM pipeline_runs
+                WHERE pipeline_name = 'bookrecs'
+                  AND status = 'SUCCESS'
+                ORDER BY finished_at DESC
+                LIMIT 3
+                """
+            )
+            rows = cur.fetchall()
 
     if not rows:
         print("[data-quality] no successful runs found, skipping", flush=True)
