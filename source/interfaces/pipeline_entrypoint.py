@@ -9,7 +9,7 @@ from source.application.use_cases.training import (
     TrainPipelineCommand,
     TrainPipelineUseCase,
 )
-from source.domain.entities import DatasetSource, PreprocessingParams
+from source.domain.entities import DatasetSource, PipelineRun, PreprocessingParams
 from source.infrastructure.config import load_pipeline_settings
 from source.infrastructure.inference import (
     ModelPointer,
@@ -99,30 +99,57 @@ def run_pipeline_from_env() -> None:
 
     if not settings.skip_train:
         train_use_case = TrainPipelineUseCase()
-        train_result = train_use_case.execute(
-            TrainPipelineCommand(
-                dataset_dir=settings.dataset_dir,
-                output_root=settings.output_root,
-                run_name=settings.run_name,
-                train_profile=settings.train_profile,
-                eval_users_limit=settings.eval_users_limit,
-                cold_max_interactions=settings.cold_max_interactions,
-                candidate_pool_size=settings.candidate_pool_size,
-                candidate_per_source_limit=settings.candidate_per_source_limit,
-                pre_top_m=settings.pre_top_m,
-                final_top_k=settings.final_top_k,
-                cf_mode=settings.cf_mode,
-                cf_max_neighbors=settings.cf_max_neighbors,
-                cf_max_items_per_user=settings.cf_max_items_per_user,
-                content_max_neighbors=settings.content_max_neighbors,
-                prerank_model=settings.prerank_model,
-                catboost_iterations=settings.catboost_iterations,
-                catboost_depth=settings.catboost_depth,
-                catboost_learning_rate=settings.catboost_learning_rate,
-                seed=settings.seed,
-                data_fraction=settings.train_data_fraction,
-            )
+        train_run = PipelineRun(
+            run_id=settings.run_name or "train",
+            pipeline_name="bookrecs",
         )
+        storage_backends.run_log.start(train_run)
+        try:
+            train_result = train_use_case.execute(
+                TrainPipelineCommand(
+                    dataset_dir=settings.dataset_dir,
+                    output_root=settings.output_root,
+                    run_name=settings.run_name,
+                    train_profile=settings.train_profile,
+                    eval_users_limit=settings.eval_users_limit,
+                    cold_max_interactions=settings.cold_max_interactions,
+                    candidate_pool_size=settings.candidate_pool_size,
+                    candidate_per_source_limit=settings.candidate_per_source_limit,
+                    pre_top_m=settings.pre_top_m,
+                    final_top_k=settings.final_top_k,
+                    cf_mode=settings.cf_mode,
+                    cf_max_neighbors=settings.cf_max_neighbors,
+                    cf_max_items_per_user=settings.cf_max_items_per_user,
+                    content_max_neighbors=settings.content_max_neighbors,
+                    prerank_model=settings.prerank_model,
+                    catboost_iterations=settings.catboost_iterations,
+                    catboost_depth=settings.catboost_depth,
+                    catboost_learning_rate=settings.catboost_learning_rate,
+                    seed=settings.seed,
+                    data_fraction=settings.train_data_fraction,
+                )
+            )
+        except Exception as exc:
+            train_run.mark_failed(str(exc))
+            storage_backends.run_log.finish(train_run)
+            raise
+        import json as _json
+
+        try:
+            raw_metrics = _json.loads(
+                Path(train_result.metrics_path).read_text(encoding="utf-8")
+            )
+            train_run.metrics = {
+                k: float(v)
+                for k, v in raw_metrics.items()
+                if isinstance(v, (int, float))
+            }
+        except Exception:
+            pass
+        train_run.run_id = train_result.run_id
+        train_run.mark_success()
+        storage_backends.run_log.finish(train_run)
+
         print(f"[pipeline] train completed run_id={train_result.run_id}")
         print(f"[pipeline] run_dir={train_result.run_dir}")
 
