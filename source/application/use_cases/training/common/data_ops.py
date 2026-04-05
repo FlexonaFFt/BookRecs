@@ -25,7 +25,9 @@ def resolve_cold_item_ids(
     }
 
 
-def load_dataset(pd: Any, dataset_dir: str, data_fraction: float = 1.0) -> dict[str, Any]:
+def load_dataset(
+    pd: Any, dataset_dir: str, data_fraction: float = 1.0
+) -> dict[str, Any]:
     from pathlib import Path
 
     root = Path(dataset_dir)

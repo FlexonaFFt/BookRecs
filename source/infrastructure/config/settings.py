@@ -389,9 +389,7 @@ class PipelineSettings:
                 "BOOKRECS_ACTIVE_MODEL_POINTER",
                 "artifacts/runs/active_model.json",
             ),
-            train_data_fraction=env_float(
-                values, "BOOKRECS_TRAIN_DATA_FRACTION", 1.0
-            ),
+            train_data_fraction=env_float(values, "BOOKRECS_TRAIN_DATA_FRACTION", 1.0),
         )
 
 
