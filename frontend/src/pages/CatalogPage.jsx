@@ -155,6 +155,7 @@ export default function CatalogPage() {
   const [selectedUserId, setSelectedUserId] = useState('');
   const [topRecs, setTopRecs] = useState([]);
   const [loadingRecs, setLoadingRecs] = useState(false);
+  const [modelRunId, setModelRunId] = useState('');
 
   const limit = 24;
   const filters = ['All', 'Fiction', 'Poetry', 'Essays', 'History', 'Science'];
@@ -185,6 +186,12 @@ export default function CatalogPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    fetchHealth()
+      .then((data) => setModelRunId(data.run_id || ''))
+      .catch(() => setModelRunId(''));
   }, []);
 
   useEffect(() => {
@@ -362,7 +369,10 @@ export default function CatalogPage() {
         <section style={{ padding: '20px 24px 8px 24px', borderBottom: '1px solid #1A1A1A' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h2 style={{ fontFamily: "'Cinzel', serif", fontSize: '22px', letterSpacing: '0.02em' }}>Top Recommendations</h2>
-            <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>User: {selectedUserId || 'N/A'}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+              <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>User: {selectedUserId || 'N/A'}</span>
+              <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#666' }}>Model: {modelRunId || 'N/A'}</span>
+            </div>
           </div>
           {loadingRecs ? (
             <div style={{ fontSize: '12px', color: '#666' }}>Loading recommendations...</div>
