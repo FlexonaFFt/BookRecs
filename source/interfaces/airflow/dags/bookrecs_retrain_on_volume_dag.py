@@ -63,7 +63,12 @@ def check_volume_threshold(**context) -> bool:
         context["ti"].xcom_push(key="current_count", value=current_count)
         return True
 
-    print("[retrain-check] threshold not reached, skipping", flush=True)
+    needed = int(last_count * (1 + threshold)) - current_count
+    print(
+        f"[retrain-check] threshold not reached, skipping"
+        f" (need +{needed} more interactions to trigger)",
+        flush=True,
+    )
     return False
 
 

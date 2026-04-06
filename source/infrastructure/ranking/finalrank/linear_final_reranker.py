@@ -14,9 +14,9 @@ class LinearFinalRerankerConfig:
     w_cf: float = 0.08
     w_content: float = 0.08
     w_pop: float = 0.05
-    w_cold: float = 0.04
+    w_cold: float = 0.15
     w_history: float = 0.03
-    source_repeat_penalty: float = 0.0
+    source_repeat_penalty: float = 0.15
     source_bias: dict[str, float] = field(default_factory=dict)
 
 

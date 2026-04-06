@@ -41,8 +41,11 @@ class ColdCandidateSource(CandidateSourcePort):
     def generate(
         self, user_id: Any, seen_items: set[Any], limit: int
     ) -> list[Candidate]:
-        if limit <= 0 or not seen_items:
+        if limit <= 0:
             return []
+
+        if not seen_items:
+            return self._generate_for_new_user(user_id=user_id, limit=limit)
 
         author_tokens: Counter[str] = Counter()
         series_tokens: Counter[str] = Counter()
@@ -127,6 +130,40 @@ class ColdCandidateSource(CandidateSourcePort):
                         "score_cold": float(score),
                         "rank_cold": float(rank),
                         "metadata_overlap": float(overlap),
+                        "item_popularity": float(pop),
+                    },
+                )
+            )
+        return out
+
+    def _generate_for_new_user(self, *, user_id: Any, limit: int) -> list[Candidate]:
+        """Return top cold items by novelty when the user has no interaction history."""
+        catalog = self._cold_catalog
+        if not catalog:
+            return []
+
+        rows: list[tuple[Any, float, float]] = []
+        for item_id, _ in catalog:
+            pop = self._popularity(item_id)
+            novelty = 1.0 + self._novelty_boost * (1.0 - pop)
+            if pop <= 0.08:
+                novelty *= 1.0 + self._rare_item_boost * (0.08 - pop) / 0.08
+            rows.append((item_id, novelty, pop))
+
+        rows.sort(key=lambda r: (r[1], -r[2]), reverse=True)
+
+        out: list[Candidate] = []
+        for rank, (item_id, score, pop) in enumerate(rows[:limit], start=1):
+            out.append(
+                Candidate(
+                    user_id=user_id,
+                    item_id=item_id,
+                    source=self.name,
+                    score=float(score),
+                    features={
+                        "score_cold": float(score),
+                        "rank_cold": float(rank),
+                        "metadata_overlap": 0.0,
                         "item_popularity": float(pop),
                     },
                 )

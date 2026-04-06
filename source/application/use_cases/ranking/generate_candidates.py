@@ -16,9 +16,9 @@ class GenerateCandidatesCommand:
     per_source_limit: int = 300
     source_limits: dict[str, int] | None = None
     source_min_quota: dict[str, int] | None = None
-    cold_tail_injection_count: int = 2
-    cold_tail_min_metadata_overlap: float = 1.5
-    cold_tail_max_score_gap: float = 0.12
+    cold_tail_injection_count: int = 12
+    cold_tail_min_metadata_overlap: float = 0.5
+    cold_tail_max_score_gap: float = 0.6
 
 
 # Реализует сценарий генерации кандидатов.
