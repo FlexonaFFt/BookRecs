@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -42,6 +43,17 @@ def run_pipeline_from_env() -> None:
         run_migration(pg_dsn=settings.pg_dsn, migration_path=settings.migration_path)
         print(f"[pipeline] migrations applied from {settings.migration_path}")
 
+    # Always build storage_backends so run_log is available for the train step too
+    storage_backends = build_prepare_storage_backends(
+        registry_backend=settings.registry_backend,
+        pg_dsn=settings.pg_dsn,
+        store_backend=settings.store_backend,
+        s3_bucket=settings.s3_bucket,
+        s3_region=settings.s3_region,
+        s3_endpoint=settings.s3_endpoint,
+        s3_verify_ssl=settings.s3_verify_ssl,
+    )
+
     if not settings.skip_prepare:
 
         def _ensure_raw_data() -> None:
@@ -52,15 +64,6 @@ def run_pipeline_from_env() -> None:
                 download_goodreads_raw(raw_dir=settings.raw_dir, force=False)
                 print("[pipeline] raw data downloaded")
 
-        storage_backends = build_prepare_storage_backends(
-            registry_backend=settings.registry_backend,
-            pg_dsn=settings.pg_dsn,
-            store_backend=settings.store_backend,
-            s3_bucket=settings.s3_bucket,
-            s3_region=settings.s3_region,
-            s3_endpoint=settings.s3_endpoint,
-            s3_verify_ssl=settings.s3_verify_ssl,
-        )
         prepare_use_case = PrepareDataUseCase(
             preprocessor=GoodreadsPreprocessor(),
             dataset_store=storage_backends.dataset_store,
@@ -133,24 +136,25 @@ def run_pipeline_from_env() -> None:
             train_run.mark_failed(str(exc))
             storage_backends.run_log.finish(train_run)
             raise
-        import json as _json
 
+        metrics: dict[str, float] = {}
         try:
-            raw_metrics = _json.loads(
+            raw = json.loads(
                 Path(train_result.metrics_path).read_text(encoding="utf-8")
             )
-            train_run.metrics = {
-                k: float(v)
-                for k, v in raw_metrics.items()
-                if isinstance(v, (int, float))
+            metrics = {
+                k: float(v) for k, v in raw.items() if isinstance(v, (int, float))
             }
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"[pipeline] warning: could not read metrics file: {exc}", flush=True)
+
         train_run.run_id = train_result.run_id
+        train_run.metrics = metrics
         train_run.mark_success()
         storage_backends.run_log.finish(train_run)
 
         print(f"[pipeline] train completed run_id={train_result.run_id}")
+        print(f"[pipeline] metrics={metrics}")
         print(f"[pipeline] run_dir={train_result.run_dir}")
 
         s3_model_uri = upload_model_to_s3(

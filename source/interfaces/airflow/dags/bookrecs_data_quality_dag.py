@@ -60,8 +60,8 @@ def decide_promotion(**context) -> str:
         else (metrics_json or {})
     )
 
-    ndcg = _get_float(metrics, "ndcg_at_10")
-    recall = _get_float(metrics, "recall_at_10")
+    ndcg = _get_float(metrics, "ndcg@10")
+    recall = _get_float(metrics, "recall@10")
 
     print(
         f"[data-quality] latest run={latest_run_id}"

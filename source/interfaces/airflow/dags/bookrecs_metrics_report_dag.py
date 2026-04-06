@@ -67,8 +67,8 @@ def report_metrics(**_) -> None:
             if isinstance(metrics_json, str)
             else (metrics_json or {})
         )
-        ndcg = metrics.get("ndcg_at_10")
-        recall = metrics.get("recall_at_10")
+        ndcg = metrics.get("ndcg@10")
+        recall = metrics.get("recall@10")
         duration = (
             int((finished_at - started_at).total_seconds())
             if finished_at and started_at
