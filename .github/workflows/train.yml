@@ -16,6 +16,10 @@ jobs:
   train:
     runs-on: ubuntu-latest
     steps:
+      - name: Get short SHA
+        id: vars
+        run: echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
       - name: Run pipeline on remote server
         uses: appleboy/ssh-action@v1
         with:
@@ -29,5 +33,6 @@ jobs:
             docker compose -f docker-compose.prod.yml --profile batch run --rm \
               -e BOOKRECS_MAX_USERS=${{ github.event.inputs.max_users }} \
               -e BOOKRECS_MAX_INTERACTIONS_ROWS=${{ github.event.inputs.max_interactions_rows }} \
+              -e BOOKRECS_BATCH_RUN_NAME=git_promote_${{ steps.vars.outputs.short_sha }} \
               pipeline
             docker compose -f docker-compose.prod.yml --profile batch run --rm demo-seed
