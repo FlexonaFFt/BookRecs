@@ -55,6 +55,15 @@ def check_volume_threshold(**context) -> bool:
         print("[retrain-check] no interactions yet, skipping", flush=True)
         return False
 
+    if current_count < last_count:
+        print(
+            "[retrain-check] interactions count decreased since last checkpoint,"
+            " triggering retrain",
+            flush=True,
+        )
+        context["ti"].xcom_push(key="current_count", value=current_count)
+        return True
+
     growth = (current_count - last_count) / last_count if last_count > 0 else 1.0
     print(f"[retrain-check] growth={growth:.1%} threshold={threshold:.1%}", flush=True)
 
@@ -74,7 +83,7 @@ def check_volume_threshold(**context) -> bool:
 
 def save_checkpoint(**context) -> None:
     dsn = _pg_dsn()
-    run_id = context["dag_run"].run_id
+    run_id = f"retrain_{context['ds_nodash']}"
     current_count = (
         context["ti"].xcom_pull(task_ids="check_volume", key="current_count") or 0
     )
@@ -97,7 +106,17 @@ def save_checkpoint(**context) -> None:
 
 def _retrain_env() -> dict[str, str]:
     env = docker_env()
+    env["BOOKRECS_SKIP_PREPARE"] = "true"
+    env["BOOKRECS_SKIP_TRAIN"] = "false"
     env["BOOKRECS_BATCH_RUN_NAME"] = "retrain_{{ ds_nodash }}"
+    return env
+
+
+def _prepare_env() -> dict[str, str]:
+    env = docker_env()
+    env["BOOKRECS_SKIP_PREPARE"] = "false"
+    env["BOOKRECS_SKIP_TRAIN"] = "true"
+    env["BOOKRECS_TRAIN_RUN_NAME"] = "prepare_{{ ds_nodash }}"
     return env
 
 
@@ -116,7 +135,14 @@ with DAG(
         python_callable=check_volume_threshold,
     )
 
-    retrain = DockerOperator(
+    prepare_dataset = DockerOperator(
+        task_id="prepare_dataset",
+        command="python -m source.interfaces.pipeline_entrypoint",
+        environment=_prepare_env(),
+        **{k: v for k, v in default_docker_args().items() if k != "environment"},
+    )
+
+    train = DockerOperator(
         task_id="retrain",
         command="python -m source.interfaces.batch_entrypoint",
         environment=_retrain_env(),
@@ -131,7 +157,8 @@ with DAG(
     trigger_data_quality = TriggerDagRunOperator(
         task_id="trigger_data_quality",
         trigger_dag_id="bookrecs_data_quality",
-        wait_for_completion=False,
+        wait_for_completion=True,
+        poke_interval=30,
     )
 
-    check_volume >> retrain >> save_checkpoint_task >> trigger_data_quality
+    check_volume >> prepare_dataset >> train >> save_checkpoint_task >> trigger_data_quality

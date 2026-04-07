@@ -6,6 +6,7 @@ import { addCartItem, getCartCount, onCartUpdate } from '../utils/cartStore';
 import {
   fetchDemoBooksByIds,
   fetchDemoUsers,
+  fetchHealth,
   postInteraction,
   fetchRecommendations,
   getStoredUserId,

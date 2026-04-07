@@ -39,7 +39,7 @@ def decide_promotion(**context) -> str:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT run_id, status, metrics_json
+                SELECT run_id, status, metrics_json, metadata_json
                 FROM pipeline_runs
                 WHERE pipeline_name = 'bookrecs'
                   AND status = 'SUCCESS'
@@ -53,7 +53,8 @@ def decide_promotion(**context) -> str:
         print("[data-quality] no successful runs found, skipping", flush=True)
         return _SKIP_TASK
 
-    latest_run_id, _, metrics_json = rows[0]
+    latest_run_id, _, metrics_json, _ = rows[0]
+    context["ti"].xcom_push(key="run_id", value=latest_run_id)
     metrics = (
         json.loads(metrics_json)
         if isinstance(metrics_json, str)
@@ -74,16 +75,16 @@ def decide_promotion(**context) -> str:
     )
 
     consecutive_skips = 0
-    for _, _, m in rows[1:]:
+    for _, _, _, m in rows[1:]:
         m_dict = json.loads(m) if isinstance(m, str) else (m or {})
-        if not m_dict.get("promoted", False):
+        if not bool(m_dict.get("promoted", False)):
             consecutive_skips += 1
 
     force_promote = consecutive_skips >= force_after_skips
 
     if meets_threshold:
         print("[data-quality] metrics OK → promote", flush=True)
-        context["ti"].xcom_push(key="run_id", value=latest_run_id)
+        context["ti"].xcom_push(key="promotion_reason", value="metrics_ok")
         return _PROMOTE_TASK
 
     if force_promote:
@@ -91,7 +92,7 @@ def decide_promotion(**context) -> str:
             f"[data-quality] skipped {consecutive_skips}x in a row → force promote",
             flush=True,
         )
-        context["ti"].xcom_push(key="run_id", value=latest_run_id)
+        context["ti"].xcom_push(key="promotion_reason", value="force_after_skips")
         return _PROMOTE_TASK
 
     print(
@@ -100,11 +101,49 @@ def decide_promotion(**context) -> str:
         " skipping",
         flush=True,
     )
+    context["ti"].xcom_push(key="promotion_reason", value="metrics_below_threshold")
     return _SKIP_TASK
 
 
 def skip_promotion(**_) -> None:
     print("[data-quality] promotion skipped", flush=True)
+
+
+def mark_promotion_result(*, promoted: bool, **context) -> None:
+    dsn = _pg_dsn()
+    run_id = context["ti"].xcom_pull(task_ids="decide_promotion", key="run_id")
+    reason = context["ti"].xcom_pull(
+        task_ids="decide_promotion", key="promotion_reason"
+    )
+
+    if not run_id:
+        print("[data-quality] no run_id for metadata update, skipping", flush=True)
+        return
+
+    patch = {
+        "promoted": bool(promoted),
+        "promotion_reason": str(reason or ""),
+        "promotion_checked_at": context.get("ts"),
+    }
+
+    with psycopg.connect(dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE pipeline_runs
+                SET metadata_json = COALESCE(metadata_json, '{}'::jsonb) || %s::jsonb,
+                    updated_at = NOW()
+                WHERE run_id = %s
+                """,
+                (json.dumps(patch), run_id),
+            )
+        conn.commit()
+
+    print(
+        f"[data-quality] metadata updated run_id={run_id} promoted={promoted}"
+        f" reason={reason}",
+        flush=True,
+    )
 
 
 def _promote_env() -> dict[str, str]:
@@ -142,4 +181,18 @@ with DAG(
         python_callable=skip_promotion,
     )
 
+    mark_promoted = PythonOperator(
+        task_id="mark_promoted",
+        python_callable=mark_promotion_result,
+        op_kwargs={"promoted": True},
+    )
+
+    mark_skipped = PythonOperator(
+        task_id="mark_skipped",
+        python_callable=mark_promotion_result,
+        op_kwargs={"promoted": False},
+    )
+
     decide >> [promote, skip]
+    promote >> mark_promoted
+    skip >> mark_skipped

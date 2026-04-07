@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from pathlib import Path
 
 from data.goodreads import download_goodreads_raw
@@ -12,11 +11,6 @@ from source.application.use_cases.training import (
 )
 from source.domain.entities import DatasetSource, PipelineRun, PreprocessingParams
 from source.infrastructure.config import load_pipeline_settings
-from source.infrastructure.inference import (
-    ModelPointer,
-    upload_model_to_s3,
-    write_model_pointer,
-)
 from source.infrastructure.processing.preprocessing import GoodreadsPreprocessor
 from source.infrastructure.storage import build_prepare_storage_backends
 from source.interfaces.migration_runner import run_migration
@@ -156,24 +150,7 @@ def run_pipeline_from_env() -> None:
         print(f"[pipeline] train completed run_id={train_result.run_id}")
         print(f"[pipeline] metrics={metrics}")
         print(f"[pipeline] run_dir={train_result.run_dir}")
-
-        s3_model_uri = upload_model_to_s3(
-            run_id=train_result.run_id,
-            output_root=settings.output_root,
-            bucket=settings.s3_bucket,
-            s3_prefix="models",
-            s3_region=settings.s3_region,
-            s3_endpoint=settings.s3_endpoint,
-            verify_ssl=settings.s3_verify_ssl,
-        )
-        pointer = ModelPointer(
-            run_id=train_result.run_id,
-            model_uri=s3_model_uri,
-            promoted_at=datetime.now(timezone.utc).isoformat(),
-            metrics={},
-        )
-        write_model_pointer(settings.active_model_pointer, pointer)
-        print(f"[pipeline] model promoted to {s3_model_uri}")
+        print("[pipeline] promotion is handled by a separate quality gate", flush=True)
     else:
         print("[pipeline] train skipped")
 
