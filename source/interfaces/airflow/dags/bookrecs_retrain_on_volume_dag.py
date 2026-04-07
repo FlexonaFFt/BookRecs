@@ -5,10 +5,13 @@ from datetime import datetime
 
 import psycopg2 as psycopg
 from airflow import DAG
+from airflow.models import Variable
 from airflow.operators.python import PythonOperator, ShortCircuitOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.docker.operators.docker import DockerOperator
 from dag_common import DEFAULT_ARGS, default_docker_args, docker_env
+
+_FORCE_AFTER_SKIPS_VAR = "bookrecs_retrain_on_volume__consecutive_skips"
 
 
 def _pg_dsn() -> str:
@@ -18,8 +21,21 @@ def _pg_dsn() -> str:
     return dsn
 
 
+def _get_consecutive_skips() -> int:
+    try:
+        raw = Variable.get(_FORCE_AFTER_SKIPS_VAR, default_var="0")
+        return max(0, int(str(raw)))
+    except Exception:
+        return 0
+
+
+def _set_consecutive_skips(value: int) -> None:
+    Variable.set(_FORCE_AFTER_SKIPS_VAR, str(max(0, int(value))))
+
+
 def check_volume_threshold(**context) -> bool:
     threshold = float(os.getenv("BOOKRECS_RETRAIN_THRESHOLD", "0.10"))
+    force_after_skips = int(os.getenv("BOOKRECS_RETRAIN_FORCE_AFTER_SKIPS", "2"))
     dsn = _pg_dsn()
 
     with psycopg.connect(dsn) as conn:
@@ -39,8 +55,11 @@ def check_volume_threshold(**context) -> bool:
             row = cur.fetchone()
             last_count = int(row[0]) if row else 0
 
+    consecutive_skips = _get_consecutive_skips()
     print(
-        f"[retrain-check] current={current_count} last_trained={last_count}", flush=True
+        f"[retrain-check] current={current_count} last_trained={last_count}"
+        f" consecutive_skips={consecutive_skips}",
+        flush=True,
     )
 
     if last_count == 0 and current_count > 0:
@@ -48,11 +67,13 @@ def check_volume_threshold(**context) -> bool:
             "[retrain-check] no previous training found, triggering first run",
             flush=True,
         )
+        _set_consecutive_skips(0)
         context["ti"].xcom_push(key="current_count", value=current_count)
         return True
 
     if current_count == 0:
         print("[retrain-check] no interactions yet, skipping", flush=True)
+        _set_consecutive_skips(0)
         return False
 
     if current_count < last_count:
@@ -61,6 +82,7 @@ def check_volume_threshold(**context) -> bool:
             " triggering retrain",
             flush=True,
         )
+        _set_consecutive_skips(0)
         context["ti"].xcom_push(key="current_count", value=current_count)
         return True
 
@@ -69,13 +91,26 @@ def check_volume_threshold(**context) -> bool:
 
     if growth >= threshold:
         print("[retrain-check] threshold reached, triggering retrain", flush=True)
+        _set_consecutive_skips(0)
         context["ti"].xcom_push(key="current_count", value=current_count)
         return True
 
+    if consecutive_skips >= force_after_skips:
+        print(
+            f"[retrain-check] forced retrain after {consecutive_skips} skipped runs",
+            flush=True,
+        )
+        _set_consecutive_skips(0)
+        context["ti"].xcom_push(key="current_count", value=current_count)
+        return True
+
+    next_skips = consecutive_skips + 1
+    _set_consecutive_skips(next_skips)
     needed = int(last_count * (1 + threshold)) - current_count
     print(
         f"[retrain-check] threshold not reached, skipping"
-        f" (need +{needed} more interactions to trigger)",
+        f" (need +{needed} more interactions to trigger,"
+        f" skips={next_skips}/{force_after_skips})",
         flush=True,
     )
     return False

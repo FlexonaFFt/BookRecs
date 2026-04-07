@@ -48,6 +48,9 @@ def test_run_auto_rollback_restores_env(monkeypatch: pytest.MonkeyPatch) -> None
         captured["BOOKRECS_ROLLBACK_TARGET_FRACTION"] = mod.os.getenv(
             "BOOKRECS_ROLLBACK_TARGET_FRACTION"
         )
+        captured["BOOKRECS_ROLLBACK_RESET_CHECKPOINTS"] = mod.os.getenv(
+            "BOOKRECS_ROLLBACK_RESET_CHECKPOINTS"
+        )
 
     monkeypatch.setattr(mod.rollback_seed_entrypoint, "main", _fake_rollback_main)
 
@@ -59,6 +62,7 @@ def test_run_auto_rollback_restores_env(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert captured["BOOKRECS_ROLLBACK_DRY_RUN"] == "false"
     assert captured["BOOKRECS_ROLLBACK_TARGET_FRACTION"] == "0.25"
+    assert captured["BOOKRECS_ROLLBACK_RESET_CHECKPOINTS"] == "false"
     assert mod.os.getenv("BOOKRECS_ROLLBACK_DRY_RUN") == "true"
 
 

@@ -148,13 +148,18 @@ def _run_auto_rollback(
     *, pg_dsn: str, dataset_dir: str, target_fraction: float
 ) -> None:
     rollback_pct = int(target_fraction * 100)
+    reset_checkpoints = _env_bool(
+        "BOOKRECS_SEED_AUTO_ROLLBACK_RESET_CHECKPOINTS", False
+    )
     env_patch = {
         "BOOKRECS_PG_DSN": pg_dsn,
         "BOOKRECS_SEED_DATASET_DIR": dataset_dir,
         "BOOKRECS_ROLLBACK_TARGET_FRACTION": str(target_fraction),
         "BOOKRECS_ROLLBACK_DRY_RUN": "false",
         "BOOKRECS_ROLLBACK_EVENT_TYPE": "seed",
-        "BOOKRECS_ROLLBACK_RESET_CHECKPOINTS": "true",
+        "BOOKRECS_ROLLBACK_RESET_CHECKPOINTS": (
+            "true" if reset_checkpoints else "false"
+        ),
         "BOOKRECS_ROLLBACK_RUN_ID": f"seed_auto_rollback_{rollback_pct}pct",
     }
     prev_values = {key: os.getenv(key) for key in env_patch}
