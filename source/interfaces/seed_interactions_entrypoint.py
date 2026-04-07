@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import psycopg
 
+from source.interfaces import rollback_seed_entrypoint
 from source.interfaces.migration_runner import run_migration
 
 
@@ -49,6 +50,8 @@ def main() -> None:
     )
     batch_fraction = _env_float("BOOKRECS_SEED_BATCH_FRACTION", 0.15)
     max_fraction = _env_float("BOOKRECS_SEED_MAX_FRACTION", 0.75)
+    auto_rollback_enabled = _env_bool("BOOKRECS_SEED_AUTO_ROLLBACK_ENABLED", False)
+    auto_rollback_fraction = _env_float("BOOKRECS_SEED_AUTO_ROLLBACK_FRACTION", 0.25)
     chunk_size = 500
     migration_path = _env_str(
         "BOOKRECS_PG_MIGRATION_PATH",
@@ -88,6 +91,17 @@ def main() -> None:
             " skipping",
             flush=True,
         )
+        if auto_rollback_enabled:
+            print(
+                f"[seed] auto-rollback enabled -> rolling back to"
+                f" {auto_rollback_fraction:.0%}",
+                flush=True,
+            )
+            _run_auto_rollback(
+                pg_dsn=pg_dsn,
+                dataset_dir=str(dataset_dir),
+                target_fraction=auto_rollback_fraction,
+            )
         return
 
     offset = current_count
@@ -128,6 +142,33 @@ def main() -> None:
         f" total seeded={end} ({end / total:.1%} of dataset)",
         flush=True,
     )
+
+
+def _run_auto_rollback(
+    *, pg_dsn: str, dataset_dir: str, target_fraction: float
+) -> None:
+    rollback_pct = int(target_fraction * 100)
+    env_patch = {
+        "BOOKRECS_PG_DSN": pg_dsn,
+        "BOOKRECS_SEED_DATASET_DIR": dataset_dir,
+        "BOOKRECS_ROLLBACK_TARGET_FRACTION": str(target_fraction),
+        "BOOKRECS_ROLLBACK_DRY_RUN": "false",
+        "BOOKRECS_ROLLBACK_EVENT_TYPE": "seed",
+        "BOOKRECS_ROLLBACK_RESET_CHECKPOINTS": "true",
+        "BOOKRECS_ROLLBACK_RUN_ID": f"seed_auto_rollback_{rollback_pct}pct",
+    }
+    prev_values = {key: os.getenv(key) for key in env_patch}
+
+    try:
+        for key, value in env_patch.items():
+            os.environ[key] = value
+        rollback_seed_entrypoint.main()
+    finally:
+        for key, previous in prev_values.items():
+            if previous is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = previous
 
 
 if __name__ == "__main__":
