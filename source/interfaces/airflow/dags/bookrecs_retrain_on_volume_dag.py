@@ -161,4 +161,10 @@ with DAG(
         poke_interval=30,
     )
 
-    check_volume >> prepare_dataset >> train >> save_checkpoint_task >> trigger_data_quality
+    (
+        check_volume
+        >> prepare_dataset
+        >> train
+        >> save_checkpoint_task
+        >> trigger_data_quality
+    )
