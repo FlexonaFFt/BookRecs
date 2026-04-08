@@ -5,7 +5,7 @@ from datetime import datetime
 from airflow import DAG
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.docker.operators.docker import DockerOperator
-from dag_common import DEFAULT_ARGS, default_docker_args, docker_env
+from dag_common import DEFAULT_ARGS, default_docker_args, docker_env, docker_secret_env
 
 _FRACTIONS = [0.15, 0.30, 0.45, 0.60, 0.75]
 
@@ -13,7 +13,7 @@ _FRACTIONS = [0.15, 0.30, 0.45, 0.60, 0.75]
 def _train_env(fraction: float) -> dict[str, str]:
     pct = int(fraction * 100)
     stage_label = f"{pct:02d}pct"
-    env = docker_env()
+    env = {**docker_env(), **docker_secret_env()}
     env["BOOKRECS_BATCH_RUN_NAME"] = f"sim2_{stage_label}"
     env["BOOKRECS_TRAIN_DATA_FRACTION"] = str(fraction)
     return env

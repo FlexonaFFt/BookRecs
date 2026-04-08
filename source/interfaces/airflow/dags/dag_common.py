@@ -12,6 +12,15 @@ def env_if_set(name: str) -> str | None:
     return value or None
 
 
+def _conn_id(name: str, default: str) -> str:
+    raw = (os.getenv(name) or "").strip()
+    return raw or default
+
+
+PG_CONN_ID = _conn_id("BOOKRECS_AIRFLOW_PG_CONN_ID", "bookrecs_postgres")
+S3_CONN_ID = _conn_id("BOOKRECS_AIRFLOW_S3_CONN_ID", "bookrecs_s3")
+
+
 def docker_env() -> dict[str, str]:
     env: dict[str, str] = {
         "BOOKRECS_BATCH_EXECUTION_DATE": "{{ ds }}",
@@ -30,7 +39,6 @@ def docker_env() -> dict[str, str]:
         "BOOKRECS_S3_REGION",
         "BOOKRECS_S3_ENDPOINT",
         "BOOKRECS_S3_VERIFY_SSL",
-        "BOOKRECS_PG_DSN",
         "BOOKRECS_PG_MIGRATION_PATH",
         "BOOKRECS_SEED_DATASET_DIR",
         "BOOKRECS_SEED_BATCH_FRACTION",
@@ -67,9 +75,6 @@ def docker_env() -> dict[str, str]:
         "BOOKRECS_PROMOTION_MIN_RECALL10",
         "BOOKRECS_PROMOTION_MIN_COLD_NDCG10",
         "BOOKRECS_PROMOTION_MIN_COLD_RECALL10",
-        "AWS_ACCESS_KEY_ID",
-        "AWS_SECRET_ACCESS_KEY",
-        "AWS_DEFAULT_REGION",
     ]
 
     for key in passthrough_names:
@@ -78,6 +83,17 @@ def docker_env() -> dict[str, str]:
             env[key] = value
 
     return env
+
+
+def docker_secret_env() -> dict[str, str]:
+    return {
+        "BOOKRECS_PG_DSN": f"{{{{ conn.{PG_CONN_ID}.get_uri() }}}}",
+        "AWS_ACCESS_KEY_ID": f"{{{{ conn.{S3_CONN_ID}.login }}}}",
+        "AWS_SECRET_ACCESS_KEY": f"{{{{ conn.{S3_CONN_ID}.password }}}}",
+        "AWS_DEFAULT_REGION": (
+            f"{{{{ conn.{S3_CONN_ID}.extra_dejson.get('region_name', 'ru-1') }}}}"
+        ),
+    }
 
 
 def docker_mounts() -> list[Mount]:

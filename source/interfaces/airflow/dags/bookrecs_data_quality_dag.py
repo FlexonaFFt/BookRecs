@@ -6,19 +6,23 @@ from datetime import datetime
 
 import psycopg2 as psycopg
 from airflow import DAG
+from airflow.hooks.base import BaseHook
 from airflow.operators.python import BranchPythonOperator, PythonOperator
 from airflow.providers.docker.operators.docker import DockerOperator
-from dag_common import DEFAULT_ARGS, default_docker_args, docker_env
+from dag_common import (
+    DEFAULT_ARGS,
+    PG_CONN_ID,
+    default_docker_args,
+    docker_env,
+    docker_secret_env,
+)
 
 _PROMOTE_TASK = "promote_model"
 _SKIP_TASK = "skip_promotion"
 
 
 def _pg_dsn() -> str:
-    dsn = (os.getenv("BOOKRECS_PG_DSN") or "").strip()
-    if not dsn:
-        raise ValueError("BOOKRECS_PG_DSN is required")
-    return dsn
+    return BaseHook.get_connection(PG_CONN_ID).get_uri()
 
 
 def _get_float(d: dict, key: str) -> float | None:
@@ -147,7 +151,7 @@ def mark_promotion_result(*, promoted: bool, **context) -> None:
 
 
 def _promote_env() -> dict[str, str]:
-    env = docker_env()
+    env = {**docker_env(), **docker_secret_env()}
     env["BOOKRECS_PROMOTE_RUN_NAME"] = (
         "{{ ti.xcom_pull(task_ids='decide_promotion', key='run_id') }}"
     )

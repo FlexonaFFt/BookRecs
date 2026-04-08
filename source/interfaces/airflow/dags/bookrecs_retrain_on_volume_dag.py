@@ -5,20 +5,24 @@ from datetime import datetime
 
 import psycopg2 as psycopg
 from airflow import DAG
+from airflow.hooks.base import BaseHook
 from airflow.models import Variable
 from airflow.operators.python import PythonOperator, ShortCircuitOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.docker.operators.docker import DockerOperator
-from dag_common import DEFAULT_ARGS, default_docker_args, docker_env
+from dag_common import (
+    DEFAULT_ARGS,
+    PG_CONN_ID,
+    default_docker_args,
+    docker_env,
+    docker_secret_env,
+)
 
 _FORCE_AFTER_SKIPS_VAR = "bookrecs_retrain_on_volume__consecutive_skips"
 
 
 def _pg_dsn() -> str:
-    dsn = (os.getenv("BOOKRECS_PG_DSN") or "").strip()
-    if not dsn:
-        raise ValueError("BOOKRECS_PG_DSN is required")
-    return dsn
+    return BaseHook.get_connection(PG_CONN_ID).get_uri()
 
 
 def _get_consecutive_skips() -> int:
@@ -140,7 +144,7 @@ def save_checkpoint(**context) -> None:
 
 
 def _retrain_env() -> dict[str, str]:
-    env = docker_env()
+    env = {**docker_env(), **docker_secret_env()}
     env["BOOKRECS_SKIP_PREPARE"] = "true"
     env["BOOKRECS_SKIP_TRAIN"] = "false"
     env["BOOKRECS_BATCH_RUN_NAME"] = "retrain_{{ ds_nodash }}"
@@ -148,7 +152,7 @@ def _retrain_env() -> dict[str, str]:
 
 
 def _prepare_env() -> dict[str, str]:
-    env = docker_env()
+    env = {**docker_env(), **docker_secret_env()}
     env["BOOKRECS_SKIP_PREPARE"] = "false"
     env["BOOKRECS_SKIP_TRAIN"] = "true"
     env["BOOKRECS_TRAIN_RUN_NAME"] = "prepare_{{ ds_nodash }}"

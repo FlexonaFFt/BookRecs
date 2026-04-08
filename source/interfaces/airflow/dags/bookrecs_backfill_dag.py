@@ -5,7 +5,7 @@ from datetime import datetime
 from airflow import DAG
 from airflow.models.param import Param
 from airflow.providers.docker.operators.docker import DockerOperator
-from dag_common import DEFAULT_ARGS, default_docker_args, docker_env
+from dag_common import DEFAULT_ARGS, default_docker_args, docker_env, docker_secret_env
 
 with DAG(
     dag_id="bookrecs_backfill",
@@ -27,6 +27,7 @@ with DAG(
         command="python -m source.interfaces.batch_backfill_entrypoint",
         environment={
             **docker_env(),
+            **docker_secret_env(),
             "BOOKRECS_BATCH_END_DATE": "{{ params.end_date }}",
             "BOOKRECS_BATCH_BACKFILL_DAYS": "{{ params.days }}",
             "BOOKRECS_BATCH_BACKFILL_PROMOTE": "{{ params.promote }}",

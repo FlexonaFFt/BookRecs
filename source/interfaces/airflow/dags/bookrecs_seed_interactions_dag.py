@@ -4,7 +4,7 @@ from datetime import datetime
 
 from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
-from dag_common import DEFAULT_ARGS, default_docker_args, docker_env
+from dag_common import DEFAULT_ARGS, default_docker_args, docker_env, docker_secret_env
 
 with DAG(
     dag_id="bookrecs_seed_interactions",
@@ -19,6 +19,6 @@ with DAG(
     DockerOperator(
         task_id="seed_interactions",
         command="python -m source.interfaces.seed_interactions_entrypoint",
-        environment=docker_env(),
+        environment={**docker_env(), **docker_secret_env()},
         **{k: v for k, v in default_docker_args().items() if k != "environment"},
     )
