@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from data.goodreads import download_goodreads_raw
@@ -13,6 +14,7 @@ from source.domain.entities import DatasetSource, PipelineRun, PreprocessingPara
 from source.infrastructure.config import load_pipeline_settings
 from source.infrastructure.processing.preprocessing import GoodreadsPreprocessor
 from source.infrastructure.storage import build_prepare_storage_backends
+from source.infrastructure.inference.model_publisher import upload_run_artifacts_to_s3
 from source.interfaces.migration_runner import run_migration
 
 
@@ -147,6 +149,16 @@ def run_pipeline_from_env() -> None:
         train_run.mark_success()
         storage_backends.run_log.finish(train_run)
 
+        _publish_train_artifacts_to_s3_if_enabled(
+            run_id=train_result.run_id,
+            output_root=settings.output_root,
+            store_backend=settings.store_backend,
+            s3_bucket=settings.s3_bucket,
+            s3_region=settings.s3_region,
+            s3_endpoint=settings.s3_endpoint,
+            s3_verify_ssl=settings.s3_verify_ssl,
+        )
+
         print(f"[pipeline] train completed run_id={train_result.run_id}")
         print(f"[pipeline] metrics={metrics}")
         print(f"[pipeline] run_dir={train_result.run_dir}")
@@ -157,6 +169,44 @@ def run_pipeline_from_env() -> None:
 
 def main() -> None:
     run_pipeline_from_env()
+
+
+def _publish_train_artifacts_to_s3_if_enabled(
+    *,
+    run_id: str,
+    output_root: str,
+    store_backend: str,
+    s3_bucket: str,
+    s3_region: str,
+    s3_endpoint: str,
+    s3_verify_ssl: bool,
+) -> None:
+    if store_backend.strip().lower() != "s3":
+        return
+    if not _env_bool("BOOKRECS_TRAIN_UPLOAD_RUN_ARTIFACTS", True):
+        print("[pipeline] skip S3 run artifacts upload (disabled by env)", flush=True)
+        return
+    if not s3_bucket.strip():
+        raise ValueError("BOOKRECS_S3_BUCKET is required for S3 run artifacts upload")
+
+    runs_prefix = (os.getenv("BOOKRECS_TRAIN_S3_RUNS_PREFIX") or "").strip()
+    s3_uri = upload_run_artifacts_to_s3(
+        run_id=run_id,
+        output_root=output_root,
+        bucket=s3_bucket,
+        s3_prefix=runs_prefix,
+        s3_region=s3_region,
+        s3_endpoint=s3_endpoint or None,
+        verify_ssl=s3_verify_ssl,
+    )
+    print(f"[pipeline] run artifacts s3_uri={s3_uri}", flush=True)
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = (os.getenv(name) or "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on", "y"}
 
 
 if __name__ == "__main__":
