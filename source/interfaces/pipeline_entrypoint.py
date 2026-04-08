@@ -12,9 +12,9 @@ from source.application.use_cases.training import (
 )
 from source.domain.entities import DatasetSource, PipelineRun, PreprocessingParams
 from source.infrastructure.config import load_pipeline_settings
+from source.infrastructure.inference.model_publisher import upload_run_artifacts_to_s3
 from source.infrastructure.processing.preprocessing import GoodreadsPreprocessor
 from source.infrastructure.storage import build_prepare_storage_backends
-from source.infrastructure.inference.model_publisher import upload_run_artifacts_to_s3
 from source.interfaces.migration_runner import run_migration
 
 
