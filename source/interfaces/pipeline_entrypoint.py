@@ -12,7 +12,7 @@ from source.application.use_cases.training import (
 )
 from source.domain.entities import DatasetSource, PipelineRun, PreprocessingParams
 from source.infrastructure.config import load_pipeline_settings
-from source.infrastructure.inference.model_publisher import upload_run_artifacts_to_s3
+from source.infrastructure.inference.model_publisher import upload_model_to_s3
 from source.infrastructure.processing.preprocessing import GoodreadsPreprocessor
 from source.infrastructure.storage import build_prepare_storage_backends
 from source.interfaces.migration_runner import run_migration
@@ -183,23 +183,29 @@ def _publish_train_artifacts_to_s3_if_enabled(
 ) -> None:
     if store_backend.strip().lower() != "s3":
         return
-    if not _env_bool("BOOKRECS_TRAIN_UPLOAD_RUN_ARTIFACTS", True):
-        print("[pipeline] skip S3 run artifacts upload (disabled by env)", flush=True)
+    upload_enabled = _env_bool(
+        "BOOKRECS_TRAIN_UPLOAD_MODEL_ARTIFACTS",
+        _env_bool("BOOKRECS_TRAIN_UPLOAD_RUN_ARTIFACTS", True),
+    )
+    if not upload_enabled:
+        print("[pipeline] skip S3 model upload (disabled by env)", flush=True)
         return
     if not s3_bucket.strip():
-        raise ValueError("BOOKRECS_S3_BUCKET is required for S3 run artifacts upload")
+        raise ValueError("BOOKRECS_S3_BUCKET is required for S3 model upload")
 
-    runs_prefix = (os.getenv("BOOKRECS_TRAIN_S3_RUNS_PREFIX") or "").strip()
-    s3_uri = upload_run_artifacts_to_s3(
+    models_prefix = (
+        (os.getenv("BOOKRECS_TRAIN_S3_MODELS_PREFIX") or "").strip() or "models"
+    )
+    s3_uri = upload_model_to_s3(
         run_id=run_id,
         output_root=output_root,
         bucket=s3_bucket,
-        s3_prefix=runs_prefix,
+        s3_prefix=models_prefix,
         s3_region=s3_region,
         s3_endpoint=s3_endpoint or None,
         verify_ssl=s3_verify_ssl,
     )
-    print(f"[pipeline] run artifacts s3_uri={s3_uri}", flush=True)
+    print(f"[pipeline] model s3_uri={s3_uri}", flush=True)
 
 
 def _env_bool(name: str, default: bool) -> bool:
