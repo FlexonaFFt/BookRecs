@@ -194,8 +194,8 @@ def _publish_train_artifacts_to_s3_if_enabled(
         raise ValueError("BOOKRECS_S3_BUCKET is required for S3 model upload")
 
     models_prefix = (
-        (os.getenv("BOOKRECS_TRAIN_S3_MODELS_PREFIX") or "").strip() or "models"
-    )
+        os.getenv("BOOKRECS_TRAIN_S3_MODELS_PREFIX") or ""
+    ).strip() or "models"
     s3_uri = upload_model_to_s3(
         run_id=run_id,
         output_root=output_root,
