@@ -127,7 +127,9 @@ def create_app() -> FastAPI:
         model_ready = _check_model_ready(state=state)
         postgres_ok = _check_postgres_available(state=state, pg_dsn=settings.pg_dsn)
         model_uri_for_check = state.current_model_uri or settings.model_uri
-        requires_s3 = bool(model_uri_for_check and model_uri_for_check.startswith("s3://"))
+        requires_s3 = bool(
+            model_uri_for_check and model_uri_for_check.startswith("s3://")
+        )
         s3_ok = True
         if requires_s3:
             s3_ok = _check_s3_available(
