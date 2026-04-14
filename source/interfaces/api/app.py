@@ -127,19 +127,22 @@ def create_app() -> FastAPI:
         model_ready = _check_model_ready(state=state)
         postgres_ok = _check_postgres_available(state=state, pg_dsn=settings.pg_dsn)
         model_uri_for_check = state.current_model_uri or settings.model_uri
-        s3_ok = _check_s3_available(
-            model_uri_for_check,
-            settings.s3_region,
-            settings.s3_endpoint,
-            settings.aws_access_key_id,
-            settings.aws_secret_access_key,
-            verify_ssl=settings.s3_verify_ssl,
-        )
+        requires_s3 = bool(model_uri_for_check and model_uri_for_check.startswith("s3://"))
+        s3_ok = True
+        if requires_s3:
+            s3_ok = _check_s3_available(
+                model_uri_for_check,
+                settings.s3_region,
+                settings.s3_endpoint,
+                settings.aws_access_key_id,
+                settings.aws_secret_access_key,
+                verify_ssl=settings.s3_verify_ssl,
+            )
 
         state.postgres_ok = postgres_ok
         state.s3_ok = s3_ok
 
-        ready = model_ready and postgres_ok and s3_ok
+        ready = model_ready and postgres_ok and (s3_ok if requires_s3 else True)
         if not ready:
             response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return ReadinessResponse(
