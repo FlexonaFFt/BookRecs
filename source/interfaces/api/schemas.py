@@ -41,8 +41,14 @@ class InteractionRequest(BaseModel):
     event_type: str = Field("implicit", min_length=1, max_length=64)
 
 
-class HealthResponse(BaseModel):
+class LivenessResponse(BaseModel):
     status: str
+    alive: bool
+
+
+class ReadinessResponse(BaseModel):
+    status: str
+    ready: bool
     model_dir: str
     run_id: str | None
     postgres: bool

@@ -19,7 +19,7 @@ export function setStoredUserId(userId) {
 }
 
 export async function fetchDemoUsers(limit = 200) {
-  const res = await fetch(`/v1/demo/users?limit=${encodeURIComponent(limit)}`);
+  const res = await fetch(`/demo/users?limit=${encodeURIComponent(limit)}`);
   if (!res.ok) {
     throw new Error(`users http ${res.status}`);
   }
@@ -28,7 +28,7 @@ export async function fetchDemoUsers(limit = 200) {
 }
 
 export async function fetchRecommendations(userId, topK = 10) {
-  const res = await fetch('/v1/demo/recommendations', {
+  const res = await fetch('/demo/recommendations', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_id: String(userId), top_k: topK }),
@@ -40,7 +40,7 @@ export async function fetchRecommendations(userId, topK = 10) {
 }
 
 export async function fetchDemoBook(itemId) {
-  const res = await fetch(`/v1/demo/books/${encodeURIComponent(itemId)}`);
+  const res = await fetch(`/demo/books/${encodeURIComponent(itemId)}`);
   if (!res.ok) {
     throw new Error(`book http ${res.status}`);
   }
@@ -63,7 +63,7 @@ export async function fetchDemoBooksByIds(itemIds) {
 }
 
 export async function fetchSimilarItems(itemId, limit = 8) {
-  const res = await fetch(`/v1/items/${encodeURIComponent(itemId)}/similar?limit=${encodeURIComponent(limit)}`);
+  const res = await fetch(`/items/${encodeURIComponent(itemId)}/similar?limit=${encodeURIComponent(limit)}`);
   if (!res.ok) {
     throw new Error(`similar http ${res.status}`);
   }
@@ -71,7 +71,7 @@ export async function fetchSimilarItems(itemId, limit = 8) {
 }
 
 export async function fetchHealth() {
-  const res = await fetch('/healthz');
+  const res = await fetch('/readyz');
   if (!res.ok) {
     throw new Error(`health http ${res.status}`);
   }
@@ -82,7 +82,7 @@ export async function postInteraction({ userId, itemId, eventType }) {
   if (!userId || itemId === null || itemId === undefined) {
     return;
   }
-  await fetch('/v1/interactions', {
+  await fetch('/interactions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

@@ -139,7 +139,7 @@ class InferenceService:
             self._request_logger.log(
                 {
                     "user_id": req.user_id,
-                    "endpoint": "/v1/recommendations",
+                    "endpoint": "/recommendations",
                     "request": {
                         "top_k": req.top_k,
                         "candidate_pool_size": req.candidate_pool_size,

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response, status
 
 try:
     import boto3
@@ -34,8 +34,9 @@ from source.interfaces.api.schemas import (
     DemoCatalogResponse,
     DemoUser,
     DemoUsersResponse,
-    HealthResponse,
     InteractionRequest,
+    LivenessResponse,
+    ReadinessResponse,
     RecommendationRequest,
     RecommendationResponse,
     SimilarItemsResponse,
@@ -112,19 +113,45 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    @app.get("/healthz", response_model=HealthResponse)
-    def healthz() -> HealthResponse:
-        _maybe_reload_model(state=state)
-        svc = _service_or_503(state)
-        return HealthResponse(
+    @app.get("/healthz", response_model=LivenessResponse)
+    def healthz() -> LivenessResponse:
+        return LivenessResponse(
             status="ok",
-            model_dir=svc.model_dir,
-            run_id=state.current_model_run_id,
-            postgres=state.postgres_ok,
-            s3=state.s3_ok,
+            alive=True,
         )
 
-    @app.post("/v1/recommendations", response_model=RecommendationResponse)
+    @app.get("/readyz", response_model=ReadinessResponse)
+    def readyz(response: Response) -> ReadinessResponse:
+        settings = load_api_runtime_settings()
+
+        model_ready = _check_model_ready(state=state)
+        postgres_ok = _check_postgres_available(state=state, pg_dsn=settings.pg_dsn)
+        model_uri_for_check = state.current_model_uri or settings.model_uri
+        s3_ok = _check_s3_available(
+            model_uri_for_check,
+            settings.s3_region,
+            settings.s3_endpoint,
+            settings.aws_access_key_id,
+            settings.aws_secret_access_key,
+            verify_ssl=settings.s3_verify_ssl,
+        )
+
+        state.postgres_ok = postgres_ok
+        state.s3_ok = s3_ok
+
+        ready = model_ready and postgres_ok and s3_ok
+        if not ready:
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return ReadinessResponse(
+            status="ready" if ready else "not_ready",
+            ready=ready,
+            model_dir=state.service.model_dir if state.service is not None else "",
+            run_id=state.current_model_run_id,
+            postgres=postgres_ok,
+            s3=s3_ok,
+        )
+
+    @app.post("/recommendations", response_model=RecommendationResponse)
     def recommendations(payload: RecommendationRequest) -> RecommendationResponse:
         _maybe_reload_model(state=state)
         svc = _service_or_503(state)
@@ -141,7 +168,7 @@ def create_app() -> FastAPI:
         )
         return RecommendationResponse(**result)
 
-    @app.post("/v1/demo/recommendations", response_model=RecommendationResponse)
+    @app.post("/demo/recommendations", response_model=RecommendationResponse)
     def demo_recommendations(payload: RecommendationRequest) -> RecommendationResponse:
         _maybe_reload_model(state=state)
         svc = _service_or_503(state)
@@ -162,7 +189,7 @@ def create_app() -> FastAPI:
         )
         return RecommendationResponse(**result)
 
-    @app.get("/v1/items/{item_id}/similar", response_model=SimilarItemsResponse)
+    @app.get("/items/{item_id}/similar", response_model=SimilarItemsResponse)
     def similar_items(item_id: str, limit: int = 10) -> SimilarItemsResponse:
         _maybe_reload_model(state=state)
         svc = _service_or_503(state)
@@ -174,7 +201,7 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    @app.post("/v1/interactions")
+    @app.post("/interactions")
     def add_interaction(payload: InteractionRequest) -> dict[str, Any]:
         _maybe_reload_model(state=state)
         svc = _service_or_503(state)
@@ -188,7 +215,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {"status": "ok"}
 
-    @app.post("/v1/admin/reload-model")
+    @app.post("/admin/reload-model")
     def reload_model() -> dict[str, Any]:
         changed = _reload_model(
             state=state, settings=load_api_runtime_settings(), force=True
@@ -202,7 +229,7 @@ def create_app() -> FastAPI:
             "run_id": state.current_model_run_id,
         }
 
-    @app.get("/v1/demo/users", response_model=DemoUsersResponse)
+    @app.get("/demo/users", response_model=DemoUsersResponse)
     def demo_users(limit: int = 100) -> DemoUsersResponse:
         store = _demo_store_or_503(state)
         safe_limit = min(max(1, int(limit)), 5000)
@@ -214,7 +241,7 @@ def create_app() -> FastAPI:
             total=len(items),
         )
 
-    @app.get("/v1/demo/catalog", response_model=DemoCatalogResponse)
+    @app.get("/demo/catalog", response_model=DemoCatalogResponse)
     def demo_catalog(
         limit: int = 40,
         offset: int = 0,
@@ -237,7 +264,7 @@ def create_app() -> FastAPI:
             offset=safe_offset,
         )
 
-    @app.get("/v1/demo/books/{item_id}", response_model=DemoBook)
+    @app.get("/demo/books/{item_id}", response_model=DemoBook)
     def demo_book(item_id: int) -> DemoBook:
         store = _demo_store_or_503(state)
         book = store.get_book(item_id=item_id)
@@ -257,6 +284,31 @@ def _service_or_503(state: AppState) -> InferenceService:
             status_code=503, detail="Inference service is not initialized"
         )
     return state.service
+
+
+def _check_model_ready(state: AppState) -> bool:
+    try:
+        _maybe_reload_model(state=state)
+    except Exception:
+        return False
+    return state.service is not None
+
+
+def _check_postgres_available(state: AppState, pg_dsn: str) -> bool:
+    if not pg_dsn:
+        return False
+
+    client = state.runtime_pg
+    if client is None:
+        client = PostgresClient(pg_dsn)
+    try:
+        row = client.fetchone("SELECT 1 AS ok")
+    except Exception:
+        state.runtime_pg = None
+        return False
+    is_ok = bool(row and row.get("ok") == 1)
+    state.runtime_pg = client if is_ok else None
+    return is_ok
 
 
 def _maybe_reload_model(state: AppState) -> None:

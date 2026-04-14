@@ -223,7 +223,7 @@ export default function CatalogPage() {
         if (activeFilter !== 'All') {
           params.set('genre', activeFilter.toLowerCase());
         }
-        const res = await fetch(`/v1/demo/catalog?${params.toString()}`);
+        const res = await fetch(`/demo/catalog?${params.toString()}`);
         if (!res.ok) {
           throw new Error(`catalog http ${res.status}`);
         }
