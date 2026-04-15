@@ -111,16 +111,49 @@ def create_app() -> FastAPI:
         title="BookRecs Inference API",
         version="0.1.0",
         lifespan=lifespan,
+        openapi_tags=[
+            {
+                "name": "Health",
+                "description": "Liveness/readiness probes for infrastructure and model availability.",
+            },
+            {
+                "name": "Recommendations",
+                "description": "Core recommendation and interaction endpoints.",
+            },
+            {
+                "name": "Demo",
+                "description": "Demo data APIs used by the frontend showcase.",
+            },
+            {
+                "name": "Admin",
+                "description": "Operational endpoints for runtime model management.",
+            },
+        ],
     )
 
-    @app.get("/healthz", response_model=LivenessResponse)
+    @app.get(
+        "/healthz",
+        response_model=LivenessResponse,
+        tags=["Health"],
+        summary="Liveness Probe",
+        description="Returns process liveness. Does not perform heavy dependency checks.",
+    )
     def healthz() -> LivenessResponse:
         return LivenessResponse(
             status="ok",
             alive=True,
         )
 
-    @app.get("/readyz", response_model=ReadinessResponse)
+    @app.get(
+        "/readyz",
+        response_model=ReadinessResponse,
+        tags=["Health"],
+        summary="Readiness Probe",
+        description=(
+            "Checks runtime readiness: model availability, PostgreSQL connectivity, "
+            "and S3 availability when model URI points to s3://."
+        ),
+    )
     def readyz(response: Response) -> ReadinessResponse:
         settings = load_api_runtime_settings()
 
@@ -156,7 +189,13 @@ def create_app() -> FastAPI:
             s3=s3_ok,
         )
 
-    @app.post("/recommendations", response_model=RecommendationResponse)
+    @app.post(
+        "/recommendations",
+        response_model=RecommendationResponse,
+        tags=["Recommendations"],
+        summary="Get Personalized Recommendations",
+        description="Generates top-N personalized recommendations for a user.",
+    )
     def recommendations(payload: RecommendationRequest) -> RecommendationResponse:
         _maybe_reload_model(state=state)
         svc = _service_or_503(state)
@@ -173,7 +212,16 @@ def create_app() -> FastAPI:
         )
         return RecommendationResponse(**result)
 
-    @app.post("/demo/recommendations", response_model=RecommendationResponse)
+    @app.post(
+        "/demo/recommendations",
+        response_model=RecommendationResponse,
+        tags=["Demo"],
+        summary="Get Demo Recommendations",
+        description=(
+            "Generates recommendations for demo users with persisted demo history "
+            "merged into request seen items."
+        ),
+    )
     def demo_recommendations(payload: RecommendationRequest) -> RecommendationResponse:
         _maybe_reload_model(state=state)
         svc = _service_or_503(state)
@@ -194,7 +242,13 @@ def create_app() -> FastAPI:
         )
         return RecommendationResponse(**result)
 
-    @app.get("/items/{item_id}/similar", response_model=SimilarItemsResponse)
+    @app.get(
+        "/items/{item_id}/similar",
+        response_model=SimilarItemsResponse,
+        tags=["Recommendations"],
+        summary="Get Similar Items",
+        description="Returns content-based and collaborative similar items for a given item.",
+    )
     def similar_items(item_id: str, limit: int = 10) -> SimilarItemsResponse:
         _maybe_reload_model(state=state)
         svc = _service_or_503(state)
@@ -206,7 +260,14 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    @app.post("/interactions")
+    @app.post(
+        "/interactions",
+        tags=["Recommendations"],
+        summary="Log User Interaction",
+        description=(
+            "Stores a user-item interaction event to update history and future recommendation relevance."
+        ),
+    )
     def add_interaction(payload: InteractionRequest) -> dict[str, Any]:
         _maybe_reload_model(state=state)
         svc = _service_or_503(state)
@@ -220,7 +281,12 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {"status": "ok"}
 
-    @app.post("/admin/reload-model")
+    @app.post(
+        "/admin/reload-model",
+        tags=["Admin"],
+        summary="Reload Active Model",
+        description="Forces model bundle reload from configured model URI or active pointer.",
+    )
     def reload_model() -> dict[str, Any]:
         changed = _reload_model(
             state=state, settings=load_api_runtime_settings(), force=True
@@ -234,7 +300,13 @@ def create_app() -> FastAPI:
             "run_id": state.current_model_run_id,
         }
 
-    @app.get("/demo/users", response_model=DemoUsersResponse)
+    @app.get(
+        "/demo/users",
+        response_model=DemoUsersResponse,
+        tags=["Demo"],
+        summary="List Demo Users",
+        description="Returns demo users with their interaction history sizes.",
+    )
     def demo_users(limit: int = 100) -> DemoUsersResponse:
         store = _demo_store_or_503(state)
         safe_limit = min(max(1, int(limit)), 5000)
@@ -246,7 +318,13 @@ def create_app() -> FastAPI:
             total=len(items),
         )
 
-    @app.get("/demo/catalog", response_model=DemoCatalogResponse)
+    @app.get(
+        "/demo/catalog",
+        response_model=DemoCatalogResponse,
+        tags=["Demo"],
+        summary="Get Demo Catalog",
+        description="Returns paginated demo books with optional text and genre filters.",
+    )
     def demo_catalog(
         limit: int = 40,
         offset: int = 0,
@@ -269,7 +347,13 @@ def create_app() -> FastAPI:
             offset=safe_offset,
         )
 
-    @app.get("/demo/books/{item_id}", response_model=DemoBook)
+    @app.get(
+        "/demo/books/{item_id}",
+        response_model=DemoBook,
+        tags=["Demo"],
+        summary="Get Demo Book",
+        description="Returns detailed demo book information by item identifier.",
+    )
     def demo_book(item_id: int) -> DemoBook:
         store = _demo_store_or_503(state)
         book = store.get_book(item_id=item_id)
