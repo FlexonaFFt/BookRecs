@@ -25,10 +25,6 @@ export default defineConfig({
         target: apiProxyTarget,
         changeOrigin: true,
       },
-      '/admin': {
-        target: apiProxyTarget,
-        changeOrigin: true,
-      },
       '/healthz': {
         target: apiProxyTarget,
         changeOrigin: true,

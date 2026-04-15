@@ -128,10 +128,6 @@ def create_app() -> FastAPI:
                 "description": "Demo data APIs used by the frontend showcase.",
             },
             {
-                "name": "Admin",
-                "description": "Operational endpoints for runtime model management.",
-            },
-            {
                 "name": "Info",
                 "description": (
                     "Reference documentation endpoints:\n\n"
@@ -297,27 +293,6 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {"status": "ok"}
-
-    @app.post(
-        "/admin/reload-model",
-        tags=["Admin"],
-        summary="Reload Active Model",
-        description=(
-            "Forces model bundle reload from configured model URI or " "active pointer."
-        ),
-    )
-    def reload_model() -> dict[str, Any]:
-        changed = _reload_model(
-            state=state, settings=load_api_runtime_settings(), force=True
-        )
-        svc = _service_or_503(state)
-        return {
-            "status": "ok",
-            "changed": changed,
-            "model_dir": svc.model_dir,
-            "model_uri": state.current_model_uri,
-            "run_id": state.current_model_run_id,
-        }
 
     @app.get(
         "/demo/users",
