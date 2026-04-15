@@ -84,12 +84,6 @@ class ReadinessResponse(BaseModel):
     s3: bool = Field(..., description="S3 readiness flag when S3 check is required.")
 
 
-class ApiEndpointsInfoResponse(BaseModel):
-    docs_url: str = Field(..., description="Swagger UI endpoint URL.")
-    openapi_url: str = Field(..., description="OpenAPI JSON endpoint URL.")
-    redoc_url: str = Field(..., description="ReDoc endpoint URL.")
-
-
 class DemoUser(BaseModel):
     user_id: str = Field(..., description="Demo user identifier.")
     history_len: int = Field(..., description="Count of known user interactions.")

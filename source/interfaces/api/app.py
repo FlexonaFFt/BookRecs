@@ -30,7 +30,6 @@ from source.infrastructure.inference.demo_store import DemoStore
 from source.infrastructure.inference.service import InferenceRequest
 from source.infrastructure.storage.postgres import PostgresClient
 from source.interfaces.api.schemas import (
-    ApiEndpointsInfoResponse,
     DemoBook,
     DemoCatalogResponse,
     DemoUser,
@@ -135,7 +134,10 @@ def create_app() -> FastAPI:
             {
                 "name": "Info",
                 "description": (
-                    "Service metadata and reference links for API documentation."
+                    "Reference documentation endpoints:\n\n"
+                    "- `GET /docs` — Swagger UI.\n"
+                    "- `GET /openapi.json` — OpenAPI JSON schema.\n"
+                    "- `GET /redoc` — ReDoc UI."
                 ),
             },
         ],
@@ -379,20 +381,6 @@ def create_app() -> FastAPI:
         if book is None:
             raise HTTPException(status_code=404, detail=f"Book {item_id} not found")
         return _to_demo_book(book)
-
-    @app.get(
-        "/info/endpoints",
-        response_model=ApiEndpointsInfoResponse,
-        tags=["Info"],
-        summary="Get Documentation Endpoints",
-        description="Returns links to Swagger UI, OpenAPI JSON, and ReDoc endpoints.",
-    )
-    def api_endpoints_info() -> ApiEndpointsInfoResponse:
-        return ApiEndpointsInfoResponse(
-            docs_url=app.docs_url or "/docs",
-            openapi_url=app.openapi_url or "/openapi.json",
-            redoc_url=app.redoc_url or "/redoc",
-        )
 
     return app
 
