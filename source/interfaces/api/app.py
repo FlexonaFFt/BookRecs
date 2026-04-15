@@ -114,7 +114,10 @@ def create_app() -> FastAPI:
         openapi_tags=[
             {
                 "name": "Health",
-                "description": "Liveness/readiness probes for infrastructure and model availability.",
+                "description": (
+                    "Liveness/readiness probes for infrastructure and model "
+                    "availability."
+                ),
             },
             {
                 "name": "Recommendations",
@@ -136,7 +139,9 @@ def create_app() -> FastAPI:
         response_model=LivenessResponse,
         tags=["Health"],
         summary="Liveness Probe",
-        description="Returns process liveness. Does not perform heavy dependency checks.",
+        description=(
+            "Returns process liveness. Does not perform heavy dependency checks."
+        ),
     )
     def healthz() -> LivenessResponse:
         return LivenessResponse(
@@ -247,7 +252,9 @@ def create_app() -> FastAPI:
         response_model=SimilarItemsResponse,
         tags=["Recommendations"],
         summary="Get Similar Items",
-        description="Returns content-based and collaborative similar items for a given item.",
+        description=(
+            "Returns content-based and collaborative similar items for a " "given item."
+        ),
     )
     def similar_items(item_id: str, limit: int = 10) -> SimilarItemsResponse:
         _maybe_reload_model(state=state)
@@ -265,7 +272,8 @@ def create_app() -> FastAPI:
         tags=["Recommendations"],
         summary="Log User Interaction",
         description=(
-            "Stores a user-item interaction event to update history and future recommendation relevance."
+            "Stores a user-item interaction event to update history and "
+            "future recommendation relevance."
         ),
     )
     def add_interaction(payload: InteractionRequest) -> dict[str, Any]:
@@ -285,7 +293,9 @@ def create_app() -> FastAPI:
         "/admin/reload-model",
         tags=["Admin"],
         summary="Reload Active Model",
-        description="Forces model bundle reload from configured model URI or active pointer.",
+        description=(
+            "Forces model bundle reload from configured model URI or " "active pointer."
+        ),
     )
     def reload_model() -> dict[str, Any]:
         changed = _reload_model(
@@ -323,7 +333,9 @@ def create_app() -> FastAPI:
         response_model=DemoCatalogResponse,
         tags=["Demo"],
         summary="Get Demo Catalog",
-        description="Returns paginated demo books with optional text and genre filters.",
+        description=(
+            "Returns paginated demo books with optional text and " "genre filters."
+        ),
     )
     def demo_catalog(
         limit: int = 40,
